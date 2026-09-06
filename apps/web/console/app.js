@@ -20,7 +20,7 @@ import { Capability, grants, Permission } from '../shared/events.js';
 
 import { renderMenuBuilder } from './views/menu.js';
 import { renderTables, renderTerminals } from './views/service.js';
-import { renderOrders, renderReports, renderAudit } from './views/orders.js';
+import { renderOrders, renderReports, renderActivityLog } from './views/orders.js';
 import { renderSettings, renderUsers, renderPrinting, renderBackup, renderLicense } from './views/system.js';
 import { renderLanguages, renderThemes } from './views/packs.js';
 import { renderLockScreen } from './views/lock.js';
@@ -89,7 +89,7 @@ const NAV = [
   { route: 'languages', label: 'nav.languages', permission: Permission.SETTINGS_MANAGE },
   { route: 'themes', label: 'nav.themes', permission: Permission.SETTINGS_MANAGE },
   { route: 'backup', label: 'nav.backup', permission: Permission.BACKUP_MANAGE },
-  { route: 'audit', label: 'nav.activity', permission: Permission.AUDIT_VIEW },
+  { route: 'activity', label: 'nav.activity', permission: Permission.AUDIT_VIEW },
   { route: 'license', label: 'nav.license', permission: Permission.LICENSE_MANAGE },
   // Only in a developer build; a restaurant's console never shows this.
   { route: 'developer', label: 'nav.developer', permission: Permission.SETTINGS_MANAGE,
@@ -109,7 +109,7 @@ const VIEWS = {
   languages: renderLanguages,
   themes: renderThemes,
   backup: renderBackup,
-  audit: renderAudit,
+  activity: renderActivityLog,
   license: renderLicense,
   developer: renderDeveloper,
 };

@@ -2,10 +2,11 @@
  * Licence activation client (spec §31, §38, §40).
  *
  * This is the *only* module in the restaurant server that makes an outbound
- * network call, and it makes one on exactly four occasions: first activation,
- * deactivation before a move, a manual status check, and a re-activation after
- * a restore. Normal service never touches it — no heartbeat, no phone-home, no
- * check at boot (spec §1).
+ * network call, and it makes one on exactly five occasions, every one of them
+ * started by a person pressing a button: first activation, deactivation before
+ * a move, a manual status check, a re-activation after a restore, and fetching
+ * the vendor's contact details and prices. Normal service never touches it —
+ * no heartbeat, no phone-home, no check at boot (spec §1).
  */
 
 import { AppError, ErrorCode, LicenseErrorCode, normaliseLicenseKey, RestaurantMode,

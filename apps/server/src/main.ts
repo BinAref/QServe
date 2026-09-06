@@ -34,6 +34,10 @@ export async function start(config = loadServerConfig()): Promise<StartedApp> {
   if (mode === RestaurantMode.SETUP) {
     console.log(`  Licence:     ${services.gate.explain()}`);
   }
+  // Worth stating out loud: it adds routes that write into locales/ and
+  // themes/, and it should never be on in a restaurant.
+  if (services.config.developerMode) console.log('  Developer:   ON');
+  if (services.appLock.enabled) console.log('  App lock:    ON');
   console.log('');
 
   return {

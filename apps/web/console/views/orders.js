@@ -1,5 +1,5 @@
 /**
- * Orders, reports and the audit log.
+ * Orders, reports and the activity log.
  *
  * The order detail view and the activity log are the spec's §19 timeline made
  * real: every event, who caused it, from which station, and when. They are the
@@ -235,7 +235,7 @@ function breakdown(title, rows) {
  * without anybody editing a dropdown, and results are paged rather than
  * truncated — a log you can only see the newest page of is not evidence.
  */
-export async function renderAudit(container) {
+export async function renderActivityLog(container) {
   const filters = { search: '', actorUserId: '', action: '', entityType: '', since: '', until: '' };
   const page = { limit: 100, offset: 0 };
 
