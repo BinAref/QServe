@@ -11,6 +11,9 @@
       "path": "./packages/http"
     },
     {
+      "path": "./packages/db"
+    },
+    {
       "path": "./apps/license-server"
     },
     {

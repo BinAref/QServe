@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QServe — Vendor Console</title>
+  <link rel="stylesheet" href="/admin/styles.css" />
+</head>
+<body>
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">QS</span>
+        <div>
+          <strong>QServe Vendor Console</strong>
+          <small>Licence administration</small>
+        </div>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab" data-view="licenses">Licences</button>
+        <button class="tab" data-view="restaurants">Restaurants</button>
+        <button class="tab" data-view="issue">Issue licence</button>
+        <button class="tab" data-view="audit">Audit</button>
+      </nav>
+      <div class="session">
+        <span id="who"></span>
+        <button class="btn btn-ghost" id="logout">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main"></main>
+  </div>
+
+  <div id="login" class="login" hidden>
+    <form class="login-card" id="login-form">
+      <span class="brand-mark large">QS</span>
+      <h1>Vendor Console</h1>
+      <p class="muted">Sign in to administer perpetual licences.</p>
+      <label>Username<input name="username" autocomplete="username" required /></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+      <p class="error" id="login-error" hidden></p>
+    </form>
+  </div>
+
+  <div class="toast-stack" id="toasts"></div>
+
+  <script type="module" src="/admin/app.js"></script>
+</body>
+</html>

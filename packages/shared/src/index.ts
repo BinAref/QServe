@@ -20,6 +20,7 @@ export * from './theme.js';
 export * from './money.js';
 export * from './errors.js';
 export * from './models.js';
+export * from './validate.js';
 
 /** Bumped on every release; embedded in activation requests and backups. */
 export const APP_VERSION = '1.0.0';
