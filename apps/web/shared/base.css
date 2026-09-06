@@ -342,3 +342,54 @@ table.qs-table { width: 100%; border-collapse: collapse; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------- amounts */
+
+.qs-amount { display: grid; gap: 4px; }
+.qs-amount-row { display: flex; gap: var(--qs-spacing-sm); align-items: stretch; }
+
+.qs-amount-input {
+  flex: 1 1 auto;
+  font-family: var(--qs-typography-font-family-mono);
+  font-size: var(--qs-typography-size-lg);
+  font-variant-numeric: tabular-nums;
+  /* Amounts are read left to right in every language, symbols and all. */
+  text-align: start;
+  direction: ltr;
+}
+.qs-amount-currency { flex: 0 0 auto; inline-size: auto; min-inline-size: 96px; }
+
+.qs-amount-foot {
+  display: flex;
+  gap: var(--qs-spacing-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  min-block-size: 1.2em;
+}
+.qs-amount-preview {
+  font-size: var(--qs-typography-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--qs-color-text-muted);
+  transition: color var(--qs-motion-fast, 120ms) ease;
+}
+.qs-amount-preview[data-state="ok"] { color: var(--qs-color-success); }
+
+.qs-field-error {
+  margin: 0;
+  min-block-size: 1.1em;
+  font-size: var(--qs-typography-size-xs);
+  color: var(--qs-color-error);
+}
+.qs-amount[data-invalid="true"] .qs-amount-input {
+  border-color: var(--qs-color-error);
+  /* A shake would be punitive; a settle is enough to draw the eye back. */
+  animation: qs-settle var(--qs-motion-normal, 200ms) ease;
+}
+
+@keyframes qs-settle {
+  from { transform: translateX(-3px); }
+  to   { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qs-amount[data-invalid="true"] .qs-amount-input { animation: none; }
+}

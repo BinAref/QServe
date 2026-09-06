@@ -21,6 +21,54 @@ export const DEFAULT_CURRENCY: CurrencyConfig = {
   symbolPosition: 'after',
 };
 
+/* ------------------------------------------------------ several currencies */
+
+/**
+ * A currency the restaurant accepts, as it defines it.
+ *
+ * A restaurant near a border, or one serving tourists, prices some things in
+ * one currency and some in another. So a currency is a row the owner writes —
+ * code, symbol, how many decimals, which side the symbol sits — not a constant
+ * compiled into the product.
+ *
+ * `rateToBase` is what keeps the arithmetic honest. Exactly one currency is the
+ * **base**: the one the till counts, the reports add up and the bill settles
+ * in. Every other currency records how many base minor units one of its minor
+ * units is worth, and **every order line stores the rate it used**, so a bill
+ * printed last month never changes because the rate moved this morning.
+ */
+export interface Currency extends CurrencyConfig {
+  /** Shown in the picker; the owner's own words, translatable. */
+  readonly name: Readonly<Record<string, string>>;
+  /** Base minor units per one minor unit of this currency. The base is 1. */
+  readonly rateToBase: number;
+  readonly isBase: boolean;
+  readonly enabled: boolean;
+  readonly sortOrder: number;
+}
+
+/** ISO-4217 shape: three letters. Restaurants type it, so be forgiving of case. */
+export const CURRENCY_CODE_PATTERN = /^[A-Za-z]{3}$/;
+
+/**
+ * Convert an amount into the base currency, rounded once, at the end.
+ *
+ * Rounding here rather than per component matters: converting each modifier
+ * separately and summing would drift by a unit or two on a large order, and a
+ * bill that disagrees with itself is a bill a diner argues about.
+ */
+export function toBaseMinor(
+  minor: number,
+  rateToBase: number,
+  baseDecimals: number,
+  currencyDecimals: number,
+): number {
+  if (rateToBase === 1 && baseDecimals === currencyDecimals) return minor;
+  // Move to major units, apply the rate, then back into the base's minor units.
+  const major = minor / 10 ** currencyDecimals;
+  return Math.round(major * rateToBase * 10 ** baseDecimals);
+}
+
 export const toMinorUnits = (major: number, decimals: number): number =>
   Math.round(major * 10 ** decimals);
 
@@ -49,6 +97,106 @@ export function formatMoney(
     ? `${currency.symbol} ${number}`
     : `${number} ${currency.symbol}`;
 }
+
+/* -------------------------------------------------- typing an amount by hand */
+
+export interface AmountProblem {
+  /** A translation key, so the message reaches the typist in their language. */
+  readonly messageKey: string;
+  readonly params?: Record<string, unknown>;
+}
+
+export interface ParsedAmount {
+  readonly ok: boolean;
+  /** The value in minor units. Only meaningful when `ok`. */
+  readonly minor: number;
+  /** What is wrong, if anything. */
+  readonly problem: AmountProblem | null;
+}
+
+/**
+ * The one place that decides whether typed text is a price.
+ *
+ * Every rule here exists because of a way a real till gets a wrong number into
+ * a real bill: a stray letter, a decimal point left dangling at the end of
+ * "12.", a second point in "1.2.3", more decimals than the currency has. The
+ * same function runs in the browser as the field is typed and on the server
+ * before the value is stored, so the two can never disagree about what a price
+ * is.
+ */
+export function parseAmount(raw: string, decimals: number): ParsedAmount {
+  const text = raw.trim();
+  const fail = (messageKey: string, params?: Record<string, unknown>): ParsedAmount => ({
+    ok: false,
+    minor: 0,
+    problem: params ? { messageKey, params } : { messageKey },
+  });
+
+  if (text === '') return fail('amount.error.required');
+
+  // Digits and at most one dot. Not a regex on the whole string, because the
+  // reason it failed is what the typist needs to be told.
+  for (const character of text) {
+    if (character !== '.' && (character < '0' || character > '9')) {
+      return fail('amount.error.digits_only', { character });
+    }
+  }
+
+  const points = [...text].filter((character) => character === '.').length;
+  if (points > 1) return fail('amount.error.one_point');
+  if (text.endsWith('.')) return fail('amount.error.trailing_point');
+  if (text.startsWith('.')) return fail('amount.error.leading_point');
+
+  const [whole = '', fraction = ''] = text.split('.');
+  if (decimals === 0 && points === 1) return fail('amount.error.no_decimals');
+  if (fraction.length > decimals) {
+    return fail('amount.error.too_many_decimals', { decimals });
+  }
+  // 18 digits is comfortably inside a safe integer once scaled, and no menu
+  // needs more.
+  if (whole.length > 15) return fail('amount.error.too_large');
+
+  const padded = fraction.padEnd(decimals, '0');
+  const minor = Number(`${whole || '0'}${padded}`);
+  if (!Number.isSafeInteger(minor)) return fail('amount.error.too_large');
+
+  return { ok: true, minor, problem: null };
+}
+
+/**
+ * Strip what a typist cannot mean, as they type: anything but digits and one
+ * decimal point, and never more decimals than the currency has. Used for the
+ * live keystroke filter — it never reports an error, it just refuses to let
+ * the character in, so the field cannot hold nonsense in the first place.
+ */
+export function sanitiseAmountInput(raw: string, decimals: number): string {
+  let out = '';
+  let seenPoint = false;
+
+  for (const character of raw) {
+    if (character >= '0' && character <= '9') {
+      // A digit past the currency's precision is silently dropped rather than
+      // accepted and rounded away later.
+      if (seenPoint && decimals > 0) {
+        const fraction = out.length - out.indexOf('.') - 1;
+        if (fraction >= decimals) continue;
+      }
+      out += character;
+      continue;
+    }
+    if (character === '.' && !seenPoint && decimals > 0 && out !== '') {
+      seenPoint = true;
+      out += character;
+    }
+  }
+  return out;
+}
+
+/** Minor units back into the text the field shows. */
+export const amountToInput = (minor: number, decimals: number): string =>
+  decimals === 0
+    ? String(Math.round(minor))
+    : (minor / 10 ** decimals).toFixed(decimals);
 
 /** Line total: unit price plus selected extras, times quantity. */
 export function lineTotal(

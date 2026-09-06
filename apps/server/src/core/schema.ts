@@ -19,7 +19,7 @@
 import type { Migration } from '@qserve/db';
 import { DEFAULT_ROLE_PERMISSIONS, SystemRole } from '@qserve/shared';
 
-export const RESTAURANT_SCHEMA_VERSION = 2;
+export const RESTAURANT_SCHEMA_VERSION = 3;
 
 export const migrations: readonly Migration[] = [
   {
@@ -485,6 +485,69 @@ export const migrations: readonly Migration[] = [
           updated_at   TEXT NOT NULL
         );
       `);
+    },
+  },
+  {
+    version: 3,
+    name: 'currencies',
+    up: (db) => {
+      db.exec(`
+        -- Currencies the restaurant accepts, as the owner defines them.
+        -- Exactly one is the base: what the till counts and the reports add up.
+        CREATE TABLE currencies (
+          code            TEXT PRIMARY KEY,
+          symbol          TEXT NOT NULL,
+          name_json       TEXT NOT NULL DEFAULT '{}',
+          decimals        INTEGER NOT NULL DEFAULT 2,
+          symbol_position TEXT NOT NULL DEFAULT 'after',
+          -- Base minor units per one minor unit of this currency; the base is 1.
+          rate_to_base    REAL NOT NULL DEFAULT 1,
+          is_base         INTEGER NOT NULL DEFAULT 0,
+          enabled         INTEGER NOT NULL DEFAULT 1,
+          sort_order      INTEGER NOT NULL DEFAULT 0,
+          created_at      TEXT NOT NULL,
+          updated_at      TEXT NOT NULL
+        );
+        -- Exactly one base currency, enforced by the storage engine rather than
+        -- by an "if" somebody can forget: two bases would make every total
+        -- ambiguous.
+        CREATE UNIQUE INDEX idx_currencies_base ON currencies(is_base) WHERE is_base = 1;
+
+        -- NULL means the base currency, so every existing product keeps its
+        -- price and its meaning without a data migration.
+        ALTER TABLE products ADD COLUMN currency_code TEXT REFERENCES currencies(code);
+        ALTER TABLE addons   ADD COLUMN currency_code TEXT REFERENCES currencies(code);
+
+        -- What an order line was priced in, and the rate that applied when it
+        -- was taken. Stored, not looked up: a bill printed last month must not
+        -- change because the rate moved this morning.
+        ALTER TABLE order_items ADD COLUMN currency_code TEXT;
+        ALTER TABLE order_items ADD COLUMN rate_to_base REAL NOT NULL DEFAULT 1;
+        -- The line in the currency the till settles in.
+        ALTER TABLE order_items ADD COLUMN base_total_minor INTEGER;
+      `);
+
+      // Seed the base currency from what the restaurant already uses, so an
+      // upgraded installation is in exactly the state a new one would be.
+      const row = db
+        .prepare('SELECT currency_json FROM restaurant WHERE singleton = 1')
+        .get() as { currency_json: string } | undefined;
+
+      if (row) {
+        const currency = JSON.parse(row.currency_json) as {
+          code: string; symbol: string; decimals: number; symbolPosition: string;
+        };
+        const at = new Date().toISOString();
+        db.prepare(`
+          INSERT INTO currencies
+            (code, symbol, name_json, decimals, symbol_position,
+             rate_to_base, is_base, enabled, sort_order, created_at, updated_at)
+          VALUES (?, ?, '{}', ?, ?, 1, 1, 1, 0, ?, ?)
+        `).run(
+          currency.code, currency.symbol, currency.decimals,
+          currency.symbolPosition, at, at,
+        );
+      }
     },
   },
 ];

@@ -92,6 +92,12 @@ export function createManagementRoutes(services: Services): Router<AppState> {
       ...(themeId ? { themeId } : {}),
     });
 
+    // The profile's currency and the base currency row are two views of one
+    // fact; editing one without the other would leave the menu priced against
+    // something the restaurant no longer uses.
+    const updated = services.settings.profile()!;
+    services.currencies.seedBase(updated.currency);
+
     services.audit.record({
       action: 'restaurant.updated',
       actor: ctx.state.auth!.actor,

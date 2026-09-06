@@ -135,8 +135,9 @@ stopped, is permanent.
 
 ## 4. What a backup carries
 
-Twenty-six tables: the restaurant, its settings and counters, roles and grants,
-users, terminals, tables, the whole menu, assets, orders and their items,
+Twenty-seven tables: the restaurant, its settings and counters, roles and grants,
+users, terminals, tables, the currencies it accepts, the whole menu, assets,
+orders and their items,
 payments, printers, print jobs, the audit log, and the languages and themes the
 restaurant authored for itself (`custom_locales`, `custom_themes`) — a
 restaurant that translated its entire menu into French must not lose that work

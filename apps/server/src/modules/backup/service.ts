@@ -43,6 +43,7 @@ const BACKED_UP_TABLES: readonly string[] = [
   'restaurant',
   'settings',
   'counters',
+  'currencies',
   'roles',
   'role_permissions',
   'users',

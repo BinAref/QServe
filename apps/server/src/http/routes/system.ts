@@ -72,6 +72,10 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
       currency: DEFAULT_CURRENCY,
     });
 
+    // The base currency is a row from the first moment, so the menu has
+    // something to price against before anything is priced.
+    services.currencies.seedBase(DEFAULT_CURRENCY);
+
     services.audit.record({
       action: 'restaurant.created',
       actor: { kind: 'SYSTEM', userId: null, userName: null, terminalId: null, terminalName: null },

@@ -100,6 +100,8 @@ export interface Addon {
   readonly id: string;
   readonly name: Localised;
   readonly priceMinor: number;
+  /** The currency this price is in. `null` means the restaurant's base. */
+  readonly currencyCode: string | null;
   readonly sortOrder: number;
   readonly available: boolean;
 }
@@ -111,6 +113,8 @@ export interface Product {
   readonly description: Localised;
   readonly imageAssetId: string | null;
   readonly priceMinor: number;
+  /** The currency this price is in. `null` means the restaurant's base. */
+  readonly currencyCode: string | null;
   readonly sortOrder: number;
   readonly visible: boolean;
   readonly available: boolean;
@@ -202,6 +206,12 @@ export interface OrderItem {
   readonly addons: readonly OrderItemAddon[];
   readonly notes: string | null;
   readonly station: string | null;
+  /** What this line was priced in; null means the restaurant's base currency. */
+  readonly currencyCode: string | null;
+  /** The rate that applied when the order was taken, not the rate today. */
+  readonly rateToBase: number;
+  /** The line in the currency the till settles in. */
+  readonly baseTotalMinor: number;
   readonly lineTotalMinor: number;
 }
 

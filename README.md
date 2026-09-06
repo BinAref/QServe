@@ -188,10 +188,13 @@ boot, and is not recommended.
 The spec sets these as the bar for "complete". Each is enforced, and most are
 covered by a test:
 
-- [x] No hard-coded languages — 509 keys in `locales/*.json`, validated
+- [x] No hard-coded languages — 544 keys in `locales/*.json`, validated
 - [x] No hard-coded themes — 57 design tokens in `themes/*.json`, validated
-- [x] A restaurant adds its own language or theme without a developer — and the
-      language covers its own menu text, not only the interface
+- [x] A restaurant adds its own language, theme or currency without a developer
+      — and the language covers its own menu text, not only the interface
+- [x] Several currencies on one menu, each line settled at the rate it was
+      ordered at
+- [x] Amounts are typed through one control that refuses what is not a price
 - [x] The application handles no payment; the vendor writes both prices
 - [x] Optional password lock on the console, the restaurant's choice
 - [x] Restaurant data never bound to one device

@@ -50,7 +50,9 @@ export interface OrderRow {
 interface ItemRow {
   id: string; order_id: string; product_id: string | null; name_json: string;
   unit_price_minor: number; quantity: number; notes: string | null;
-  station: string | null; line_total_minor: number; sort_order: number; created_at: string;
+  station: string | null; line_total_minor: number; currency_code: string | null;
+  rate_to_base: number; base_total_minor: number | null;
+  sort_order: number; created_at: string;
 }
 
 interface SelectionRow {
@@ -71,6 +73,15 @@ export interface PersistItemInput {
   readonly notes: string | null;
   readonly station: string | null;
   readonly lineTotalMinor: number;
+  /** The currency this line was priced in; null means the base. */
+  readonly currencyCode: string | null;
+  /**
+   * The rate that applied when the order was taken, stored rather than looked
+   * up: a bill printed last month must not change because the rate moved.
+   */
+  readonly rateToBase: number;
+  /** The line in the currency the till settles in. */
+  readonly baseTotalMinor: number;
   readonly selections: readonly OrderItemSelection[];
   readonly addons: readonly OrderItemAddon[];
 }
@@ -124,8 +135,9 @@ export class OrderRepository {
     const insertItem = this.db.prepare(`
       INSERT INTO order_items
         (id, order_id, product_id, name_json, unit_price_minor, quantity, notes,
-         station, line_total_minor, sort_order, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         station, line_total_minor, currency_code, rate_to_base, base_total_minor,
+         sort_order, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertSelection = this.db.prepare(`
       INSERT INTO order_item_selections
@@ -153,7 +165,8 @@ export class OrderRepository {
         const itemId = newEntityId('ITM');
         insertItem.run(
           itemId, orderId, item.productId, toDbJson(item.name), item.unitPriceMinor,
-          item.quantity, item.notes, item.station, item.lineTotalMinor, index, at,
+          item.quantity, item.notes, item.station, item.lineTotalMinor,
+          item.currencyCode, item.rateToBase, item.baseTotalMinor, index, at,
         );
         for (const selection of item.selections) {
           insertSelection.run(
@@ -271,8 +284,9 @@ export class OrderRepository {
     const insertItem = this.db.prepare(`
       INSERT INTO order_items
         (id, order_id, product_id, name_json, unit_price_minor, quantity, notes,
-         station, line_total_minor, sort_order, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         station, line_total_minor, currency_code, rate_to_base, base_total_minor,
+         sort_order, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertSelection = this.db.prepare(`
       INSERT INTO order_item_selections
@@ -291,6 +305,7 @@ export class OrderRepository {
         insertItem.run(
           itemId, orderId, item.productId, toDbJson(item.name), item.unitPriceMinor,
           item.quantity, item.notes, item.station, item.lineTotalMinor,
+          item.currencyCode, item.rateToBase, item.baseTotalMinor,
           nextSort + 1 + index, at,
         );
         for (const selection of item.selections) {
@@ -464,6 +479,11 @@ export class OrderRepository {
         notes: row.notes,
         station: row.station,
         lineTotalMinor: row.line_total_minor,
+        currencyCode: row.currency_code,
+        rateToBase: row.rate_to_base,
+        // Orders taken before the restaurant had a second currency have no
+        // stored base total, and for them the line total already is one.
+        baseTotalMinor: row.base_total_minor ?? row.line_total_minor,
       });
       byOrder.set(row.order_id, list);
     }

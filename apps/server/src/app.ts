@@ -31,6 +31,7 @@ import { createOperationsRoutes } from './http/routes/operations.js';
 import { createManagementRoutes } from './http/routes/management.js';
 import { createLockRoutes, LOCK_ALLOWED_PATHS } from './http/routes/lock.js';
 import { createPackRoutes } from './http/routes/packs.js';
+import { createCurrencyRoutes } from './http/routes/currencies.js';
 import { createDeveloperRoutes } from './http/routes/developer.js';
 import {
   createAssetFileRoutes, createContentRoutes, createEnrolmentRoutes,
@@ -68,6 +69,7 @@ export class QServeApp {
       isLanRunning: this.isLanRunning,
     }));
     router.mount('/', createContentRoutes(this.services));
+    router.mount('/', createCurrencyRoutes(this.services));
     router.mount('/', createMenuRoutes(this.services));
     router.mount('/', createOrderRoutes(this.services));
     router.mount('/', createOperationsRoutes(this.services));

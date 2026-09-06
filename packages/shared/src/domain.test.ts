@@ -17,7 +17,10 @@ import {
   grants, intersectPermissions, WILDCARD_PERMISSION,
 } from './permissions.js';
 import { Capability, capabilitiesForMode, isCapabilityAvailable, SETUP_CAPABILITIES } from './capabilities.js';
-import { computeTotals, formatMoney, lineTotal, applyRate, DEFAULT_CURRENCY } from './money.js';
+import {
+  amountToInput, computeTotals, formatMoney, lineTotal, applyRate, parseAmount,
+  sanitiseAmountInput, toBaseMinor, DEFAULT_CURRENCY,
+} from './money.js';
 import { encodeLicenseKey, generateLicenseKey, normaliseLicenseKey } from './license-key.js';
 import { formatRestaurantId, formatLicenseId, formatTableId, monotonicCode, newOrderId, isOrderId } from './ids.js';
 import { pickLocalised } from './validate.js';
@@ -229,4 +232,72 @@ test('localised text falls back predictably', () => {
   assert.equal(pickLocalised(value, 'tr'), 'Burger', 'unknown locale falls back to reference');
   assert.equal(pickLocalised({ '*': 'Sole' }, 'tr'), 'Sole', 'single-language installs use *');
   assert.equal(pickLocalised({}, 'en'), '');
+});
+
+/* ---------------------------------------------------- typing a price by hand */
+
+test('a plain price parses to minor units', () => {
+  assert.deepEqual(parseAmount('12.50', 2), { ok: true, minor: 1250, problem: null });
+  assert.equal(parseAmount('7', 2).minor, 700, 'a whole number is padded');
+  assert.equal(parseAmount('0.05', 2).minor, 5);
+  assert.equal(parseAmount('1.5', 2).minor, 150, 'one decimal is padded to two');
+  assert.equal(parseAmount(' 3.20 ', 2).minor, 320, 'surrounding space is not an error');
+  assert.equal(parseAmount('1500', 0).minor, 1500, 'a zero-decimal currency');
+});
+
+test('anything that is not a digit or a point is refused, and named', () => {
+  for (const bad of ['12a', '1,50', '12 50', '-5', '١٢', '12٫5', '$12']) {
+    const result = parseAmount(bad, 2);
+    assert.equal(result.ok, false, `${bad} should be refused`);
+  }
+  // The typist is told which character was wrong, not merely that one was.
+  assert.deepEqual(parseAmount('1,50', 2).problem, {
+    messageKey: 'amount.error.digits_only',
+    params: { character: ',' },
+  });
+});
+
+test('the decimal point is refused where it cannot mean anything', () => {
+  assert.equal(parseAmount('12.', 2).problem?.messageKey, 'amount.error.trailing_point');
+  assert.equal(parseAmount('1.2.3', 2).problem?.messageKey, 'amount.error.one_point');
+  assert.equal(parseAmount('.5', 2).problem?.messageKey, 'amount.error.leading_point');
+  assert.equal(parseAmount('12.345', 2).problem?.messageKey, 'amount.error.too_many_decimals');
+  assert.equal(parseAmount('12.5', 0).problem?.messageKey, 'amount.error.no_decimals');
+  assert.equal(parseAmount('', 2).problem?.messageKey, 'amount.error.required');
+});
+
+test('the keystroke filter refuses what the parser would reject', () => {
+  assert.equal(sanitiseAmountInput('12a.5x0', 2), '12.50');
+  assert.equal(sanitiseAmountInput('1.2.3', 2), '1.23', 'the second point becomes a digit position');
+  assert.equal(sanitiseAmountInput('.5', 2), '5', 'a leading point cannot be typed at all');
+  assert.equal(sanitiseAmountInput('12.999', 2), '12.99', 'precision is capped as it is typed');
+  assert.equal(sanitiseAmountInput('12.5', 0), '125', 'a zero-decimal currency takes no point');
+  assert.equal(sanitiseAmountInput('-12', 2), '12');
+
+  // Whatever the filter allows through, the parser must accept — otherwise a
+  // field could sit in a state the typist cannot fix.
+  for (const raw of ['12a.5x0', '1.2.3', '12.999', '0.07']) {
+    const filtered = sanitiseAmountInput(raw, 2);
+    if (filtered !== '' && !filtered.endsWith('.')) {
+      assert.equal(parseAmount(filtered, 2).ok, true, `${filtered} should parse`);
+    }
+  }
+});
+
+test('a price survives the round trip back into the field', () => {
+  for (const minor of [0, 5, 1250, 999_999]) {
+    assert.equal(parseAmount(amountToInput(minor, 2), 2).minor, minor);
+  }
+  assert.equal(amountToInput(1500, 0), '1500');
+});
+
+/* ------------------------------------------------------ several currencies */
+
+test('converting to the base currency rounds once, at the end', () => {
+  // 100.00 TRY at 0.0982 SAR per lira.
+  assert.equal(toBaseMinor(10_000, 0.0982, 2, 2), 982);
+  // The base converts to itself untouched, whatever the arithmetic would say.
+  assert.equal(toBaseMinor(1234, 1, 2, 2), 1234);
+  // Different precision on each side: 1500 JPY (0 decimals) at 0.025.
+  assert.equal(toBaseMinor(1500, 0.025, 2, 0), 3750);
 });

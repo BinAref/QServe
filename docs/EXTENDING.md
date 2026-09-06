@@ -150,7 +150,37 @@ applied at runtime.
 
 ---
 
-## 3. Add a terminal type
+## 3. Add a currency
+
+**Console → Currencies → Add a currency.** Write the code and the symbol —
+`TRY` and `₺`, `USD` and `$` — say how many decimal places it has and which
+side the symbol sits, and give what one unit is worth in the base. Every price
+field on the menu then offers it.
+
+One currency is the **base**: what the till counts, what the reports add up,
+what a bill settles in. A partial unique index makes "exactly one base" a
+property of the storage engine rather than a rule somebody can forget.
+
+Three decisions worth knowing, because they are what keep the money honest:
+
+- **A dish's options and add-ons are in the dish's own currency.** A "large"
+  that costs 5 more costs 5 of whatever the dish is priced in, so one currency
+  governs a whole order line and there is nothing to pick twice.
+- **Every order line stores the rate it used.** A bill printed last month does
+  not change because the rate moved this morning — the line keeps its currency,
+  its price, the rate, and the converted amount, all four.
+- **Totals are always in the base.** Tax, service and the amount the till takes
+  have to be one number in one currency, whatever the lines were priced in.
+
+Moving the base re-expresses every other rate in the same transaction, so no
+price silently changes meaning. A currency still priced on the menu cannot be
+deleted; the screen says how many dishes hold it.
+
+**You do not touch:** any TypeScript, any stylesheet, any front-end.
+
+---
+
+## 4. Add a terminal type
 
 Say a `SOMMELIER` station.
 
@@ -174,7 +204,7 @@ mechanism, the router.
 
 ---
 
-## 4. Add a role
+## 5. Add a role
 
 Entirely at runtime, in **Users → Roles → Add role**. Pick a key, a name and the
 permissions. Roles are rows; the built-in defaults seed the table once at
@@ -187,7 +217,7 @@ and guard the route with it.
 
 ---
 
-## 5. Add a printer
+## 6. Add a printer
 
 Configuration only, in **Printing**. Choose a transport:
 
@@ -206,7 +236,7 @@ to `renderKitchenTicket` / `renderReceipt`, and mirror the enum.
 
 ---
 
-## 6. Add a module
+## 7. Add a module
 
 ```
 apps/server/src/modules/<name>/
@@ -229,7 +259,7 @@ apps/server/src/modules/<name>/
 
 ---
 
-## 7. The features the architecture is ready for
+## 8. The features the architecture is ready for
 
 The spec lists these as future work, explicitly not to be built now. Each is
 noted with where it would attach:
@@ -252,7 +282,7 @@ admits them, not the features themselves.**
 
 ---
 
-## 8. Before you ship a change
+## 9. Before you ship a change
 
 ```bash
 npm run check      # build + validate packs + 113 tests

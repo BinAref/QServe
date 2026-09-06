@@ -33,6 +33,25 @@ export function createMenuRoutes(services: Services): Router<AppState> {
   };
 
   /**
+   * A price is meaningless without the currency it is in, so a code that is not
+   * in the registry is refused rather than stored and puzzled over later.
+   */
+  const currencyCode = (body: Record<string, unknown>): string | null => {
+    const code = optionalString(body, 'currencyCode', { max: 3 });
+    if (code === null) return null;
+
+    const currency = services.currencies.get(code);
+    if (!currency || !currency.enabled) {
+      throw validationError('that currency is not one this restaurant accepts', {
+        field: 'currencyCode',
+      });
+    }
+    // The base is stored as null, so changing which currency is the base never
+    // leaves a product pointing at a stale code.
+    return currency.isBase ? null : currency.code;
+  };
+
+  /**
    * Menu edits are audited as carefully as money is. "Who put the price up?"
    * and "who hid that dish?" are questions restaurants really ask, and without
    * a before/after pair the log cannot answer them (spec §19).
@@ -82,6 +101,10 @@ export function createMenuRoutes(services: Services): Router<AppState> {
         showPrices: services.settings.get<boolean>('menu.showPrices'),
         showUnavailableProducts: showUnavailable,
       },
+      // A diner's phone formats every price it shows, so the symbols travel
+      // with the menu rather than needing a second request.
+      currencies: services.currencies.enabled(),
+      baseCurrency: services.currencies.base(),
       categories,
       products: includeHidden || showUnavailable
         ? products
@@ -168,6 +191,7 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       description: optionalLocalised(body, 'description', { max: 2000 }),
       imageAssetId: optionalString(body, 'imageAssetId', { max: 64 }),
       priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 100_000_000 }),
+      currencyCode: currencyCode(body),
       visible: optionalBoolean(body, 'visible', true),
       available: optionalBoolean(body, 'available', true),
       station: optionalString(body, 'station', { max: 40 }),
@@ -207,6 +231,7 @@ export function createMenuRoutes(services: Services): Router<AppState> {
         ? { imageAssetId: optionalString(body, 'imageAssetId', { max: 64 }) } : {}),
       ...(body['priceMinor'] !== undefined
         ? { priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 100_000_000 }) } : {}),
+      ...(body['currencyCode'] !== undefined ? { currencyCode: currencyCode(body) } : {}),
       ...(body['visible'] !== undefined ? { visible: optionalBoolean(body, 'visible', true) } : {}),
       ...(body['available'] !== undefined
         ? { available: optionalBoolean(body, 'available', true) } : {}),
@@ -387,6 +412,7 @@ export function createMenuRoutes(services: Services): Router<AppState> {
     const addon = services.menu.createAddon({
       name: requireLocalised(body, 'name', { max: 120 }),
       priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 1_000_000 }),
+      currencyCode: currencyCode(body),
       sortOrder: optionalNumber(body, 'sortOrder', { min: 0, max: 9999 }) ?? 0,
       available: optionalBoolean(body, 'available', true),
     });
@@ -405,6 +431,7 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       ...(body['name'] !== undefined ? { name: requireLocalised(body, 'name', { max: 120 }) } : {}),
       ...(body['priceMinor'] !== undefined
         ? { priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 1_000_000 }) } : {}),
+      ...(body['currencyCode'] !== undefined ? { currencyCode: currencyCode(body) } : {}),
       ...(body['available'] !== undefined
         ? { available: optionalBoolean(body, 'available', true) } : {}),
       ...(body['sortOrder'] !== undefined

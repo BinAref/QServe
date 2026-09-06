@@ -23,6 +23,7 @@ import { renderTables, renderTerminals } from './views/service.js';
 import { renderOrders, renderReports, renderActivityLog } from './views/orders.js';
 import { renderSettings, renderUsers, renderPrinting, renderBackup, renderLicense } from './views/system.js';
 import { renderLanguages, renderThemes } from './views/packs.js';
+import { renderCurrencies } from './views/currencies.js';
 import { renderLockScreen } from './views/lock.js';
 import { renderDeveloper } from './views/developer.js';
 
@@ -86,6 +87,7 @@ const NAV = [
   { route: 'printing', label: 'nav.printing', permission: Permission.PRINTING_MANAGE, capability: Capability.PRINTING_RUNTIME },
   { route: 'users', label: 'nav.users', permission: Permission.USERS_MANAGE },
   { route: 'settings', label: 'nav.settings', permission: Permission.SETTINGS_MANAGE },
+  { route: 'currencies', label: 'nav.currencies', permission: Permission.SETTINGS_MANAGE },
   { route: 'languages', label: 'nav.languages', permission: Permission.SETTINGS_MANAGE },
   { route: 'themes', label: 'nav.themes', permission: Permission.SETTINGS_MANAGE },
   { route: 'backup', label: 'nav.backup', permission: Permission.BACKUP_MANAGE },
@@ -106,6 +108,7 @@ const VIEWS = {
   printing: renderPrinting,
   users: renderUsers,
   settings: renderSettings,
+  currencies: renderCurrencies,
   languages: renderLanguages,
   themes: renderThemes,
   backup: renderBackup,

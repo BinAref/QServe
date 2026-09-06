@@ -25,6 +25,7 @@ import { AppLockService } from './core/app-lock.js';
 import { AccessRepository } from './core/repositories/access.js';
 import { AuditRepository } from './core/repositories/audit.js';
 import { LicenseRepository } from './core/repositories/license.js';
+import { CurrencyRepository } from './core/repositories/currencies.js';
 import { PackRepository } from './core/repositories/packs.js';
 import { SettingsRepository } from './core/repositories/settings.js';
 import { TerminalRepository } from './core/repositories/terminals.js';
@@ -63,6 +64,7 @@ export interface Services {
   readonly licenseRepository: LicenseRepository;
   readonly settings: SettingsRepository;
   readonly terminalRepository: TerminalRepository;
+  readonly currencies: CurrencyRepository;
   readonly packs: PackRepository;
   readonly contentTranslations: ContentTranslationRepository;
   readonly menu: MenuRepository;
@@ -119,6 +121,7 @@ export function buildServices(options: BuildOptions = {}): Services {
   const access = new AccessRepository(db);
   const terminalRepository = new TerminalRepository(db);
   const licenseRepository = new LicenseRepository(db, paths);
+  const currencies = new CurrencyRepository(db);
   const packs = new PackRepository(db);
   const contentTranslations = new ContentTranslationRepository(db);
 
@@ -142,7 +145,9 @@ export function buildServices(options: BuildOptions = {}): Services {
   const paymentRepository = new PaymentRepository(db);
   const printingRepository = new PrintingRepository(db);
 
-  const orders = new OrderService(orderRepository, menu, tables, settings, audit, bus);
+  const orders = new OrderService(
+    orderRepository, menu, tables, settings, audit, bus, currencies,
+  );
   const payments = new PaymentService(paymentRepository, orderRepository, orders, audit, bus);
   // Closes the loop between the two: orders can ask whether a bill is settled
   // without depending on the payments module at construction time.
@@ -197,7 +202,7 @@ export function buildServices(options: BuildOptions = {}): Services {
   return {
     config, paths, db, bus, gate, security, realtime, discovery, fingerprint, appLock,
     access, audit, licenseRepository, settings, terminalRepository,
-    packs, contentTranslations, menu, tables, orderRepository,
+    currencies, packs, contentTranslations, menu, tables, orderRepository,
     orders, payments, terminals, printing, backup, reports, licensing,
     translations, themes, packAuthoring, shippedPacks, assets,
     appVersion: APP_VERSION,

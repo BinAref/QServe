@@ -13,30 +13,40 @@
 import { api, guard, t, toast } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { formatMoney, pick } from '../../shared/i18n.js';
+import { moneyField, integerField } from '../../shared/fields.js';
 import { Permission } from '../../shared/events.js';
 import { state, has, pageHeader, reroute } from '../app.js';
 
 let categories = [];
 let products = [];
 let addons = [];
+let currencies = [];
 let selectedCategoryId = null;
 
 const currency = () => state.status?.currency ?? { code: 'SAR', symbol: 'SAR', decimals: 2, symbolPosition: 'after' };
+
+/** The currency a price is in: the product's own, or the base when it has none. */
+const currencyOf = (code) =>
+  currencies.find((entry) => entry.code === code)
+  ?? currencies.find((entry) => entry.isBase)
+  ?? currency();
 const canManage = () => has(Permission.MENU_MANAGE);
 
 /** The languages this restaurant offers; every name/description is per-language. */
 const locales = () => state.status?.locales?.filter((entry) => entry.enabled).map((entry) => entry.locale) ?? ['en'];
 
 async function load() {
-  const [categoryResult, productResult, addonResult, restaurant] = await Promise.all([
+  const [categoryResult, productResult, addonResult, restaurant, currencyResult] = await Promise.all([
     api.get('/api/menu/categories'),
     api.get('/api/menu/products'),
     api.get('/api/menu/addons'),
     api.get('/api/restaurant').catch(() => null),
+    api.get('/api/currencies').catch(() => ({ currencies: [] })),
   ]);
   categories = categoryResult.categories;
   products = productResult.products;
   addons = addonResult.addons;
+  currencies = currencyResult.currencies.filter((entry) => entry.enabled);
   if (restaurant) state.status.currency = restaurant.currency;
 
   if (!categories.some((entry) => entry.id === selectedCategoryId)) {
@@ -71,10 +81,6 @@ function collectLocalised(data, name) {
   }
   return out;
 }
-
-const majorToMinor = (value) =>
-  Math.round(Number(value || 0) * 10 ** currency().decimals);
-const minorToMajor = (minor) => (minor / 10 ** currency().decimals).toFixed(currency().decimals);
 
 /* ------------------------------------------------------------- drag sort */
 
@@ -246,7 +252,8 @@ function productPanel() {
           product.addons.length > 0 ? ` · ${product.addons.length} ${t('menu.addons')}` : '')),
       !product.visible ? h('span', { class: 'qs-badge' }, t('common.hidden')) : null,
       !product.available ? h('span', { class: 'qs-badge qs-badge-error' }, t('menu.sold_out')) : null,
-      h('span', { class: 'qs-strong' }, formatMoney(product.priceMinor, currency())),
+      h('span', { class: 'qs-strong' },
+        formatMoney(product.priceMinor, currencyOf(product.currencyCode))),
       canManage()
         ? h('button', { class: 'qs-btn qs-btn-ghost', onClick: () => openProductForm(product) },
             t('common.edit'))
@@ -269,23 +276,33 @@ function productPanel() {
 }
 
 function openProductForm(product) {
+  // Digits and one decimal point, refused at the keystroke, previewed as the
+  // diner will see it — and the currency picked right beside the number.
+  const price = moneyField({
+    label: t('common.price'),
+    value: product?.priceMinor ?? 0,
+    currencies,
+    currencyCode: product?.currencyCode ?? null,
+    hint: currencies.length > 1 ? t('menu.currency') : null,
+  });
+  const prep = integerField({
+    name: 'prep',
+    label: t('menu.prep_minutes'),
+    value: product?.preparationMinutes ?? 0,
+    min: 0,
+    max: 600,
+  });
+
   const form = h('form', { id: 'prod-form' },
     localisedField(t('common.name'), 'name', product?.name ?? {}),
     localisedField(t('common.description'), 'description', product?.description ?? {}, { textarea: true }),
 
     h('div', { class: 'qs-grid qs-grid-2' },
-      h('label', { class: 'qs-field' },
-        h('span', {}, `${t('common.price')} (${currency().code})`),
-        h('input', {
-          name: 'price', type: 'number', step: '0.01', min: '0', required: true,
-          value: product ? minorToMajor(product.priceMinor) : '',
-        })),
+      price.node,
       h('label', { class: 'qs-field' },
         h('span', {}, t('menu.station')),
         h('input', { name: 'station', value: product?.station ?? '', list: 'stations', maxlength: '40' })),
-      h('label', { class: 'qs-field' },
-        h('span', {}, t('menu.prep_minutes')),
-        h('input', { name: 'prep', type: 'number', min: '0', max: '600', value: product?.preparationMinutes ?? '' })),
+      prep.node,
       h('label', { class: 'qs-field' },
         h('span', {}, t('common.type')),
         h('select', { name: 'categoryId' }, categories.map((category) =>
@@ -350,13 +367,27 @@ function openProductForm(product) {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
 
+          // Ask the fields before asking the server: a price the typist can see
+          // is wrong should never make a round trip to be told so.
+          const amount = price.validate();
+          if (!amount.ok) {
+            price.focus();
+            return;
+          }
+          const minutes = prep.validate();
+          if (!minutes.ok) {
+            prep.focus();
+            return;
+          }
+
           const payload = {
             categoryId: data.categoryId,
             name: collectLocalised(data, 'name'),
             description: collectLocalised(data, 'description'),
-            priceMinor: majorToMinor(data.price),
+            priceMinor: amount.minor,
+            currencyCode: amount.currencyCode,
             station: String(data.station ?? '').trim() || null,
-            preparationMinutes: data.prep ? Number(data.prep) : null,
+            preparationMinutes: minutes.value || null,
             visible: data.visible === 'on',
             available: data.available === 'on',
             addonIds: addons.filter((addon) => data[`addon.${addon.id}`] === 'on').map((addon) => addon.id),
@@ -458,7 +489,9 @@ function optionEditor(product) {
               h('span', {}, pick(choice.name), choice.isDefault ? ' ★' : ''),
               h('span', { class: 'qs-row' },
                 h('span', { class: 'qs-muted' },
-                  choice.priceDeltaMinor ? `+${formatMoney(choice.priceDeltaMinor, currency())}` : '—'),
+                  choice.priceDeltaMinor
+                    ? `+${formatMoney(choice.priceDeltaMinor, currencyOf(product.currencyCode))}`
+                    : '—'),
                 h('button', {
                   class: 'qs-btn qs-btn-ghost', type: 'button',
                   onClick: async () => {
@@ -469,7 +502,7 @@ function optionEditor(product) {
                 }, '×'))))),
           h('button', {
             class: 'qs-btn qs-btn-ghost', type: 'button',
-            onClick: () => openChoiceForm(option, draw),
+            onClick: () => openChoiceForm(option, draw, product.currencyCode),
           }, t('menu.add_choice')))),
       h('button', {
         class: 'qs-btn', type: 'button',
@@ -521,12 +554,21 @@ function openOptionForm(product, redraw) {
   });
 }
 
-function openChoiceForm(option, redraw) {
+function openChoiceForm(option, redraw, productCurrencyCode) {
+  // A choice's extra is in the dish's own currency: a "large" that costs 5 more
+  // costs 5 of whatever the dish is priced in, so there is nothing to pick.
+  const dishCurrency = currencyOf(productCurrencyCode);
+  const delta = moneyField({
+    label: `${t('common.price')} ±`,
+    value: 0,
+    currencies: [{ ...dishCurrency, isBase: true }],
+    baseCurrency: dishCurrency,
+    required: false,
+  });
+
   const form = h('form', {},
     localisedField(t('common.name'), 'name'),
-    h('label', { class: 'qs-field' },
-      h('span', {}, `${t('common.price')} ±`),
-      h('input', { name: 'delta', type: 'number', step: '0.01', value: '0' })),
+    delta.node,
     h('label', { class: 'qs-check' },
       h('input', { type: 'checkbox', name: 'isDefault' }),
       h('span', {}, '★')));
@@ -542,9 +584,13 @@ function openChoiceForm(option, redraw) {
         onClick: async (event) => {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
+          const extra = delta.read();
+          if (!delta.input.value.trim()) extra.minor = 0;
+          else if (!delta.validate().ok) { delta.focus(); return; }
+
           const created = await guard(() => api.post(`/api/menu/options/${option.id}/choices`, {
             name: collectLocalised(data, 'name'),
-            priceDeltaMinor: majorToMinor(data.delta),
+            priceDeltaMinor: extra.minor,
             isDefault: data.isDefault === 'on',
           }));
           if (!created) return;
@@ -572,18 +618,21 @@ function addonPanel() {
           h('button', {
             class: 'qs-btn qs-btn-ghost',
             onClick: () => canManage() && openAddonForm(addon),
-          }, `${pick(addon.name)} · ${formatMoney(addon.priceMinor, currency())}`))));
+          }, `${pick(addon.name)} · ${
+            formatMoney(addon.priceMinor, currencyOf(addon.currencyCode))}`))));
 }
 
 function openAddonForm(addon) {
+  const price = moneyField({
+    label: t('common.price'),
+    value: addon?.priceMinor ?? 0,
+    currencies,
+    currencyCode: addon?.currencyCode ?? null,
+  });
+
   const form = h('form', {},
     localisedField(t('common.name'), 'name', addon?.name ?? {}),
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('common.price')),
-      h('input', {
-        name: 'price', type: 'number', step: '0.01', min: '0',
-        value: addon ? minorToMajor(addon.priceMinor) : '0',
-      })),
+    price.node,
     h('label', { class: 'qs-check' },
       h('input', { type: 'checkbox', name: 'available', checked: addon ? addon.available : true }),
       h('span', {}, t('common.enabled'))));
@@ -609,9 +658,13 @@ function openAddonForm(addon) {
         onClick: async (event) => {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
+          const amount = price.validate();
+          if (!amount.ok) { price.focus(); return; }
+
           const payload = {
             name: collectLocalised(data, 'name'),
-            priceMinor: majorToMinor(data.price),
+            priceMinor: amount.minor,
+            currencyCode: amount.currencyCode,
             available: data.available === 'on',
           };
           const saved = await guard(() => addon

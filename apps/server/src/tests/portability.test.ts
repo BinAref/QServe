@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 import {
   Capability, EVENT_CATALOGUE, OrderSource, OrderStatus, Permission, SOUND_EVENTS,
   TERMINAL_TYPES, TableStatus, PaymentMethod, PrintDocumentType, PrinterTransport,
-  Topic, hasBlockingIssues, validateLocalePack, validateThemePack, type LocalePack,
+  Topic, amountToInput, hasBlockingIssues, parseAmount, sanitiseAmountInput, toBaseMinor,
+  validateLocalePack, validateThemePack, type LocalePack,
 } from '@qserve/shared';
 import { BackupService } from '../modules/backup/service.js';
 import { createInstallation, seedRestaurant, seedUser } from './harness.js';
@@ -304,6 +305,50 @@ describe('browser constants mirror', () => {
         `${name} has drifted between the server and the terminals`,
       );
     }
+  });
+
+  /**
+   * The amount rules exist twice on purpose: the field has to answer a typist
+   * on the keystroke, and the server has to refuse without explaining itself.
+   * This is what stops "the browser accepted it but the server refused".
+   */
+  test('the mirrored amount parser agrees with the server’s, character for character', async () => {
+    const mirror = await import(
+      new URL('../../../web/shared/money.js', import.meta.url).href
+    ) as {
+      parseAmount: (raw: string, decimals: number) => {
+        ok: boolean; minor: number; problem: { messageKey: string } | null;
+      };
+      sanitiseAmountInput: (raw: string, decimals: number) => string;
+      amountToInput: (minor: number, decimals: number) => string;
+      toBaseMinor: (m: number, r: number, b: number, c: number) => number;
+    };
+
+    const cases = [
+      '12.50', '7', '0.05', '1.5', ' 3.20 ', '1500', '0',
+      '12a', '1,50', '12 50', '-5', '١٢', '$12', '12.', '.5', '1.2.3',
+      '12.345', '', '   ', '00.10', '999999999999999999',
+    ];
+
+    for (const decimals of [0, 2, 3]) {
+      for (const raw of cases) {
+        assert.deepEqual(
+          mirror.parseAmount(raw, decimals),
+          parseAmount(raw, decimals),
+          `parseAmount("${raw}", ${decimals}) has drifted`,
+        );
+        assert.equal(
+          mirror.sanitiseAmountInput(raw, decimals),
+          sanitiseAmountInput(raw, decimals),
+          `sanitiseAmountInput("${raw}", ${decimals}) has drifted`,
+        );
+      }
+    }
+
+    for (const minor of [0, 5, 1250, 999_999]) {
+      assert.equal(mirror.amountToInput(minor, 2), amountToInput(minor, 2));
+    }
+    assert.equal(mirror.toBaseMinor(10_000, 0.0982, 2, 2), toBaseMinor(10_000, 0.0982, 2, 2));
   });
 
   test('the mirrored permission check behaves like the server’s', async () => {

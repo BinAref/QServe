@@ -18,6 +18,7 @@
 import {
   assertTransition, canTransition, computeTotals, conflict, EventName, forbidden, grants,
   isTerminalOrderStatus, lineTotal, notFound, OrderSource, OrderStatus, Permission,
+  toBaseMinor,
   pickLocalised, validationError,
   type Actor, type CurrencyConfig, type Localised, type Order, type OrderStatus as Status,
   type OrderItemAddon, type OrderItemSelection, type Product,
@@ -28,6 +29,7 @@ import type { SettingsRepository } from '../../core/repositories/settings.js';
 import type { MenuRepository } from '../menu/repository.js';
 import type { TableRepository } from '../tables/repository.js';
 import { deriveTableStatus } from '../tables/repository.js';
+import type { CurrencyRepository } from '../../core/repositories/currencies.js';
 import type { OrderRepository, PersistItemInput } from './repository.js';
 
 export interface RequestedItem {
@@ -57,6 +59,7 @@ export class OrderService {
     private readonly settings: SettingsRepository,
     private readonly audit: AuditRepository,
     private readonly bus: EventBus,
+    private readonly currencies: CurrencyRepository,
   ) {}
 
   /**
@@ -110,6 +113,13 @@ export class OrderService {
         ...addons.map((addon) => addon.priceMinor * addon.quantity),
       ];
 
+      // A product's options and add-ons are priced in the product's own
+      // currency — a "large" that costs 5 more costs 5 of whatever the dish is
+      // priced in. So one currency governs the whole line.
+      const base = this.currencies.base();
+      const currency = this.currencies.resolve(product.currencyCode);
+      const lineTotalMinor = lineTotal(product.priceMinor, modifiers, request.quantity);
+
       return {
         productId: product.id,
         name: product.name,
@@ -117,7 +127,14 @@ export class OrderService {
         quantity: request.quantity,
         notes: request.notes?.trim() || null,
         station: product.station,
-        lineTotalMinor: lineTotal(product.priceMinor, modifiers, request.quantity),
+        lineTotalMinor,
+        currencyCode: currency.isBase ? null : currency.code,
+        rateToBase: currency.rateToBase,
+        // Converted once, now, and stored: the bill is settled at the rate that
+        // was true when the food was ordered, not the rate at closing time.
+        baseTotalMinor: toBaseMinor(
+          lineTotalMinor, currency.rateToBase, base.decimals, currency.decimals,
+        ),
         selections,
         addons,
       };
@@ -218,8 +235,11 @@ export class OrderService {
     serviceMinor: number; totalMinor: number;
   } {
     const profile = this.settings.profile()!;
+    // Totals are always in the base currency: tax, service and the amount the
+    // till takes have to be one number in one currency, whatever the lines
+    // were priced in.
     return computeTotals({
-      lineTotalsMinor: lines.map((line) => line.lineTotalMinor),
+      lineTotalsMinor: lines.map((line) => line.baseTotalMinor),
       discountMinor,
       taxRatePercent: profile.taxRatePercent,
       serviceRatePercent: profile.serviceRatePercent,
