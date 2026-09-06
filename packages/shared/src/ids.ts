@@ -110,13 +110,27 @@ export function formatLicenseId(year: number, sequence: number): LicenseId {
 /**
  * Table ids embed the operator-visible table number so the printed QR stays
  * readable by a human ("TABLE-05"). They are scoped by restaurant, never global.
+ *
+ * Operators label tables in whatever way suits them — "5", "Table 05",
+ * "TABLE-05", "Terrace 3" — and all of the first three must land on the same id,
+ * or a restaurant ends up with `TABLE-TABLE-05` printed on a card.
  */
 export function formatTableId(label: string): TableId {
-  const normalised = label.trim().toUpperCase().replace(/[^0-9A-Z_-]+/g, '-');
-  if (normalised.length === 0 || normalised.length > 24) {
+  const normalised = label.trim().toUpperCase().replace(/[^0-9A-Z_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (normalised.length === 0) {
     throw new RangeError(`table label cannot be turned into an id: "${label}"`);
   }
-  return `TABLE-${normalised}` as TableId;
+
+  // Strip a redundant leading "TABLE" so labelling styles converge, but never
+  // strip it down to nothing ("Table" on its own stays TABLE-TABLE).
+  const stripped = normalised.replace(/^TABLE-?/, '');
+  const suffix = stripped.length > 0 ? stripped : normalised;
+
+  if (suffix.length > 24) {
+    throw new RangeError(`table label is too long for an id: "${label}"`);
+  }
+  return `TABLE-${suffix}` as TableId;
 }
 
 export const isRestaurantId = (v: unknown): v is RestaurantId =>

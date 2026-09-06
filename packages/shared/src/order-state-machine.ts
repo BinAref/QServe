@@ -8,6 +8,7 @@
  */
 
 import { OrderStatus } from './enums.js';
+import { AppError } from './errors.js';
 import { Permission } from './permissions.js';
 
 export interface OrderTransition {
@@ -67,14 +68,23 @@ const INDEX: ReadonlyMap<string, OrderTransition> = new Map(
   ORDER_TRANSITIONS.map((t) => [`${t.from}>${t.to}`, t]),
 );
 
-export class InvalidOrderTransitionError extends Error {
-  readonly code = 'INVALID_ORDER_TRANSITION';
+/**
+ * An illegal transition is a client mistake, not a server fault — a kitchen
+ * screen that raced another station, or a stale button. It therefore extends
+ * `AppError` and answers 409 with a translation key, rather than surfacing as a
+ * 500 and an alarming stack trace in the restaurant's log.
+ */
+export class InvalidOrderTransitionError extends AppError {
   constructor(
     readonly from: OrderStatus,
     readonly to: OrderStatus,
   ) {
-    super(`order cannot move from ${from} to ${to}`);
-    this.name = 'InvalidOrderTransitionError';
+    super('INVALID_ORDER_TRANSITION', `order cannot move from ${from} to ${to}`, {
+      status: 409,
+      messageKey: 'orders.error.invalid_transition',
+      details: { from, to },
+    });
+    this.name = 'AppError';
   }
 }
 

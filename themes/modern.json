@@ -1,0 +1,87 @@
+{
+  "$schema": "qserve.theme.v1",
+  "id": "modern",
+  "name": "Modern",
+  "colorScheme": "light",
+  "author": "QServe",
+  "version": "1.0.0",
+  "tokens": {
+    "color": {
+      "background": "#fbfbfd",
+      "surface": "#ffffff",
+      "surfaceAlt": "#f2f1fb",
+      "overlay": "rgb(24 20 48 / 0.45)",
+      "primary": "#6d4aff",
+      "primaryContrast": "#ffffff",
+      "secondary": "#00c2a8",
+      "secondaryContrast": "#04241f",
+      "text": "#16132b",
+      "textMuted": "#6b6785",
+      "textInverse": "#ffffff",
+      "border": "#e6e3f4",
+      "borderStrong": "#cdc7e6",
+      "success": "#12a150",
+      "warning": "#e08700",
+      "error": "#e5484d",
+      "info": "#6d4aff",
+      "focusRing": "#6d4aff"
+    },
+    "spacing": {
+      "xs": "4px",
+      "sm": "8px",
+      "md": "14px",
+      "lg": "22px",
+      "xl": "34px",
+      "xxl": "52px"
+    },
+    "radius": {
+      "sm": "10px",
+      "md": "16px",
+      "lg": "24px",
+      "pill": "999px"
+    },
+    "typography": {
+      "fontFamilyBase": "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Naskh Arabic', Arial, sans-serif",
+      "fontFamilyDisplay": "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Naskh Arabic', Arial, sans-serif",
+      "fontFamilyMono": "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+      "sizeXs": "12px",
+      "sizeSm": "13px",
+      "sizeMd": "15px",
+      "sizeLg": "18px",
+      "sizeXl": "24px",
+      "sizeXxl": "34px",
+      "weightRegular": "400",
+      "weightMedium": "600",
+      "weightBold": "700",
+      "lineHeightTight": "1.25",
+      "lineHeightNormal": "1.55"
+    },
+    "shadow": {
+      "sm": "0 2px 6px rgb(109 74 255 / 0.08)",
+      "md": "0 8px 24px rgb(109 74 255 / 0.12)",
+      "lg": "0 20px 48px rgb(109 74 255 / 0.18)"
+    },
+    "component": {
+      "button": {
+        "radius": "{radius.md}",
+        "paddingX": "{spacing.md}",
+        "paddingY": "{spacing.sm}"
+      },
+      "card": {
+        "radius": "{radius.lg}",
+        "padding": "{spacing.lg}",
+        "shadow": "{shadow.sm}"
+      },
+      "input": {
+        "radius": "{radius.md}",
+        "borderColor": "{color.border}",
+        "background": "{color.surface}"
+      },
+      "nav": {
+        "background": "{color.surface}",
+        "text": "{color.text}",
+        "activeBackground": "{color.surfaceAlt}"
+      }
+    }
+  }
+}
