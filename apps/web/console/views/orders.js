@@ -1,14 +1,14 @@
 /**
  * Orders, reports and the audit log.
  *
- * The order detail view is the spec's §19 timeline made real: every event, who
- * caused it, from which station, and when. It is the screen a manager opens
- * when a diner disputes a bill, so it shows the raw record rather than a
- * summary.
+ * The order detail view and the activity log are the spec's §19 timeline made
+ * real: every event, who caused it, from which station, and when. They are the
+ * screens a manager opens when a diner disputes a bill, so they show the raw
+ * record rather than a summary.
  */
 
 import { api, guard, t } from '../../shared/boot.js';
-import { h, mount, modal } from '../../shared/dom.js';
+import { h, mount, modal, debounce } from '../../shared/dom.js';
 import { formatMoney, pick, te, formatDateTime, formatTime } from '../../shared/i18n.js';
 import { Capability, Permission } from '../../shared/events.js';
 import { state, has, can, pageHeader, lockedPanel } from '../app.js';
@@ -224,31 +224,162 @@ function breakdown(title, rows) {
               h('td', { style: { textAlign: 'end' } }, row[2]))))));
 }
 
-/* ---------------------------------------------------------------- audit */
+/* ------------------------------------------------------------- activity */
 
+/**
+ * The activity log (spec §19).
+ *
+ * Every action by every person and every station, filterable by who did it,
+ * what they did, which station they did it from, and when. Filters are built
+ * from what the log actually contains, so a module added later shows up here
+ * without anybody editing a dropdown, and results are paged rather than
+ * truncated — a log you can only see the newest page of is not evidence.
+ */
 export async function renderAudit(container) {
-  const { entries } = await api.get('/api/audit?limit=300');
+  const filters = { search: '', actorUserId: '', action: '', entityType: '', since: '', until: '' };
+  const page = { limit: 100, offset: 0 };
 
-  mount(container,
-    pageHeader(t('audit.title')),
-    h('p', { class: 'qs-muted' }, t('orders.timeline')),
+  const facets = await api.get('/api/audit/facets').catch(
+    () => ({ actions: [], entityTypes: [], actors: [] }));
 
-    h('div', { class: 'qs-card' },
-      h('div', { class: 'qs-table-wrap' },
-        h('table', { class: 'qs-table' },
-          h('thead', {}, h('tr', {},
-            h('th', {}, t('audit.when')),
-            h('th', {}, t('audit.action')),
-            h('th', {}, t('audit.who')),
-            h('th', {}, t('audit.entity')),
-            h('th', {}, t('audit.detail')))),
-          h('tbody', {}, entries.map((entry) =>
-            h('tr', {},
-              h('td', { class: 'qs-xs qs-muted qs-nowrap' }, formatDateTime(entry.at)),
-              h('td', { class: 'qs-small' }, entry.action),
-              h('td', { class: 'qs-small' },
-                entry.actor.userName ?? entry.actor.terminalName ?? entry.actor.kind),
-              h('td', { class: 'qs-mono qs-xs' }, `${entry.entityType} ${entry.entityId ?? ''}`),
-              h('td', { class: 'qs-xs qs-muted' },
-                JSON.stringify(entry.after ?? entry.detail ?? {}).slice(0, 120)))))))));
+  const results = h('div', {});
+  let rows = [];
+
+  const queryString = () => {
+    const params = new URLSearchParams({ limit: String(page.limit), offset: String(page.offset) });
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== '') params.set(key, value);
+    }
+    return params.toString();
+  };
+
+  const load = async ({ append = false } = {}) => {
+    if (!append) page.offset = 0;
+    const response = await api.get(`/api/audit?${queryString()}`);
+    rows = append ? [...rows, ...response.entries] : response.entries;
+    draw(response.total);
+  };
+
+  const reload = debounce(() => void load(), 250);
+
+  /** One row, expandable into its before/after pair. */
+  const row = (entry) => {
+    const who = entry.actor.userName ?? entry.actor.terminalName
+      ?? t(`audit.kind.${entry.actor.kind.toLowerCase()}`);
+    const hasChange = entry.before !== null || entry.after !== null
+      || Object.keys(entry.detail ?? {}).length > 0;
+
+    const tr = h('tr', { 'data-expandable': String(hasChange) },
+      h('td', { class: 'qs-xs qs-muted qs-nowrap' }, formatDateTime(entry.at)),
+      h('td', { class: 'qs-small' },
+        h('span', { class: 'qs-mono qs-xs' }, entry.action)),
+      h('td', { class: 'qs-small' },
+        who,
+        entry.actor.terminalName && entry.actor.userName
+          ? h('span', { class: 'qs-xs qs-muted' }, ` · ${entry.actor.terminalName}`)
+          : null),
+      h('td', { class: 'qs-xs' },
+        entry.entityType,
+        entry.entityId ? h('span', { class: 'qs-mono qs-muted' }, ` ${entry.entityId}`) : null));
+
+    if (!hasChange) return [tr];
+
+    const detail = h('tr', { class: 'qs-row-detail qs-hidden' },
+      h('td', { colspan: '4' },
+        h('div', { class: 'qs-grid qs-grid-2' },
+          entry.before !== null
+            ? h('div', {},
+                h('div', { class: 'qs-section-title' }, t('audit.before')),
+                h('pre', { class: 'qs-xs' }, JSON.stringify(entry.before, null, 2)))
+            : null,
+          entry.after !== null
+            ? h('div', {},
+                h('div', { class: 'qs-section-title' }, t('audit.after')),
+                h('pre', { class: 'qs-xs' }, JSON.stringify(entry.after, null, 2)))
+            : null,
+          Object.keys(entry.detail ?? {}).length > 0
+            ? h('div', {},
+                h('div', { class: 'qs-section-title' }, t('audit.detail')),
+                h('pre', { class: 'qs-xs' }, JSON.stringify(entry.detail, null, 2)))
+            : null)));
+
+    tr.addEventListener('click', () => detail.classList.toggle('qs-hidden'));
+    return [tr, detail];
+  };
+
+  const draw = (total) => {
+    mount(results,
+      h('p', { class: 'qs-small qs-muted' },
+        t('audit.showing', { shown: rows.length, total })),
+
+      rows.length === 0
+        ? h('div', { class: 'qs-empty' }, t('audit.empty'))
+        : h('div', { class: 'qs-table-wrap' },
+            h('table', { class: 'qs-table qs-table-clickable' },
+              h('thead', {}, h('tr', {},
+                h('th', {}, t('audit.when')),
+                h('th', {}, t('audit.action')),
+                h('th', {}, t('audit.who')),
+                h('th', {}, t('audit.entity')))),
+              h('tbody', {}, rows.map(row)))),
+
+      rows.length < total
+        ? h('button', {
+            class: 'qs-btn qs-btn-block',
+            onClick: async () => {
+              page.offset = rows.length;
+              await load({ append: true });
+            },
+          }, t('audit.load_more'))
+        : null);
+  };
+
+  const filterInput = (key, node) => {
+    node.addEventListener('input', () => { filters[key] = node.value; reload(); });
+    node.addEventListener('change', () => { filters[key] = node.value; reload(); });
+    return node;
+  };
+
+  const controls = h('div', { class: 'qs-card filter-bar' },
+    h('label', { class: 'qs-field' },
+      h('span', {}, t('audit.search')),
+      filterInput('search', h('input', { type: 'search', placeholder: t('audit.search') }))),
+
+    h('label', { class: 'qs-field' },
+      h('span', {}, t('audit.filter_actor')),
+      filterInput('actorUserId', h('select', {},
+        h('option', { value: '' }, t('audit.everyone')),
+        facets.actors.map((actor) => h('option', { value: actor.userId }, actor.userName))))),
+
+    h('label', { class: 'qs-field' },
+      h('span', {}, t('audit.filter_action')),
+      filterInput('action', h('select', {},
+        h('option', { value: '' }, t('audit.anything')),
+        facets.actions.map((action) => h('option', { value: action }, action))))),
+
+    h('label', { class: 'qs-field' },
+      h('span', {}, t('audit.filter_entity')),
+      filterInput('entityType', h('select', {},
+        h('option', { value: '' }, t('audit.anything')),
+        facets.entityTypes.map((kind) => h('option', { value: kind }, kind))))),
+
+    h('label', { class: 'qs-field' },
+      h('span', {}, t('audit.filter_from')),
+      filterInput('since', h('input', { type: 'date' }))),
+
+    h('label', { class: 'qs-field' },
+      h('span', {}, t('audit.filter_to')),
+      filterInput('until', h('input', { type: 'date' }))),
+
+    h('button', {
+      class: 'qs-btn qs-btn-ghost qs-btn-sm',
+      onClick: async () => {
+        for (const key of Object.keys(filters)) filters[key] = '';
+        for (const node of controls.querySelectorAll('input, select')) node.value = '';
+        await load();
+      },
+    }, t('audit.clear_filters')));
+
+  mount(container, pageHeader(t('audit.title')), controls, results);
+  await load();
 }

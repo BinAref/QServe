@@ -186,3 +186,80 @@
   background: var(--qs-color-border);
 }
 .wizard-steps span[data-done="true"] { background: var(--qs-color-primary); }
+
+/* ------------------------------------------------- languages and themes */
+
+.pack-card { display: grid; gap: var(--qs-spacing-md); }
+.pack-editor { display: grid; gap: var(--qs-spacing-lg); }
+.pack-editor textarea {
+  font-family: var(--qs-typography-font-family-mono);
+  font-size: var(--qs-typography-size-xs);
+  line-height: 1.5;
+  resize: vertical;
+}
+.pack-step {
+  padding-inline-start: var(--qs-spacing-md);
+  border-inline-start: 3px solid var(--qs-color-border);
+}
+.pack-step h3 { margin: 0 0 var(--qs-spacing-sm); font-size: var(--qs-typography-size-md); }
+
+.coverage { display: grid; gap: 4px; }
+.coverage-bar {
+  block-size: 6px;
+  border-radius: var(--qs-radius-pill);
+  background: var(--qs-color-surface-alt);
+  overflow: hidden;
+}
+.coverage-bar span {
+  display: block;
+  block-size: 100%;
+  background: var(--qs-color-primary);
+}
+
+/* ---------------------------------------------------------- vendor info */
+
+.price-list {
+  display: grid;
+  gap: var(--qs-spacing-sm);
+  margin-block: var(--qs-spacing-md);
+}
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--qs-spacing-sm);
+  flex-wrap: wrap;
+  padding: var(--qs-spacing-sm);
+  border-radius: var(--qs-radius-sm);
+  background: var(--qs-color-surface-alt);
+}
+.price-row strong { font-size: var(--qs-typography-size-lg); }
+
+/* -------------------------------------------------------- activity log */
+
+.filter-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--qs-spacing-md);
+  align-items: end;
+  margin-block-end: var(--qs-spacing-lg);
+}
+.filter-bar .qs-field { margin-block-end: 0; }
+.qs-row-detail td { background: var(--qs-color-surface-alt); }
+.qs-row-detail pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-block-size: 240px;
+  overflow: auto;
+}
+
+/* --------------------------------------------------------------- lock */
+
+.lock-screen {
+  display: grid;
+  place-items: center;
+  min-block-size: 100vh;
+  padding: var(--qs-spacing-lg);
+}
+.lock-card { inline-size: min(420px, 100%); text-align: center; }
+.lock-mark { font-size: 48px; line-height: 1; }

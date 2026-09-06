@@ -56,6 +56,37 @@ user.
 Disabling an account or changing its password deletes its live sessions
 immediately, rather than waiting for expiry.
 
+### The app lock
+
+A restaurant PC often sits in a back room where deliveries arrive and staff come
+and go. Each restaurant chooses: a password when this computer opens QServe, or
+none. It is **off** until the owner turns it on.
+
+Three properties make it a lock rather than a hidden screen:
+
+- **The API is what is locked.** While locked, the middleware refuses every
+  console route with `423 APP_LOCKED`, and the asset files with it. The lock
+  screen cannot be walked past by typing a URL, because there is nothing behind
+  it to reach. Only four paths stay open: the lock status, the unlock attempt,
+  the language packs and the theme CSS — so the lock screen appears in the
+  owner's own language and colours. None of those carries restaurant data.
+- **It never locks the restaurant out of service.** The guard is mounted on the
+  loopback console only. Tables, kitchen, till and waiter terminals on the LAN
+  are untouched, because a forgotten office password must not stop dinner.
+- **It is not a preference.** The passphrase is scrypt-hashed like a staff
+  secret, unlock attempts are rate limited (10 per 10 minutes), and unlock
+  sessions are held in memory only, so restarting re-locks. Turning the lock on
+  or off, or changing the passphrase, requires the *current* passphrase and
+  invalidates every open unlock session — including the one making the change.
+
+`GET /api/settings` redacts the lock hash and the backup passphrase to a
+placeholder, and `PATCH /api/settings` refuses to write either: a secret has its
+own endpoint, never a text box in a settings grid.
+
+Every attempt is audited — `applock.enabled`, `applock.disabled`,
+`applock.locked`, `applock.unlocked`, `applock.failed` — with the address it
+came from.
+
 ---
 
 ## 3. Authorisation
@@ -178,9 +209,27 @@ the database. Manual backups take a passphrase that is never stored.
 ## 7. Audit trail
 
 Append-only by construction: the repository exposes `record` and reads, and no
-update or delete. Every order creation, status change, payment, refund, licence
-action, settings change and user change is recorded with the actor, the station,
-the timestamp, the client address and the before/after values.
+update or delete. Everything every person and every station does is recorded
+with the actor, the station, the timestamp, the client address and the
+before/after values:
+
+| area | recorded |
+|---|---|
+| orders | created, status changed, items added and removed, discount applied, cancelled |
+| money | payment captured, refunded, receipt or ticket reprinted |
+| menu | every category, product, option, choice and add-on created, edited, reordered or deleted — with before/after |
+| service | tables and terminals created, edited, deleted, QR rotated, station signed out, sound changed |
+| people | sign-in, failed sign-in, sign-out, users and roles created, edited, deleted, permissions changed |
+| system | settings changed, backup created and restored, assets uploaded and deleted, printers edited |
+| licence | activated, deactivated |
+| the lock | enabled, disabled, locked, unlocked, failed unlock |
+| languages and themes | restaurant packs created, updated, deleted; shipped packs installed and removed |
+
+**Console → Activity log** reads it back filtered by person, station, action,
+kind, date range and free text, paged rather than truncated, with each row
+expanding into its before/after pair. The filter lists are built from the values
+actually present, so a module added later appears without anybody editing a
+dropdown.
 
 Ordering is by `(at, rowid)`. The rowid tiebreaker is deliberate: several
 actions routinely share a millisecond, and ids carry random suffixes, so

@@ -16,6 +16,7 @@ import {
 import { HttpResponse, Router } from '@qserve/http';
 import type { Services } from '../../container.js';
 import type { AppState } from '../../core/security.js';
+import { SECRET_PLACEHOLDER, SECRET_SETTING_KEYS } from '../../core/repositories/settings.js';
 
 export function createManagementRoutes(services: Services): Router<AppState> {
   const router = new Router<AppState>();
@@ -106,34 +107,43 @@ export function createManagementRoutes(services: Services): Router<AppState> {
 
   /* ----------------------------------------------------------- settings */
 
-  router.get('/settings', () => ({ settings: services.settings.all() }),
+  router.get('/settings', () => ({ settings: services.settings.publicAll() }),
     [loopbackOnly, security.requirePermission(Permission.SETTINGS_MANAGE)]);
 
   router.patch('/settings', (ctx) => {
     const body = asObject(ctx.body);
     const before = services.settings.all();
+    const written: string[] = [];
 
     for (const [key, value] of Object.entries(body)) {
       if (!(key in before)) {
         throw validationError(`unknown setting "${key}"`, { field: key });
       }
+      // The console never receives a secret's value, so it cannot send one
+      // back. Echoing the placeholder means "unchanged"; the app lock has its
+      // own endpoint for actually setting one.
+      if (SECRET_SETTING_KEYS.includes(key) && value === SECRET_PLACEHOLDER) continue;
+      if (key === 'security.appLockHash' || key === 'security.appLockEnabled') {
+        throw validationError('the app lock is changed from the lock screen', { field: key });
+      }
       services.settings.set(key, value);
+      written.push(key);
     }
 
     services.audit.record({
       action: 'settings.updated',
       actor: ctx.state.auth!.actor,
       entityType: 'settings',
-      detail: { keys: Object.keys(body) },
+      detail: { keys: written },
       clientIp: ctx.ip,
     });
 
     services.bus.publish({
       name: EventName.SYSTEM_SETTINGS_CHANGED,
-      payload: { keys: Object.keys(body) },
+      payload: { keys: written },
     });
 
-    return { settings: services.settings.all() };
+    return { settings: services.settings.publicAll() };
   }, [loopbackOnly, canManageSettings]);
 
   /* -------------------------------------------------------------- users */

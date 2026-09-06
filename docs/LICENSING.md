@@ -178,8 +178,9 @@ reason.
 
 ## 6. Protocol
 
-The restaurant server makes outbound calls on exactly four occasions. Nothing
-else in the product ever reaches the network.
+The restaurant server makes outbound calls on exactly five occasions, every one
+of them started by a person pressing a button. Nothing else in the product ever
+reaches the network.
 
 | route | when |
 |---|---|
@@ -187,6 +188,7 @@ else in the product ever reaches the network.
 | `POST /api/v1/deactivate` | before moving to another machine |
 | `POST /api/v1/status` | a manual check from the licence screen |
 | `GET /api/v1/public-keys` | out-of-band key pinning by an installer |
+| `GET /api/v1/vendor-info` | the owner presses "refresh prices and contacts" |
 
 Requests carry a nonce, echoed in the response; a mismatch is treated as a
 failure rather than accepted. Activation is rate limited per source address.
@@ -197,20 +199,45 @@ restaurant keeps working — because it does.
 
 ---
 
-## 7. Requesting a licence
+## 7. Requesting a licence, and paying for one
 
-The licence screen offers **"I have a licence key"** and **"Request a licence"**.
-The latter opens WhatsApp with a message the owner can edit before sending:
+**The application handles no payment.** There is no card form, no checkout, no
+payment provider, and no route anywhere in either server that moves money. A
+restaurant that wants a licence talks to the vendor, pays however the two of
+them agree, and is given a key to type in.
+
+So the only thing the software needs to know is *who to contact and what to
+expect to pay* — and both are the vendor's to write, in the vendor console:
+
+| field | example | who writes it |
+|---|---|---|
+| vendor name and tagline | "QServe Gulf" | vendor |
+| **activation price** | `1,500 SAR`, `٥٠٠ ر.س شامل التركيب` | vendor |
+| **transfer price** | `150 SAR`, `first move within a year is free` | vendor |
+| contacts | WhatsApp, phone, email, Telegram, website | vendor |
+| how to buy | free text shown under the prices | vendor |
+
+Prices are free text on purpose. A vendor selling in three countries can say
+what is actually true, which a number and a currency code cannot. Left blank,
+the restaurant is told to ask.
+
+The restaurant fetches this once from `GET /api/v1/vendor-info` — public and
+unauthenticated, because a restaurant in SETUP mode has no licence yet, and
+that is exactly when it needs the phone number — and caches it in settings. A
+restaurant deciding to buy is often a restaurant whose internet is not working,
+which is why it bought an offline system; the cached prices stay readable, with
+the date they were fetched shown beside them.
+
+The licence screen then offers **"I have a licence key"** and a contact button
+per channel. WhatsApp and Telegram links carry a prefilled message, composed in
+the console from translation keys so it goes out in the owner's own language:
 
 ```
-مرحبًا،
-أريد تفعيل ترخيص نظام المطعم.
-
-اسم المطعم: Al Bait
+Hello, I would like a licence for QServe.
+Restaurant: Al Bait Grill
 Restaurant ID: REST-000123
-إصدار التطبيق: 1.0.0
-
-أرغب في الحصول على الترخيص.
+Version: 1.0.0
+Computer: kitchen-pc (windows/x64)
 ```
 
 It carries only what the vendor needs to issue a key. No menu, no orders, no
@@ -227,8 +254,9 @@ at first boot from the environment, or generated and printed once.
 
 The console can: search restaurants and licences, issue a licence (ids and key
 material are generated — the developer never types cryptographic material),
-release a device, revoke, reinstate, record a paid transfer, and read the full
-activation, transfer and audit history.
+release a device, revoke, reinstate, record a paid transfer, read the full
+activation, transfer and audit history, and write the pricing and contact
+details every restaurant sees on its licence screen (§7).
 
 What it **cannot** do is see a restaurant's menu, orders, prices or diners —
 because the licence server never receives them. There is no route that could.

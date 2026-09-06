@@ -35,6 +35,13 @@ export interface ServerConfig {
   readonly userSessionTtlSeconds: number;
   /** Terminal sessions are long-lived: a kitchen screen is never signed out. */
   readonly terminalSessionTtlSeconds: number;
+  /**
+   * Developer mode (spec §30). Off in every packaged build. It unlocks one
+   * thing: authoring the *shipped* language and theme packs — the files in
+   * `locales/` and `themes/` that ship with the product — which is a thing the
+   * developer does on their own machine, never a restaurant on theirs.
+   */
+  readonly developerMode: boolean;
 }
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -58,5 +65,6 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
     ),
     userSessionTtlSeconds: Number(env.QSERVE_USER_SESSION_TTL ?? 12 * 60 * 60),
     terminalSessionTtlSeconds: Number(env.QSERVE_TERMINAL_SESSION_TTL ?? 365 * 24 * 60 * 60),
+    developerMode: env.QSERVE_DEVELOPER_MODE === 'true',
   };
 }

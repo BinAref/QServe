@@ -27,6 +27,7 @@ const api = {
   get: (p) => api.call('GET', p),
   post: (p, b) => api.call('POST', p, b ?? {}),
   patch: (p, b) => api.call('PATCH', p, b),
+  put: (p, b) => api.call('PUT', p, b),
 };
 
 /* ------------------------------------------------------------------ helpers */
@@ -212,6 +213,111 @@ const views = {
           h('button', { class: 'btn btn-primary', onClick: () => form.requestSubmit() },
             'Create licence'))),
       result);
+  },
+
+  /**
+   * Pricing and contact details (spec §6, §29).
+   *
+   * QServe takes no payment anywhere. A restaurant that wants a licence talks
+   * to whoever sells it one, pays however the two of them agree, and is given a
+   * key to type in — so the only thing the software has to know is who to
+   * contact and what to expect to pay, and both are written here.
+   *
+   * The prices are free text on purpose. "1,500 SAR", "٥٠٠ ر.س شامل التركيب",
+   * "first transfer free" — a vendor selling in three countries can say what is
+   * actually true, which a number and a currency code cannot.
+   */
+  async pricing(main) {
+    const info = await api.get('/admin/api/vendor-info');
+
+    const contactRows = h('div', { class: 'contact-rows' });
+    const addContact = (contact = { kind: 'WHATSAPP', label: '', value: '' }) => {
+      const row = h('div', { class: 'row contact-row' },
+        h('select', { class: 'contact-kind' },
+          ['WHATSAPP', 'PHONE', 'EMAIL', 'TELEGRAM', 'WEBSITE', 'OTHER'].map((kind) =>
+            h('option', { value: kind, ...(kind === contact.kind ? { selected: true } : {}) },
+              kind.charAt(0) + kind.slice(1).toLowerCase()))),
+        h('input', { class: 'contact-label', placeholder: 'Label, e.g. Sales', value: contact.label }),
+        h('input', { class: 'contact-value', placeholder: '+966 50 123 4567', value: contact.value }),
+        h('button', {
+          class: 'btn btn-ghost', type: 'button',
+          onClick: () => row.remove(),
+        }, 'Remove'));
+      contactRows.append(row);
+    };
+    for (const contact of info.contacts) addContact(contact);
+    if (info.contacts.length === 0) addContact();
+
+    const field = (label, value, placeholder = '') =>
+      h('label', {}, label, h('input', { value: value ?? '', placeholder }));
+
+    const vendorName = field('Your name, as restaurants see it', info.vendorName, 'QServe Gulf');
+    const tagline = field('Tagline (optional)', info.tagline, 'Local restaurant systems');
+    const activationPrice = field('Activation price', info.pricing.activation.price, '1,500 SAR');
+    const activationNote = field('Activation note (optional)', info.pricing.activation.note, 'includes setup');
+    const transferPrice = field('Transfer price', info.pricing.transfer.price, '150 SAR');
+    const transferNote = field('Transfer note (optional)', info.pricing.transfer.note, '');
+    const instructions = h('label', {}, 'How to buy — shown under the prices',
+      h('textarea', { rows: '5' }, info.instructions ?? ''));
+
+    const value = (node, selector) => node.querySelector(selector).value.trim();
+
+    const save = () => guarded(async () => {
+      await api.put('/admin/api/vendor-info', {
+        vendorName: vendorName.querySelector('input').value.trim(),
+        tagline: tagline.querySelector('input').value.trim() || null,
+        contacts: [...contactRows.querySelectorAll('.contact-row')].map((row) => ({
+          kind: value(row, '.contact-kind'),
+          label: value(row, '.contact-label'),
+          value: value(row, '.contact-value'),
+        })).filter((contact) => contact.value !== ''),
+        pricing: {
+          activation: {
+            price: activationPrice.querySelector('input').value.trim(),
+            note: activationNote.querySelector('input').value.trim() || null,
+          },
+          transfer: {
+            price: transferPrice.querySelector('input').value.trim(),
+            note: transferNote.querySelector('input').value.trim() || null,
+          },
+        },
+        instructions: instructions.querySelector('textarea').value.trim() || null,
+      });
+      toast('Saved — restaurants see this the next time they refresh', 'success');
+      render('pricing');
+    });
+
+    main.replaceChildren(
+      h('div', { class: 'card' },
+        h('h2', {}, 'Pricing and contact'),
+        h('p', { class: 'muted' },
+          'This is the only place a price is written. The application takes no payment: ' +
+          'restaurants read this on their licence screen and contact you directly.'),
+        h('div', { class: 'form-grid', style: 'margin-top:16px' }, vendorName, tagline)),
+
+      h('div', { class: 'card' },
+        h('h3', {}, 'Prices'),
+        h('p', { class: 'muted' },
+          'Free text — write it the way you would say it. Left blank, restaurants ' +
+          'are told to ask you. The transfer price is what moving a licence to ' +
+          'another computer costs.'),
+        h('div', { class: 'form-grid', style: 'margin-top:16px' },
+          activationPrice, activationNote, transferPrice, transferNote)),
+
+      h('div', { class: 'card' },
+        h('h3', {}, 'How restaurants reach you'),
+        contactRows,
+        h('div', { class: 'row', style: 'margin-top:12px' },
+          h('button', { class: 'btn btn-ghost', type: 'button', onClick: () => addContact() },
+            'Add a contact'))),
+
+      h('div', { class: 'card' },
+        instructions,
+        h('div', { class: 'row', style: 'margin-top:16px' },
+          h('button', { class: 'btn btn-primary', onClick: save }, 'Save'),
+          info.updatedAt && !info.updatedAt.startsWith('1970')
+            ? h('span', { class: 'muted' }, `Last changed ${when(info.updatedAt)}`)
+            : null)));
   },
 
   async audit(main) {

@@ -8,7 +8,7 @@
  * while still going through the identical verification the product uses.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,12 +42,19 @@ export function createInstallation(): Installation {
   const trustedKeysFile = join(dataDir, 'trusted-keys.json');
   writeFileSync(trustedKeysFile, JSON.stringify({ keys: { [signing.keyId]: signing.publicKey } }));
 
+  // The shipped packs are copied rather than referenced: developer-mode tests
+  // write real files into these directories, and no test may edit the repo.
+  const localesDir = join(dataDir, 'locales');
+  const themesDir = join(dataDir, 'themes');
+  cpSync(join(repoRoot, 'locales'), localesDir, { recursive: true });
+  cpSync(join(repoRoot, 'themes'), themesDir, { recursive: true });
+
   const services = buildServices({
     config: loadServerConfig({
       QSERVE_DATA_DIR: dataDir,
       QSERVE_TRUSTED_KEYS_FILE: trustedKeysFile,
-      QSERVE_LOCALES_DIR: join(repoRoot, 'locales'),
-      QSERVE_THEMES_DIR: join(repoRoot, 'themes'),
+      QSERVE_LOCALES_DIR: localesDir,
+      QSERVE_THEMES_DIR: themesDir,
       QSERVE_WEB_ROOT: join(repoRoot, 'apps/web'),
     }),
     onWarning: () => {},

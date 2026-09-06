@@ -17,7 +17,8 @@ and tested alone.
 | `realtime.ts` | WebSocket projection of the bus, authorised per event |
 | `network.ts` | LAN addresses, a small mDNS responder, the QR base URL |
 | `paths.ts` | on-disk layout — encodes what is and is not backed up |
-| `repositories/` | access (users, roles, sessions), terminals, settings, audit, licence |
+| `app-lock.ts` | the optional console password: a middleware, not a screen |
+| `repositories/` | access (users, roles, sessions), terminals, settings, audit, licence, packs |
 
 ---
 
@@ -67,12 +68,26 @@ export. Reads the same local database that took the orders — no warehouse, no
 nightly export, no cloud.
 
 ### licensing
-The only module that makes an outbound call, on four occasions. Everything else
-is offline.
+The only module that makes an outbound call, on five occasions, every one of
+them started by a person pressing a button. It also caches the vendor's contact
+details and prices so the licence screen still shows them offline. Everything
+else is offline.
 
 ### translations / themes
-Discover, validate and serve packs from `locales/` and `themes/`. A pack that
-fails validation is rejected and reported rather than half-loaded.
+Discover, validate and serve packs from `locales/` and `themes/`, with the
+restaurant's own packs merged over them key by key. A pack that fails validation
+is rejected and reported rather than half-loaded.
+
+`translations/content.ts` is the catalogue of every text the owner typed —
+category names, dishes, descriptions, options, choices, add-ons, station and
+role names — as one flat map a translator can work through. Adding a
+translatable field later is one entry in a table; the export, the import, the
+coverage report and the console all pick it up.
+
+`translations/authoring.ts` is the restaurant's copy → translate → paste loop;
+`translations/shipping.ts` is the developer's, writing the files the product
+ships with, and validating them strictly because a gap there is a gap
+everywhere.
 
 ### assets
 Content-addressed image storage with magic-byte checking. Refuses to delete an

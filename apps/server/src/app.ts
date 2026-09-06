@@ -31,6 +31,7 @@ import { createOperationsRoutes } from './http/routes/operations.js';
 import { createManagementRoutes } from './http/routes/management.js';
 import { createLockRoutes, LOCK_ALLOWED_PATHS } from './http/routes/lock.js';
 import { createPackRoutes } from './http/routes/packs.js';
+import { createDeveloperRoutes } from './http/routes/developer.js';
 import {
   createAssetFileRoutes, createContentRoutes, createEnrolmentRoutes,
 } from './http/routes/content.js';
@@ -80,6 +81,7 @@ export class QServeApp {
     const api = this.commonApi();
     api.mount('/', createManagementRoutes(this.services));
     api.mount('/', createPackRoutes(this.services));
+    api.mount('/', createDeveloperRoutes(this.services));
     api.mount('/', createLockRoutes(this.services));
     // Everything the console can read goes behind the optional app lock. The
     // static files do not: they hold no restaurant data, and the lock screen is

@@ -16,9 +16,10 @@ import { state, has, can, isSetup, pageHeader, lockedPanel, refreshStatus, navig
 /* -------------------------------------------------------------- settings */
 
 export async function renderSettings(container) {
-  const [restaurant, settingsResult] = await Promise.all([
+  const [restaurant, settingsResult, lock] = await Promise.all([
     api.get('/api/restaurant'),
     api.get('/api/settings'),
+    api.get('/api/lock').catch(() => null),
   ]);
   const settings = settingsResult.settings;
   const locales = state.status.locales ?? [];
@@ -129,7 +130,126 @@ export async function renderSettings(container) {
   mount(container,
     pageHeader(t('settings.title')),
     profileForm,
+    lock ? appLockPanel(lock, canEdit, container) : null,
     operationalSettings(settings, canEdit, container));
+}
+
+/**
+ * The optional app lock (spec §20, §51).
+ *
+ * Each restaurant decides: a password when this computer opens QServe, or no
+ * password at all. It guards the console only — the panel says so, because an
+ * owner who thinks a forgotten password could stop service would never turn it
+ * on, and the fear would be misplaced.
+ */
+function appLockPanel(lock, canEdit, container) {
+  const form = h('form', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } });
+
+  const enableCheck = h('input', {
+    type: 'checkbox', name: 'enabled', checked: lock.enabled, disabled: !canEdit,
+  });
+  const fields = h('div', { class: lock.enabled ? '' : 'qs-hidden' });
+  enableCheck.addEventListener('change', () => {
+    fields.classList.toggle('qs-hidden', !enableCheck.checked);
+  });
+
+  mount(fields,
+    h('div', { class: 'qs-grid qs-grid-2' },
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('lock.new_password')),
+        h('input', {
+          name: 'passphrase', type: 'password', minlength: '4', maxlength: '200',
+          autocomplete: 'new-password', disabled: !canEdit,
+        }),
+        lock.enabled ? h('small', { class: 'qs-muted' }, t('lock.keep_password')) : null),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('lock.confirm_password')),
+        h('input', {
+          name: 'confirm', type: 'password', maxlength: '200',
+          autocomplete: 'new-password', disabled: !canEdit,
+        }))),
+
+    h('div', { class: 'qs-grid qs-grid-2' },
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('lock.hint')),
+        h('input', { name: 'hint', maxlength: '120', value: lock.hint ?? '', disabled: !canEdit }),
+        h('small', { class: 'qs-muted' }, t('lock.hint_help'))),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('lock.idle_minutes')),
+        h('input', {
+          name: 'idleMinutes', type: 'number', min: '1', max: '1440',
+          value: String(lock.idleMinutes ?? 30), disabled: !canEdit,
+        }))));
+
+  mount(form,
+    h('h2', {}, t('lock.title')),
+    h('p', { class: 'qs-muted' }, t('lock.subtitle')),
+
+    h('p', {},
+      h('span', { class: lock.enabled ? 'qs-badge qs-badge-success' : 'qs-badge' },
+        t(lock.enabled ? 'lock.enabled' : 'lock.disabled'))),
+
+    h('label', { class: 'qs-check' }, enableCheck, h('span', {}, t('lock.enable'))),
+    fields,
+
+    lock.enabled
+      ? h('label', { class: 'qs-field' },
+          h('span', {}, t('lock.current_password')),
+          h('input', {
+            name: 'currentPassphrase', type: 'password', maxlength: '200',
+            autocomplete: 'current-password', disabled: !canEdit,
+          }),
+          h('small', { class: 'qs-muted' }, t('lock.current_required')))
+      : null,
+
+    h('p', { class: 'qs-xs qs-muted' },
+      t('lock.terminals_unaffected'), ' ', t('lock.restart_note')),
+
+    canEdit
+      ? h('div', { class: 'qs-row' },
+          h('button', { class: 'qs-btn qs-btn-primary', type: 'submit' }, t('common.save')),
+          lock.enabled
+            ? h('button', {
+                class: 'qs-btn', type: 'button',
+                onClick: async () => {
+                  const done = await guard(() => api.post('/api/lock/engage'));
+                  if (done) location.reload();
+                },
+              }, t('lock.lock_now'))
+            : null)
+      : null);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    const passphrase = String(data.passphrase ?? '');
+
+    if (passphrase !== '' && passphrase !== String(data.confirm ?? '')) {
+      toast(t('lock.mismatch'), 'error');
+      return;
+    }
+    if (data.enabled === 'on' && !lock.enabled && passphrase.length < 4) {
+      toast(t('lock.too_short'), 'error');
+      return;
+    }
+
+    const saved = await guard(() => api.put('/api/lock/settings', {
+      enabled: data.enabled === 'on',
+      passphrase,
+      currentPassphrase: String(data.currentPassphrase ?? ''),
+      hint: String(data.hint ?? '').trim() || null,
+      idleMinutes: Number(data.idleMinutes ?? 30),
+    }));
+    if (!saved) return;
+
+    toast(t('common.saved'), 'success');
+    // Any change clears every unlock session, this one included, so the honest
+    // thing to do is send the owner straight to the lock screen.
+    if (saved.enabled) location.reload();
+    else await renderSettings(container);
+  });
+
+  return form;
 }
 
 function field(label, name, value) {
@@ -142,12 +262,14 @@ function field(label, name, value) {
  * The behavioural switches. Rendered from whatever keys the server reports, so
  * a module adding a setting needs no console change.
  */
+const HIDDEN_SETTINGS = ['backup.passphrase', 'security.', 'license.'];
+
 function operationalSettings(settings, canEdit, container) {
   const groups = new Map();
   for (const [key, value] of Object.entries(settings)) {
-    // A passphrase is a credential, not a preference; it is set on the backup
-    // screen, never displayed here.
-    if (key === 'backup.passphrase') continue;
+    // Credentials and machine-managed caches are not preferences: they have
+    // their own screens above, and a raw text box would be the wrong shape.
+    if (HIDDEN_SETTINGS.some((prefix) => key.startsWith(prefix))) continue;
     const group = key.split('.')[0];
     if (!groups.has(group)) groups.set(group, []);
     groups.get(group).push([key, value]);
@@ -179,7 +301,7 @@ function operationalSettings(settings, canEdit, container) {
     const payload = {};
 
     for (const [key, value] of Object.entries(settings)) {
-      if (key === 'backup.passphrase') continue;
+      if (HIDDEN_SETTINGS.some((prefix) => key.startsWith(prefix))) continue;
       if (typeof value === 'boolean') payload[key] = data.get(key) === 'on';
       else if (typeof value === 'number') payload[key] = Number(data.get(key));
       else {
@@ -681,9 +803,9 @@ function restorePanel(container) {
 /* --------------------------------------------------------------- licence */
 
 export async function renderLicense(container) {
-  const [status, request] = await Promise.all([
+  const [status, vendor] = await Promise.all([
     api.get('/api/license'),
-    api.get('/api/license/request-message').catch(() => null),
+    api.get('/api/license/vendor').catch(() => null),
   ]);
 
   const capabilityRow = (capability, unlocked) =>
@@ -754,18 +876,10 @@ export async function renderLicense(container) {
           h('div', { class: 'qs-card' },
             h('h2', {}, t('license.have_key')),
             activateForm),
-          h('div', { class: 'qs-card' },
-            h('h2', {}, t('license.request')),
-            h('p', { class: 'qs-muted qs-small' }, t('license.request_hint')),
-            request?.url
-              ? h('a', { class: 'qs-btn qs-btn-secondary qs-btn-lg', href: request.url, target: '_blank', rel: 'noopener' },
-                  t('license.request'))
-              : h('p', { class: 'qs-muted qs-small' }, 'QSERVE_VENDOR_WHATSAPP'),
-            h('pre', {
-              class: 'qs-xs qs-muted',
-              style: { whiteSpace: 'pre-wrap', marginBlockStart: 'var(--qs-spacing-md)' },
-            }, request?.text ?? '')))
-      : h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+          vendorPanel(vendor, container))
+      : h('div', { class: 'qs-grid qs-grid-2', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+        vendorPanel(vendor, container),
+        h('div', { class: 'qs-card' },
           h('h2', {}, t('license.deactivate')),
           h('p', { class: 'qs-muted' }, t('license.deactivate_hint')),
           h('button', {
@@ -785,11 +899,96 @@ export async function renderLicense(container) {
               await refreshStatus();
               await renderLicense(container);
             },
-          }, t('license.deactivate'))),
+          }, t('license.deactivate')))),
 
     h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
       h('h3', {}, isSetup() ? t('license.locked_features') : t('common.enabled')),
       h('div', { class: 'capability-list' },
         Object.values(Capability).map((capability) =>
           capabilityRow(capability, status.capabilities.includes(capability))))));
+}
+
+/**
+ * Who to contact for a licence, and what the vendor charges.
+ *
+ * QServe handles no money. Everything on this panel is text the vendor wrote in
+ * their own console and this computer cached, so the prices shown are theirs
+ * and can change without a new version of the application.
+ */
+function vendorPanel(vendor, container) {
+  const info = vendor?.info ?? null;
+  const message = vendor
+    ? t('license.request_body', {
+        restaurant: vendor.request.restaurantName || '—',
+        restaurantId: vendor.request.restaurantId ?? '—',
+        version: vendor.request.appVersion,
+        device: vendor.request.deviceLabel,
+      })
+    : '';
+
+  const priceRow = (labelKey, price) =>
+    h('div', { class: 'price-row' },
+      h('span', { class: 'qs-muted qs-small' }, t(labelKey)),
+      h('strong', {}, price?.price || t('license.price_ask')),
+      price?.note ? h('span', { class: 'qs-xs qs-muted' }, price.note) : null);
+
+  const contactLink = (contact) => {
+    const label = contact.label || t(`license.contact_${contact.kind.toLowerCase()}`);
+    // WhatsApp and Telegram take a prefilled message; the rest are plain links.
+    const href = contact.url && (contact.kind === 'WHATSAPP' || contact.kind === 'TELEGRAM')
+      ? `${contact.url}?text=${encodeURIComponent(message)}`
+      : contact.url;
+
+    return href
+      ? h('a', { class: 'qs-btn qs-btn-secondary', href, target: '_blank', rel: 'noopener' },
+          `${label} · ${contact.value}`)
+      : h('span', { class: 'qs-badge' }, `${label} · ${contact.value}`);
+  };
+
+  return h('div', { class: 'qs-card' },
+    h('h2', {}, t('license.request')),
+    h('p', { class: 'qs-muted qs-small' }, t('license.no_payment')),
+
+    info?.vendorName
+      ? h('p', {}, h('strong', {}, info.vendorName),
+          info.tagline ? h('span', { class: 'qs-muted qs-small' }, ` — ${info.tagline}`) : null)
+      : null,
+
+    h('div', { class: 'price-list' },
+      priceRow('license.price_activation', info?.pricing?.activation),
+      priceRow('license.price_transfer', info?.pricing?.transfer)),
+
+    info?.instructions
+      ? h('p', { class: 'qs-small', style: { whiteSpace: 'pre-wrap' } }, info.instructions)
+      : null,
+
+    (info?.contacts ?? []).length > 0
+      ? h('div', { class: 'qs-row', style: { flexWrap: 'wrap' } },
+          vendor.contacts.map(contactLink))
+      : null,
+
+    h('div', { class: 'qs-row', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
+      h('button', {
+        class: 'qs-btn qs-btn-ghost qs-btn-sm',
+        onClick: async () => {
+          const done = await guard(() => api.post('/api/license/vendor/refresh'));
+          if (!done) return;
+          await renderLicense(container);
+        },
+      }, t('license.refresh_vendor')),
+
+      // One line about how current these prices are, never two.
+      vendor?.fetchedAt
+        ? h('span', { class: 'qs-xs qs-muted' },
+            vendor.stale
+              ? t('license.vendor_stale', { when: formatDateTime(vendor.fetchedAt) })
+              : formatDateTime(vendor.fetchedAt))
+        : h('span', { class: 'qs-xs qs-muted' }, t('license.vendor_never'))),
+
+    message
+      ? h('pre', {
+          class: 'qs-xs qs-muted',
+          style: { whiteSpace: 'pre-wrap', marginBlockStart: 'var(--qs-spacing-md)' },
+        }, message)
+      : null);
 }

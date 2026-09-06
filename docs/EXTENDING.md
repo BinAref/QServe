@@ -8,7 +8,62 @@ practical guide. Each section ends with what you must *not* have to touch.
 
 ## 1. Add a language
 
-Adding a language is adding one file.
+There are two kinds of "add a language", and they are answers to two different
+questions.
+
+| | who | where it lives | how |
+|---|---|---|---|
+| **for one restaurant** | the owner | that restaurant's database | Console → Languages |
+| **for the product** | the developer | `locales/<code>.json` | a file, or Console → Developer |
+
+### 1a. A restaurant adds a language for itself
+
+This is the common case and it needs no developer at all. **Console →
+Languages → Add a language** walks through three steps:
+
+1. **Copy the JSON.** Either the key list with empty values, or an existing
+   language with its text to translate over.
+2. **Translate it** — anywhere. A translator, a colleague, a chat window. There
+   is no account, no API key and no integration, and it works with the internet
+   unplugged for everything except the translating itself.
+3. **Paste it back and save.**
+
+What makes this a *whole* language rather than a translated frame is what the
+file contains. Alongside the interface strings, it carries **every word the
+owner ever typed**: the restaurant's name, category names and descriptions,
+product names and descriptions, option names, every choice, add-ons, station
+names and role names. Keys are `kind:id:field`, so a re-export after the menu
+grows lines up with the previous one.
+
+```json
+{
+  "$schema": "qserve.translation.bundle.v1",
+  "locale": "fr", "name": "Français", "direction": "ltr", "sourceLocale": "en",
+  "ui":      { "common.save": "Enregistrer", "nav.menu": "Carte" },
+  "content": {
+    "product:PRD-01M1W:name": "Kofta d’agneau",
+    "option:OPT-01M1W:name":  "Niveau d’épices",
+    "choice:CHO-01M1X:name":  "Doux"
+  }
+}
+```
+
+Pastes **merge**, in both halves. A partial translation is safe: keys left blank
+keep what they had, keys not mentioned are untouched, and anything still missing
+falls back — a menu grows between exports, and a half-finished translation must
+never undo a finished one.
+
+A restaurant pack for a language QServe already ships overrides only the keys it
+defines, so correcting one wording costs nothing else. Restaurant-authored
+languages live in `custom_locales` and travel in the encrypted backup, because a
+restaurant that translated its whole menu into French must not lose that work
+when the computer is replaced.
+
+**You do not touch:** anything. This is a screen, not a deployment.
+
+### 1b. The developer adds a language to QServe
+
+Adding a language to the product is adding one file.
 
 ```bash
 cp locales/en.json locales/fr.json
@@ -37,6 +92,16 @@ node tools/validate-i18n.mjs --strict   # demand 100% coverage, for CI
 
 Restart the server and enable the language in **Settings → Available to diners**.
 
+The same thing without leaving the browser: start with `QSERVE_DEVELOPER_MODE=true`
+and use **Console → Developer**, which offers the identical copy → translate →
+paste loop and writes `locales/<code>.json` for you. It is off in every packaged
+build, so a restaurant's console has no such section and the routes 404.
+
+One difference from 1a is deliberate: a **shipped** pack is validated strictly. A
+missing key in a restaurant's own language falls back; a missing key in a shipped
+pack would be missing in every restaurant on earth, so it is refused rather than
+warned about.
+
 Notes that save time:
 
 - `locale` must equal the filename, or the pack is rejected.
@@ -55,6 +120,11 @@ Notes that save time:
 ---
 
 ## 2. Add a theme
+
+Same two kinds, same two answers. A restaurant adds a theme for itself in
+**Console → Themes** — copy a theme, change its colours, paste it back — and it
+lives in `custom_themes` and travels in the backup. The developer adds one to
+the product as a file (or in **Console → Developer**):
 
 ```bash
 cp themes/light.json themes/coastal.json

@@ -42,6 +42,7 @@ import { LicensingService } from './modules/licensing/service.js';
 import { TranslationService } from './modules/translations/service.js';
 import { ContentTranslationRepository } from './modules/translations/content.js';
 import { PackAuthoringService } from './modules/translations/authoring.js';
+import { ShippedPackService } from './modules/translations/shipping.js';
 import { ThemeService } from './modules/themes/service.js';
 import { AssetService } from './modules/assets/service.js';
 
@@ -78,6 +79,7 @@ export interface Services {
   readonly translations: TranslationService;
   readonly themes: ThemeService;
   readonly packAuthoring: PackAuthoringService;
+  readonly shippedPacks: ShippedPackService;
   readonly assets: AssetService;
 
   /** The LAN base URL, or null before the LAN listener has bound. */
@@ -181,6 +183,13 @@ export function buildServices(options: BuildOptions = {}): Services {
     packs, contentTranslations, translations, themes, settings, audit,
   );
 
+  // Authoring the packs the *product* ships with. Constructed always, reachable
+  // only in developer mode — the route module refuses otherwise.
+  const shippedPacks = new ShippedPackService(
+    { localesDir: config.localesDir, themesDir: config.themesDir },
+    translations, themes, audit,
+  );
+
   // First evaluation of the licence, entirely offline. This is what decides
   // whether the LAN listener will be started at all.
   gate.evaluate(settings.profile()?.restaurantId as never);
@@ -190,7 +199,7 @@ export function buildServices(options: BuildOptions = {}): Services {
     access, audit, licenseRepository, settings, terminalRepository,
     packs, contentTranslations, menu, tables, orderRepository,
     orders, payments, terminals, printing, backup, reports, licensing,
-    translations, themes, packAuthoring, assets,
+    translations, themes, packAuthoring, shippedPacks, assets,
     appVersion: APP_VERSION,
     lanBaseUrl: () => lanBaseUrl,
     setLanBaseUrl: (url) => { lanBaseUrl = url; },
@@ -209,6 +218,9 @@ export function systemStatus(services: Services, lanRunning: boolean): Record<st
   return {
     appVersion: services.appVersion,
     mode: snapshot.mode,
+    // Off in every packaged build; the console hides its developer section
+    // entirely rather than showing a padlock, because it is not for sale.
+    developerMode: services.config.developerMode,
     restaurantId: profile?.restaurantId ?? null,
     restaurantName: profile?.name ?? null,
     // The console formats prices everywhere, so the currency travels with the

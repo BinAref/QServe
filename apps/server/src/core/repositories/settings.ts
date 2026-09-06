@@ -90,6 +90,9 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, unknown>> = {
 };
 
 /** Settings that are credentials rather than preferences, and are never listed. */
+/** Written back unchanged to mean "keep the stored secret". */
+export const SECRET_PLACEHOLDER = '\u2022'.repeat(8);
+
 export const SECRET_SETTING_KEYS: readonly string[] = [
   'backup.passphrase',
   'security.appLockHash',
@@ -232,6 +235,19 @@ export class SettingsRepository {
   }
 
   /** Defaults overlaid with whatever the restaurant has explicitly changed. */
+  /**
+   * Settings as the console sees them: secrets replaced by a marker so a screen
+   * can show that one is set without the value ever leaving the database. The
+   * marker is what a caller writes back to mean "leave it alone".
+   */
+  publicAll(): Record<string, unknown> {
+    const all = this.all();
+    for (const key of SECRET_SETTING_KEYS) {
+      if (key in all) all[key] = all[key] === null ? null : SECRET_PLACEHOLDER;
+    }
+    return all;
+  }
+
   all(): Record<string, unknown> {
     const stored = this.db.prepare('SELECT key, value_json FROM settings').all() as {
       key: string; value_json: string;

@@ -107,8 +107,9 @@ across two report days. Numbering resets daily by default (`orders.dailyNumberRe
 restaurants ──┬── licenses ──┬── activations   (history; released_at IS NULL = live)
               │              ├── transfers     (each paid move, with fee reference)
               │              └── audit_log
-              └── signing_keys (PUBLIC halves only)
+              └── signing_keys   (PUBLIC halves only)
                   admin_users / admin_sessions
+                  vendor_settings (contact details and both prices, as free text)
 ```
 
 The single most important line in the whole schema:
@@ -134,12 +135,17 @@ stopped, is permanent.
 
 ## 4. What a backup carries
 
-Twenty-four tables: the restaurant, its settings and counters, roles and grants,
+Twenty-six tables: the restaurant, its settings and counters, roles and grants,
 users, terminals, tables, the whole menu, assets, orders and their items,
-payments, printers, print jobs, and the audit log.
+payments, printers, print jobs, the audit log, and the languages and themes the
+restaurant authored for itself (`custom_locales`, `custom_themes`) — a
+restaurant that translated its entire menu into French must not lose that work
+when the computer is replaced.
 
 Deliberately excluded: `user_sessions` and `terminal_sessions` (a restore must
-not resurrect a signed-in tablet), `license_state`, and `schema_migrations`.
+not resurrect a signed-in tablet), `license_state`, and `schema_migrations`. The
+app-lock passphrase hash lives in `settings` and therefore *does* travel, which
+is intended: restoring a restaurant restores the lock it chose.
 Also outside the database entirely, and therefore outside every backup: the
 install id, the activation certificate and the licence key.
 

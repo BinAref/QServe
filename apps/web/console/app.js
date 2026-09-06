@@ -22,6 +22,9 @@ import { renderMenuBuilder } from './views/menu.js';
 import { renderTables, renderTerminals } from './views/service.js';
 import { renderOrders, renderReports, renderAudit } from './views/orders.js';
 import { renderSettings, renderUsers, renderPrinting, renderBackup, renderLicense } from './views/system.js';
+import { renderLanguages, renderThemes } from './views/packs.js';
+import { renderLockScreen } from './views/lock.js';
+import { renderDeveloper } from './views/developer.js';
 
 export const state = {
   status: null,
@@ -83,9 +86,14 @@ const NAV = [
   { route: 'printing', label: 'nav.printing', permission: Permission.PRINTING_MANAGE, capability: Capability.PRINTING_RUNTIME },
   { route: 'users', label: 'nav.users', permission: Permission.USERS_MANAGE },
   { route: 'settings', label: 'nav.settings', permission: Permission.SETTINGS_MANAGE },
+  { route: 'languages', label: 'nav.languages', permission: Permission.SETTINGS_MANAGE },
+  { route: 'themes', label: 'nav.themes', permission: Permission.SETTINGS_MANAGE },
   { route: 'backup', label: 'nav.backup', permission: Permission.BACKUP_MANAGE },
-  { route: 'audit', label: 'nav.audit', permission: Permission.AUDIT_VIEW },
+  { route: 'audit', label: 'nav.activity', permission: Permission.AUDIT_VIEW },
   { route: 'license', label: 'nav.license', permission: Permission.LICENSE_MANAGE },
+  // Only in a developer build; a restaurant's console never shows this.
+  { route: 'developer', label: 'nav.developer', permission: Permission.SETTINGS_MANAGE,
+    developerOnly: true },
 ];
 
 const VIEWS = {
@@ -98,9 +106,12 @@ const VIEWS = {
   printing: renderPrinting,
   users: renderUsers,
   settings: renderSettings,
+  languages: renderLanguages,
+  themes: renderThemes,
   backup: renderBackup,
   audit: renderAudit,
   license: renderLicense,
+  developer: renderDeveloper,
 };
 
 export function navigate(route) {
@@ -117,7 +128,10 @@ function sidebar() {
         h('strong', {}, pick(state.status?.restaurantName) || t('app.name')),
         h('small', {}, state.status?.restaurantId ?? ''))),
 
-    NAV.filter((entry) => !entry.permission || has(entry.permission)).map((entry) => {
+    NAV
+      .filter((entry) => !entry.developerOnly || state.status?.developerMode)
+      .filter((entry) => !entry.permission || has(entry.permission))
+      .map((entry) => {
       const locked = entry.capability !== undefined && !can(entry.capability);
       return h('button', {
         class: 'shell-nav-item',
@@ -378,6 +392,14 @@ async function renderLogin() {
 /* ------------------------------------------------------------------ boot */
 
 async function main() {
+  // The lock comes first, before a session is resolved or any restaurant data
+  // is fetched: while it holds, the server refuses everything else anyway.
+  const lock = await api.get('/api/lock').catch(() => null);
+  if (lock?.locked) {
+    await renderLockScreen(root, lock);
+    return;
+  }
+
   const started = await boot({ topics: ['system', 'orders', 'tables', 'terminals', 'menu'] });
   state.session = started.session;
   state.realtime = started.realtime;

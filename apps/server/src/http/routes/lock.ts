@@ -14,10 +14,20 @@ import type { Services } from '../../container.js';
 import { clearUnlockCookie, unlockCookie } from '../../core/app-lock.js';
 import type { AppState } from '../../core/security.js';
 
-/** Paths that stay reachable while the console is locked. */
+/**
+ * Paths that stay reachable while the console is locked. A `*` matches by
+ * prefix.
+ *
+ * The language packs and theme CSS are here so the lock screen appears in the
+ * owner's own language and their own colours. Neither carries restaurant data:
+ * a locale pack is interface strings, a theme is colours and spacing. The menu,
+ * the orders and the takings are all on the other side of the lock.
+ */
 export const LOCK_ALLOWED_PATHS: readonly string[] = [
   '/api/lock',
   '/api/lock/unlock',
+  '/api/i18n/*',
+  '/api/themes/*',
 ];
 
 export function createLockRoutes(services: Services): Router<AppState> {

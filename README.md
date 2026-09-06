@@ -159,7 +159,11 @@ Copy `.env.example`. The values worth knowing:
 | `QSERVE_LAN_PORT` | `7020` | diners and staff; bound only when licensed |
 | `QSERVE_LICENSE_SERVER_URL` | `http://localhost:8090` | vendor endpoint |
 | `QSERVE_PUBLIC_HOST` | mDNS name, else the LAN IP | host baked into printed QR codes |
-| `QSERVE_VENDOR_WHATSAPP` | — | the "Request a licence" button |
+| `QSERVE_DEVELOPER_MODE` | `false` | unlocks authoring the **shipped** language and theme packs; off in every packaged build |
+
+Prices and contact details are **not** configuration. The vendor writes them in
+their own console and every restaurant fetches them — see
+[LICENSING.md §7](docs/LICENSING.md).
 
 Binding the admin console to anything but loopback prints a loud warning at
 boot, and is not recommended.
@@ -184,14 +188,19 @@ boot, and is not recommended.
 The spec sets these as the bar for "complete". Each is enforced, and most are
 covered by a test:
 
-- [x] No hard-coded languages — 376 keys in `locales/*.json`, validated
+- [x] No hard-coded languages — 509 keys in `locales/*.json`, validated
 - [x] No hard-coded themes — 57 design tokens in `themes/*.json`, validated
+- [x] A restaurant adds its own language or theme without a developer — and the
+      language covers its own menu text, not only the interface
+- [x] The application handles no payment; the vendor writes both prices
+- [x] Optional password lock on the console, the restaurant's choice
 - [x] Restaurant data never bound to one device
 - [x] Daily operation never depends on the internet
 - [x] No local web server before activation — the socket is not bound
 - [x] One licence can never be live on two devices — enforced by a unique index
 - [x] Backup and restore, encrypted and authenticated
-- [x] Append-only audit trail with actor, station and before/after values
+- [x] Append-only activity log with actor, station and before/after values,
+      filterable and paged
 - [x] Real permission system, checked server-side on every mutating route
 - [x] Realtime local communication; no polling
 - [x] Every order carries a persisted, unspoofable source

@@ -8,6 +8,7 @@
 
 import test, { after, before, beforeEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { REFERENCE_LOCALE } from '../modules/translations/service.js';
 import { TRANSLATION_BUNDLE_SCHEMA } from '../modules/translations/content.js';
@@ -352,5 +353,134 @@ describe('the app lock', () => {
       }),
       /at least 4/,
     );
+  });
+});
+
+describe('authoring the packs the product ships with', () => {
+  let installation: Installation;
+
+  before(() => {
+    installation = createInstallation();
+    seedRestaurant(installation);
+  });
+  after(() => installation.dispose());
+
+  test('a template offers every key the reference defines', () => {
+    const template = installation.services.shippedPacks.localeTemplate({
+      locale: 'de', from: 'en', name: 'Deutsch', englishName: 'German',
+    });
+
+    assert.equal(template.locale, 'de');
+    assert.equal(template.direction, 'ltr');
+    assert.deepEqual(
+      Object.keys(template.strings).sort(),
+      installation.services.translations.referenceKeys(),
+    );
+    // "from" fills the values in, so the translator works over real sentences.
+    assert.ok(Object.values(template.strings).every((value) => value !== ''));
+  });
+
+  test('a blank template has the keys and no text', () => {
+    const template = installation.services.shippedPacks.localeTemplate({ locale: 'de' });
+    assert.ok(Object.keys(template.strings).length > 100);
+    assert.ok(Object.values(template.strings).every((value) => value === ''));
+  });
+
+  test('a gap in a shipped pack is an error, not a warning', () => {
+    const { shippedPacks, translations } = installation.services;
+    const template = shippedPacks.localeTemplate({
+      locale: 'de', from: 'en', name: 'Deutsch', englishName: 'German',
+    });
+
+    const [firstKey] = Object.keys(template.strings);
+    const holed = { ...template, strings: { ...template.strings, [firstKey!]: '' } };
+
+    const { issues } = shippedPacks.checkLocale(holed);
+    assert.equal(issues.filter((issue) => issue.severity === 'error').length, 1);
+
+    assert.throws(
+      () => shippedPacks.installLocale({
+        raw: holed, actor: installation.systemActor, clientIp: null,
+      }),
+      /not ready to ship/,
+    );
+    assert.equal(translations.has('de'), false, 'nothing was written');
+  });
+
+  test('a complete pack is written to the locales folder and goes live', () => {
+    const { shippedPacks, translations } = installation.services;
+    const template = shippedPacks.localeTemplate({
+      locale: 'de', from: 'en', name: 'Deutsch', englishName: 'German',
+    });
+
+    const result = shippedPacks.installLocale({
+      raw: { ...template, strings: { ...template.strings, 'common.save': 'Speichern' } },
+      actor: installation.systemActor,
+      clientIp: null,
+    });
+
+    assert.equal(result.locale, 'de');
+    assert.ok(existsSync(result.file));
+    assert.equal(translations.isShipped('de'), true);
+    assert.equal(translations.translate('de', 'common.save'), 'Speichern');
+
+    // Written as a shipped pack, so a reboot loads the same thing from disk.
+    const onDisk = JSON.parse(readFileSync(result.file, 'utf8')) as { locale: string };
+    assert.equal(onDisk.locale, 'de');
+  });
+
+  test('the reference language is not removable', () => {
+    assert.throws(
+      () => installation.services.shippedPacks.removeLocale({
+        locale: 'en', actor: installation.systemActor, clientIp: null,
+      }),
+      /reference language/,
+    );
+  });
+
+  test('removing a shipped language deletes its file', () => {
+    const { shippedPacks, translations } = installation.services;
+    shippedPacks.removeLocale({
+      locale: 'de', actor: installation.systemActor, clientIp: null,
+    });
+    assert.equal(translations.has('de'), false);
+  });
+
+  test('a shipped theme is validated as strictly as a shipped language', () => {
+    const { shippedPacks, themes } = installation.services;
+
+    assert.throws(
+      () => shippedPacks.installTheme({
+        raw: { id: 'sunset', name: 'Sunset', colorScheme: 'light', tokens: {} },
+        actor: installation.systemActor, clientIp: null,
+      }),
+      /token/,
+    );
+
+    const template = shippedPacks.themeTemplate({ id: 'sunset', from: 'light' });
+    const result = shippedPacks.installTheme({
+      raw: { ...template, name: 'Sunset' },
+      actor: installation.systemActor,
+      clientIp: null,
+    });
+
+    assert.ok(existsSync(result.file));
+    assert.equal(themes.isShipped('sunset'), true);
+
+    shippedPacks.removeTheme({ id: 'sunset', actor: installation.systemActor, clientIp: null });
+    assert.equal(themes.has('sunset'), false);
+  });
+
+  test('every developer action is in the activity log', () => {
+    const actions = installation.services.audit
+      .query({ limit: 50 })
+      .map((entry) => entry.action);
+
+    for (const expected of [
+      'developer.locale_installed', 'developer.locale_removed',
+      'developer.theme_installed', 'developer.theme_removed',
+    ]) {
+      assert.ok(actions.includes(expected), `${expected} was not logged`);
+    }
   });
 });
