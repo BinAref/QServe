@@ -1,0 +1,20 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/shared"
+    },
+    {
+      "path": "./packages/crypto"
+    },
+    {
+      "path": "./packages/http"
+    },
+    {
+      "path": "./apps/license-server"
+    },
+    {
+      "path": "./apps/server"
+    }
+  ]
+}

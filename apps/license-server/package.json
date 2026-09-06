@@ -1,0 +1,16 @@
+{
+  "name": "@qserve/license-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "dependencies": {
+    "@qserve/crypto": "1.0.0",
+    "@qserve/shared": "1.0.0",
+    "better-sqlite3": "^11.7.0",
+    "@qserve/http": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12"
+  }
+}
