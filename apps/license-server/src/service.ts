@@ -165,6 +165,7 @@ export class LicenseService {
       }
 
       const live = this.store.liveActivation(license.license_id);
+      const history = this.store.activationHistory(license.license_id);
       let transferred = false;
 
       if (live && live.device_fingerprint === request.deviceFingerprint) {
@@ -174,17 +175,25 @@ export class LicenseService {
         throw licenseError(LicenseErrorCode.ALREADY_ACTIVE_ELSEWHERE, 409,
           'this licence is active on another device; deactivate it first');
       } else if (license.status !== LicenseStatus.PENDING) {
-        // No live binding, but the licence has been activated before — this is
-        // a move to a new machine and needs a paid transfer credit (spec §6).
-        if (license.transfer_credits <= 0) {
-          throw licenseError(LicenseErrorCode.TRANSFER_NOT_PAID, 402,
-            'moving this licence to a new device requires a licence transfer');
+        // No live binding and the licence has been activated before. A transfer
+        // fee is for *moving hardware*, so it is charged only when this is a
+        // different machine from the one that last held the licence. Coming
+        // back to the same PC — after a change of mind, or after the vendor
+        // revoked and reinstated — must be free, or the restaurant would be
+        // billed for something it never did.
+        const lastDevice = history[0]?.device_fingerprint ?? null;
+        const sameMachine = lastDevice === request.deviceFingerprint;
+
+        if (!sameMachine) {
+          if (license.transfer_credits <= 0) {
+            throw licenseError(LicenseErrorCode.TRANSFER_NOT_PAID, 402,
+              'moving this licence to a new device requires a licence transfer');
+          }
+          transferred = true;
         }
-        transferred = true;
       }
 
-      const previousFingerprint = this.store
-        .activationHistory(license.license_id)
+      const previousFingerprint = history
         .find((a) => a.device_fingerprint !== request.deviceFingerprint)?.device_fingerprint ?? null;
 
       const activation = this.store.insertActivation({

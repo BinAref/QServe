@@ -2,10 +2,12 @@
   "name": "qserve",
   "version": "1.0.0",
   "private": true,
-  "description": "QServe — Local Restaurant Operating System. Offline-first, modular, perpetual-licensed restaurant operations platform.",
+  "description": "QServe \u2014 Local Restaurant Operating System. Offline-first, modular, perpetual-licensed restaurant operations platform.",
   "license": "UNLICENSED",
   "type": "module",
-  "engines": { "node": ">=20.11.0" },
+  "engines": {
+    "node": ">=20.11.0"
+  },
   "workspaces": [
     "packages/*",
     "apps/server",
@@ -14,14 +16,16 @@
   "scripts": {
     "build": "tsc --build",
     "clean": "tsc --build --clean",
-    "test": "npm run build && node --test --test-reporter=spec \"apps/*/dist/**/*.test.js\" \"packages/*/dist/**/*.test.js\"",
+    "test": "npm run build && node --test --test-reporter=spec \"packages/*/dist/**/*.test.js\" \"apps/*/dist/**/*.test.js\"",
     "validate:i18n": "node tools/validate-i18n.mjs",
     "validate:themes": "node tools/validate-themes.mjs",
     "validate": "npm run validate:i18n && npm run validate:themes",
     "start": "node apps/server/dist/main.js",
     "start:license-server": "node apps/license-server/dist/main.js",
     "dev": "npm run build && npm run start",
-    "keygen": "node apps/license-server/dist/tools/keygen.js"
+    "keygen": "node apps/license-server/dist/tools/keygen.js",
+    "test:quick": "node --test --test-reporter=dot \"packages/*/dist/**/*.test.js\" \"apps/*/dist/**/*.test.js\"",
+    "check": "npm run build && npm run validate && npm test"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

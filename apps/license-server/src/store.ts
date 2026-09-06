@@ -373,7 +373,12 @@ export class LicenseStore {
   }
 
   recentAudit(limit = 100): unknown[] {
-    return this.db.prepare('SELECT * FROM audit_log ORDER BY at DESC LIMIT ?').all(limit);
+    // Several actions routinely share a millisecond, so the timestamp alone is
+    // not a total order. SQLite's rowid is insertion order, which is exactly
+    // what a support agent reading the log needs.
+    return this.db
+      .prepare('SELECT * FROM audit_log ORDER BY at DESC, rowid DESC LIMIT ?')
+      .all(limit);
   }
 
   /**

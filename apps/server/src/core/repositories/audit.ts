@@ -91,7 +91,9 @@ export class AuditRepository {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = this.db
-      .prepare(`SELECT * FROM audit_log ${where} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`)
+      // rowid, not id: ids carry random suffixes, so within one millisecond
+      // they would order arbitrarily. rowid is insertion order.
+      .prepare(`SELECT * FROM audit_log ${where} ORDER BY at DESC, rowid DESC LIMIT ? OFFSET ?`)
       .all(...values, Math.min(query.limit ?? 100, 1000), query.offset ?? 0) as AuditRow[];
 
     return rows.map(toEntry);
@@ -100,7 +102,7 @@ export class AuditRepository {
   /** Chronological history for one order — the timeline the spec sketches. */
   orderTimeline(orderId: string): AuditLogEntry[] {
     const rows = this.db
-      .prepare('SELECT * FROM audit_log WHERE order_id = ? ORDER BY at ASC, id ASC')
+      .prepare('SELECT * FROM audit_log WHERE order_id = ? ORDER BY at ASC, rowid ASC')
       .all(orderId) as AuditRow[];
     return rows.map(toEntry);
   }
