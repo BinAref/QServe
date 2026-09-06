@@ -9,5 +9,9 @@ data/
 .env.*
 !.env.example
 secrets/
+
+# Vendor-specific build output. Public keys only, but generated per vendor by
+# `npm run keygen`; see trusted-keys.example.json.
+apps/server/config/trusted-keys.json
 *.log
 .DS_Store

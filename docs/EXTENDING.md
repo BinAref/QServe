@@ -1,0 +1,193 @@
+# Extending QServe
+
+The spec asks that new languages, themes, devices, roles, features and
+integrations can be added **without rebuilding the system**. This is the
+practical guide. Each section ends with what you must *not* have to touch.
+
+---
+
+## 1. Add a language
+
+Adding a language is adding one file.
+
+```bash
+cp locales/en.json locales/fr.json
+```
+
+Edit the header and translate the values:
+
+```json
+{
+  "$schema": "qserve.locale.v1",
+  "locale": "fr",
+  "name": "Français",
+  "englishName": "French",
+  "direction": "ltr",
+  "fallback": "en",
+  "strings": { "app.name": "QServe", "common.save": "Enregistrer" }
+}
+```
+
+Validate before shipping:
+
+```bash
+npm run validate:i18n          # missing, invalid, duplicate, unsupported keys
+node tools/validate-i18n.mjs --strict   # demand 100% coverage, for CI
+```
+
+Restart the server and enable the language in **Settings → Available to diners**.
+
+Notes that save time:
+
+- `locale` must equal the filename, or the pack is rejected.
+- Keys are strictly lower-snake dotted (`orders.action.accept`). Enum-derived
+  keys are lowercased: `t('orders.status.' + status.toLowerCase())`.
+- A partial translation is fine — the server merges each pack over its fallback
+  chain and serves one complete dictionary, so every screen still renders.
+- `direction: "rtl"` is the entire cost of a right-to-left language. Every
+  stylesheet uses logical properties (`margin-inline`, `inset-inline-start`),
+  so there is no mirrored CSS to write.
+- Placeholders must match the reference exactly. The validator catches a
+  dropped `{number}` — otherwise every ticket would print "Order #".
+
+**You do not touch:** any TypeScript, any stylesheet, any front-end.
+
+---
+
+## 2. Add a theme
+
+```bash
+cp themes/light.json themes/coastal.json
+```
+
+Set `id` to the filename, choose `colorScheme`, and edit the tokens. Tokens may
+reference each other, so a palette change touches one line:
+
+```json
+{ "component": { "nav": { "background": "{color.surface}" } } }
+```
+
+```bash
+npm run validate:themes
+```
+
+The validator checks all 57 required tokens are present, that references
+resolve, and that none are circular. A theme that passes is guaranteed to render
+every screen, because the front-ends may use only those paths.
+
+**You do not touch:** any code. Themes are served as CSS custom properties and
+applied at runtime.
+
+---
+
+## 3. Add a terminal type
+
+Say a `SOMMELIER` station.
+
+1. `packages/shared/src/enums.ts` — add `SOMMELIER: 'SOMMELIER'` to `TerminalType`.
+2. `packages/shared/src/permissions.ts` — add its ceiling to
+   `TERMINAL_TYPE_CEILING`. This is the maximum that station can ever do,
+   whoever signs in on it.
+3. `packages/shared/src/sound.ts` — optionally add a case to
+   `defaultSoundProfile`.
+4. `apps/server/src/modules/terminals/service.ts` — add its landing path to
+   `LANDING_PATH`.
+5. `apps/web/shared/events.js` — mirror the enum value (a test enforces this).
+6. `locales/*.json` — add `terminals.type.sommelier`.
+7. Build a front-end at `apps/web/sommelier/`, or point it at an existing one.
+
+Provisioning, QR issuing, enrolment, sessions, permissions and realtime routing
+all work immediately.
+
+**You do not touch:** the database schema, the QR pipeline, the session
+mechanism, the router.
+
+---
+
+## 4. Add a role
+
+Entirely at runtime, in **Users → Roles → Add role**. Pick a key, a name and the
+permissions. Roles are rows; the built-in defaults seed the table once at
+install and are never consulted again, so re-scoping `CASHIER` gives exactly
+what you configured.
+
+To add a new *permission*, add it to `Permission` in
+`packages/shared/src/permissions.ts`, mirror it in `apps/web/shared/events.js`,
+and guard the route with it.
+
+---
+
+## 5. Add a printer
+
+Configuration only, in **Printing**. Choose a transport:
+
+| transport | target | for |
+|---|---|---|
+| `NETWORK` | `192.168.1.50:9100` | a normal network thermal printer |
+| `BROWSER` | a terminal id | a USB printer on a tablet running `/printer` |
+| `FILE` | a spool directory | whatever the restaurant already uses |
+
+Then declare which document types it accepts and which kitchen stations it
+serves. Routing is data: "kitchen tickets from the grill and fryer go here,
+receipts go there" needs no code.
+
+To add a new **document type**, extend `PrintDocumentType`, add a renderer next
+to `renderKitchenTicket` / `renderReceipt`, and mirror the enum.
+
+---
+
+## 6. Add a module
+
+```
+apps/server/src/modules/<name>/
+  repository.ts   all its SQL
+  service.ts      its rules; no SQL, no HTTP
+```
+
+1. Construct it in `container.ts`; add it to the `Services` interface.
+2. Add routes in `src/http/routes/` and mount them in `app.ts`. Mount on the
+   admin router only unless a terminal genuinely needs it.
+3. Storage: append a migration with the next version. **Never edit an applied
+   migration** — installations in the field have already run it.
+4. Realtime: add events to the catalogue in `packages/shared/src/events.ts` with
+   the permission each requires. The gateway then routes and authorises them
+   automatically.
+5. Licence gating: if it is operational rather than authoring, add a
+   `Capability` and guard the routes with `requireCapability`.
+6. Add it to `BACKED_UP_TABLES` in the backup module if its data belongs to the
+   restaurant.
+
+---
+
+## 7. The features the architecture is ready for
+
+The spec lists these as future work, explicitly not to be built now. Each is
+noted with where it would attach:
+
+| feature | where it attaches |
+|---|---|
+| Bar, delivery, takeaway | new `TerminalType` + an `OrderSource`; the order model already carries both |
+| Reservations | a new module; tables and their status already exist |
+| Inventory / stock | a module subscribing to `order.created`; products already carry a station |
+| Loyalty, customer accounts | a module; orders already record their source and actor |
+| Multiple branches | each branch is a Restaurant ID with its own licence; the identity split already supports it |
+| Online ordering | an `OrderSource.INTEGRATION` client against the existing order API |
+| Cloud sync | a module subscribing to the event bus; nothing else assumes local-only |
+| Payment integrations | a transport behind `PaymentService.capture` |
+| Accounting export | reports already produce CSV |
+| Extra KDS screens | create another `KITCHEN` or `KDS` terminal — no code |
+
+The rule the spec sets, and this codebase follows: **build the architecture that
+admits them, not the features themselves.**
+
+---
+
+## 8. Before you ship a change
+
+```bash
+npm run check      # build + validate packs + 113 tests
+```
+
+And re-read the quality checklist in the README: no hard-coded languages, no
+hard-coded themes, no restaurant data bound to a device, no internet dependency
+on the serving path, and no local web server before activation.
