@@ -192,6 +192,9 @@ export function systemStatus(services: Services, lanRunning: boolean): Record<st
     mode: snapshot.mode,
     restaurantId: profile?.restaurantId ?? null,
     restaurantName: profile?.name ?? null,
+    // The console formats prices everywhere, so the currency travels with the
+    // status rather than needing a settings-scoped request first.
+    currency: profile?.currency ?? null,
     capabilities: snapshot.capabilities,
     setupComplete: profile !== null,
     ownerExists: services.access.countUsers() > 0,

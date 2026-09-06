@@ -220,7 +220,16 @@ export function optionalLocalised(
   rules: { max?: number } = {},
 ): Record<string, string> {
   const raw = source[field];
-  if (raw === undefined || raw === null) return {};
+  if (raw === undefined || raw === null || raw === '') return {};
+
+  // A form that renders one input per language sends `{}` when the operator
+  // left every box blank — for an optional field (a description, say) that
+  // means "none", not "invalid".
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    const hasText = Object.values(raw as Record<string, unknown>)
+      .some((value) => typeof value === 'string' && value.trim() !== '');
+    if (!hasText) return {};
+  }
   return requireLocalised(source, field, rules);
 }
 

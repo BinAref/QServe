@@ -1,0 +1,28 @@
+/* Printer bridge: a screen nobody looks at, parked next to a USB printer.
+   It only has to prove it is alive and print what it is sent. */
+
+.bridge { max-width: 640px; margin-inline: auto; padding: var(--qs-spacing-xl); }
+.bridge-status { font-size: var(--qs-typography-size-lg); }
+.bridge-log {
+  font-family: var(--qs-typography-font-family-mono);
+  font-size: var(--qs-typography-size-sm);
+  background: var(--qs-color-surface-alt);
+  border-radius: var(--qs-radius-md);
+  padding: var(--qs-spacing-md);
+  max-height: 320px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* The element actually sent to the printer. Hidden on screen, and the only
+   thing visible on paper. */
+#print-area { display: none; }
+@media print {
+  body > *:not(#print-area) { display: none !important; }
+  #print-area {
+    display: block !important;
+    font-family: var(--qs-typography-font-family-mono);
+    font-size: 12px;
+    white-space: pre;
+  }
+}

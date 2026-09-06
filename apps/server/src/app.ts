@@ -75,6 +75,7 @@ export class QServeApp {
     api.mount('/', createManagementRoutes(this.services));
     router.mount('/api', api);
     router.mount('/', createAssetFileRoutes(this.services));
+    this.mountSharedAssets(router);
 
     // The console itself: a plain directory of ES modules, no build step.
     const consoleRoot = join(this.services.config.webRoot, 'console');
@@ -94,6 +95,7 @@ export class QServeApp {
     router.mount('/api', this.commonApi());
     router.mount('/', createAssetFileRoutes(this.services));
     router.mount('/', createEnrolmentRoutes(this.services));
+    this.mountSharedAssets(router);
 
     for (const [path, app] of Object.entries(TERMINAL_APPS)) {
       const root = join(this.services.config.webRoot, app);
@@ -109,6 +111,22 @@ export class QServeApp {
     return router;
   }
 
+  /**
+   * The runtime every terminal imports — i18n, theme, realtime, sound, DOM
+   * helpers. Served from one place so a fix reaches all five apps at once.
+   */
+  private mountSharedAssets(router: Router<AppState>): void {
+    const shared = join(this.services.config.webRoot, 'shared');
+    const serve = createStaticHandler({ root: shared });
+    router.get('/shared/*', (ctx) => serve(ctx as never));
+
+    // Browsers ask for this unprompted on every page; answering it keeps a real
+    // 404 in the log meaningful.
+    const favicon = createStaticHandler({ root: shared, indexFile: 'favicon.svg' });
+    router.get('/favicon.ico', (ctx) =>
+      favicon({ ...ctx, params: { wildcard: 'favicon.svg' } } as never));
+  }
+
   /* ------------------------------------------------------------ lifecycle */
 
   async start(): Promise<void> {
@@ -121,6 +139,9 @@ export class QServeApp {
       );
     }
 
+    // Subscribe the gateway to the bus before any socket can attach to it.
+    this.services.realtime.start();
+
     this.adminServer = createHttpServer<AppState>({
       router: this.createAdminRouter(),
       listener: 'admin',
@@ -129,6 +150,10 @@ export class QServeApp {
       createState: () => ({}),
       onError: (error) => this.logUnexpected(error),
     });
+
+    // The console is a realtime client too: it has to notice activation, new
+    // orders and table changes without the owner reloading the page.
+    this.services.realtime.attach(this.adminServer);
 
     await listen(this.adminServer, config.adminPort, config.adminHost);
     console.log(
@@ -144,8 +169,6 @@ export class QServeApp {
         void this.stopLan('licence is no longer active');
       }
     });
-
-    this.services.realtime.start();
 
     if (this.services.gate.mode === RestaurantMode.OPERATIONAL) {
       await this.startLan();

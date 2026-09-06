@@ -1,0 +1,157 @@
+/* Diner-facing menu. Phone-first: one column, large tap targets, a cart bar
+   pinned above the home indicator. Every value comes from the active theme. */
+
+.menu-app { padding-block-end: 96px; }
+
+.menu-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--qs-color-surface);
+  border-block-end: 1px solid var(--qs-color-border);
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+}
+.menu-brand { display: flex; align-items: center; gap: var(--qs-spacing-md); }
+.menu-logo {
+  width: 44px; height: 44px;
+  border-radius: var(--qs-radius-md);
+  object-fit: cover;
+  background: var(--qs-color-surface-alt);
+}
+.menu-title { margin: 0; font-size: var(--qs-typography-size-lg); }
+.menu-table { color: var(--qs-color-text-muted); font-size: var(--qs-typography-size-sm); }
+
+/* Horizontally scrolling category strip — the pattern every diner already knows. */
+.menu-categories {
+  display: flex;
+  gap: var(--qs-spacing-sm);
+  overflow-x: auto;
+  padding: var(--qs-spacing-sm) var(--qs-spacing-lg);
+  background: var(--qs-color-surface);
+  border-block-end: 1px solid var(--qs-color-border);
+  position: sticky;
+  top: 77px;
+  z-index: 19;
+  scrollbar-width: none;
+}
+.menu-categories::-webkit-scrollbar { display: none; }
+.menu-chip {
+  flex: 0 0 auto;
+  border: 1px solid var(--qs-color-border);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text);
+  border-radius: var(--qs-radius-pill);
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+  min-height: 40px;
+}
+.menu-chip[aria-selected="true"] {
+  background: var(--qs-color-primary);
+  border-color: var(--qs-color-primary);
+  color: var(--qs-color-primary-contrast);
+}
+
+.menu-section { padding: var(--qs-spacing-lg); }
+.menu-section h2 { font-size: var(--qs-typography-size-xl); }
+.menu-section-note { color: var(--qs-color-text-muted); margin-block-end: var(--qs-spacing-md); }
+
+.menu-items { display: grid; gap: var(--qs-spacing-md); }
+
+.menu-item {
+  display: flex;
+  gap: var(--qs-spacing-md);
+  align-items: stretch;
+  background: var(--qs-color-surface);
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-component-card-radius);
+  padding: var(--qs-spacing-md);
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+.menu-item:hover { border-color: var(--qs-color-border-strong); }
+.menu-item[disabled] { opacity: 0.55; cursor: not-allowed; }
+.menu-item-body { flex: 1; min-width: 0; }
+.menu-item-name { font-weight: var(--qs-typography-weight-medium); margin-block-end: 2px; }
+.menu-item-desc {
+  color: var(--qs-color-text-muted);
+  font-size: var(--qs-typography-size-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.menu-item-price { font-weight: var(--qs-typography-weight-bold); margin-block-start: var(--qs-spacing-xs); }
+.menu-item-img {
+  width: 84px; height: 84px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: var(--qs-radius-md);
+  background: var(--qs-color-surface-alt);
+}
+
+/* -------------------------------------------------------------------- cart */
+
+.menu-cart-bar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  padding-block-end: calc(var(--qs-spacing-md) + env(safe-area-inset-bottom, 0px));
+  background: var(--qs-color-surface);
+  border-block-start: 1px solid var(--qs-color-border);
+  box-shadow: var(--qs-shadow-lg);
+  z-index: 30;
+}
+
+.menu-qty { display: flex; align-items: center; gap: var(--qs-spacing-md); }
+.menu-qty button {
+  width: 44px; height: 44px;
+  border-radius: var(--qs-radius-pill);
+  border: 1px solid var(--qs-color-border);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text);
+  font-size: var(--qs-typography-size-lg);
+  cursor: pointer;
+}
+.menu-qty output { min-width: 2.5ch; text-align: center; font-weight: var(--qs-typography-weight-bold); }
+
+.menu-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-sm) 0;
+  border-block-end: 1px solid var(--qs-color-border);
+  cursor: pointer;
+}
+.menu-choice:last-child { border-block-end: none; }
+.menu-choice input { width: auto; min-height: auto; }
+.menu-choice-price { margin-inline-start: auto; color: var(--qs-color-text-muted); }
+
+.menu-line { display: flex; gap: var(--qs-spacing-sm); align-items: flex-start; padding-block: var(--qs-spacing-sm); }
+.menu-line + .menu-line { border-block-start: 1px solid var(--qs-color-border); }
+.menu-line-qty {
+  flex: 0 0 auto;
+  min-width: 30px;
+  font-weight: var(--qs-typography-weight-bold);
+}
+.menu-line-total { margin-inline-start: auto; white-space: nowrap; }
+
+.menu-status {
+  display: grid;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-lg);
+}
+.menu-track { display: flex; gap: var(--qs-spacing-xs); }
+.menu-track span {
+  flex: 1;
+  height: 5px;
+  border-radius: var(--qs-radius-pill);
+  background: var(--qs-color-border);
+}
+.menu-track span[data-done="true"] { background: var(--qs-color-primary); }
+
+.menu-sold-out { color: var(--qs-color-error); font-size: var(--qs-typography-size-sm); }

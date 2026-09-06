@@ -1,0 +1,76 @@
+/* Cashier terminal. A till is used standing up, quickly, often one-handed:
+   two panes, a big keypad, and the outstanding balance always in view. */
+
+.till { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; min-height: 100vh; }
+@media (max-width: 860px) { .till { grid-template-columns: 1fr; } }
+
+.till-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-md);
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  background: var(--qs-color-surface);
+  border-block-end: 1px solid var(--qs-color-border);
+}
+.till-head h1 { margin: 0; font-size: var(--qs-typography-size-lg); }
+
+.till-list {
+  border-inline-end: 1px solid var(--qs-color-border);
+  background: var(--qs-color-surface);
+  overflow-y: auto;
+  max-height: calc(100vh - 69px);
+}
+.till-order {
+  display: block;
+  width: 100%;
+  text-align: start;
+  border: none;
+  border-block-end: 1px solid var(--qs-color-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  cursor: pointer;
+}
+.till-order:hover { background: var(--qs-color-surface-alt); }
+.till-order[aria-current="true"] {
+  background: var(--qs-color-surface-alt);
+  border-inline-start: 4px solid var(--qs-color-primary);
+}
+.till-order-top { display: flex; align-items: baseline; gap: var(--qs-spacing-sm); }
+.till-order-num { font-weight: var(--qs-typography-weight-bold); font-size: var(--qs-typography-size-lg); }
+.till-order-total { margin-inline-start: auto; font-weight: var(--qs-typography-weight-medium); }
+
+.till-detail { padding: var(--qs-spacing-lg); overflow-y: auto; max-height: calc(100vh - 69px); }
+
+.till-lines { margin-block: var(--qs-spacing-md); }
+.till-line { display: flex; gap: var(--qs-spacing-sm); padding-block: 6px; }
+.till-line + .till-line { border-block-start: 1px solid var(--qs-color-border); }
+.till-line-total { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+
+.till-totals { border-block-start: 2px solid var(--qs-color-border-strong); padding-block-start: var(--qs-spacing-sm); }
+.till-totals div { display: flex; justify-content: space-between; padding-block: 3px; }
+.till-grand {
+  font-size: var(--qs-typography-size-xl);
+  font-weight: var(--qs-typography-weight-bold);
+  border-block-start: 1px solid var(--qs-color-border);
+  margin-block-start: var(--qs-spacing-xs);
+  padding-block-start: var(--qs-spacing-xs);
+}
+.till-outstanding { color: var(--qs-color-error); }
+.till-settled { color: var(--qs-color-success); }
+
+.till-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--qs-spacing-sm); }
+.till-keypad button { min-height: 56px; font-size: var(--qs-typography-size-lg); }
+.till-amount {
+  font-size: var(--qs-typography-size-xxl);
+  font-weight: var(--qs-typography-weight-bold);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+  background: var(--qs-color-surface-alt);
+  border-radius: var(--qs-radius-md);
+  margin-block-end: var(--qs-spacing-md);
+}
+.till-methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--qs-spacing-sm); }

@@ -1,0 +1,133 @@
+/* Kitchen display. Read from two metres away, in a hurry, by someone holding a
+   pan: large type, high contrast, colour used only to mean something. */
+
+.kds { display: flex; flex-direction: column; min-height: 100vh; }
+
+.kds-head {
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-md);
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  background: var(--qs-color-surface);
+  border-block-end: 1px solid var(--qs-color-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.kds-head h1 { margin: 0; font-size: var(--qs-typography-size-lg); }
+
+.kds-filters { display: flex; gap: var(--qs-spacing-xs); flex-wrap: wrap; }
+.kds-filter {
+  border: 1px solid var(--qs-color-border);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text);
+  border-radius: var(--qs-radius-pill);
+  padding: 6px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+.kds-filter[aria-pressed="true"] {
+  background: var(--qs-color-primary);
+  border-color: var(--qs-color-primary);
+  color: var(--qs-color-primary-contrast);
+}
+
+.kds-board {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--qs-spacing-md);
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg) var(--qs-spacing-xxl);
+  align-content: start;
+}
+
+.kds-ticket {
+  display: flex;
+  flex-direction: column;
+  background: var(--qs-color-surface);
+  border: 1px solid var(--qs-color-border);
+  /* The status stripe is the first thing a cook's eye lands on. */
+  border-inline-start: 6px solid var(--qs-color-border-strong);
+  border-radius: var(--qs-radius-lg);
+  box-shadow: var(--qs-shadow-sm);
+  overflow: hidden;
+}
+.kds-ticket[data-status="NEW"]       { border-inline-start-color: var(--qs-color-info); }
+.kds-ticket[data-status="ACCEPTED"]  { border-inline-start-color: var(--qs-color-warning); }
+.kds-ticket[data-status="PREPARING"] { border-inline-start-color: var(--qs-color-primary); }
+.kds-ticket[data-status="READY"]     { border-inline-start-color: var(--qs-color-success); }
+.kds-ticket[data-urgent="true"] {
+  border-inline-start-color: var(--qs-color-error);
+  animation: kds-pulse 1.6s ease-in-out infinite;
+}
+@keyframes kds-pulse {
+  0%, 100% { box-shadow: var(--qs-shadow-sm); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--qs-color-error) 35%, transparent); }
+}
+
+.kds-ticket-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-md);
+  border-block-end: 1px solid var(--qs-color-border);
+}
+.kds-number { font-size: var(--qs-typography-size-xl); font-weight: var(--qs-typography-weight-bold); }
+.kds-table { font-size: var(--qs-typography-size-lg); font-weight: var(--qs-typography-weight-medium); }
+.kds-age { margin-inline-start: auto; color: var(--qs-color-text-muted); font-variant-numeric: tabular-nums; }
+.kds-age[data-urgent="true"] { color: var(--qs-color-error); font-weight: var(--qs-typography-weight-bold); }
+
+/* Source is a spec requirement, not decoration: the kitchen must be able to see
+   whether a waiter or the diner placed the order (spec §17, §45). */
+.kds-source {
+  padding: 6px var(--qs-spacing-md);
+  background: var(--qs-color-surface-alt);
+  font-size: var(--qs-typography-size-sm);
+  color: var(--qs-color-text-muted);
+  border-block-end: 1px solid var(--qs-color-border);
+}
+
+.kds-items { padding: var(--qs-spacing-md); flex: 1; }
+.kds-item { margin-block-end: var(--qs-spacing-sm); }
+.kds-item-main { display: flex; gap: var(--qs-spacing-sm); font-size: var(--qs-typography-size-lg); }
+.kds-item-qty {
+  min-width: 2.2ch;
+  font-weight: var(--qs-typography-weight-bold);
+  color: var(--qs-color-primary);
+}
+.kds-item-sub { padding-inline-start: 2.6ch; color: var(--qs-color-text-muted); font-size: var(--qs-typography-size-sm); }
+.kds-item-note {
+  padding-inline-start: 2.6ch;
+  color: var(--qs-color-warning);
+  font-weight: var(--qs-typography-weight-medium);
+  font-size: var(--qs-typography-size-sm);
+}
+.kds-order-note {
+  margin: 0 var(--qs-spacing-md) var(--qs-spacing-md);
+  padding: var(--qs-spacing-sm);
+  border-radius: var(--qs-radius-sm);
+  background: color-mix(in srgb, var(--qs-color-warning) 15%, transparent);
+  color: var(--qs-color-text);
+  font-size: var(--qs-typography-size-sm);
+}
+
+.kds-actions { display: flex; gap: var(--qs-spacing-xs); padding: var(--qs-spacing-md); border-block-start: 1px solid var(--qs-color-border); }
+.kds-actions .qs-btn { flex: 1; }
+
+.kds-station-tag {
+  display: inline-block;
+  font-size: var(--qs-typography-size-xs);
+  padding: 1px 7px;
+  border-radius: var(--qs-radius-pill);
+  border: 1px solid var(--qs-color-border);
+  color: var(--qs-color-text-muted);
+  margin-inline-start: var(--qs-spacing-xs);
+}
+
+.kds-sound-prompt {
+  position: fixed;
+  inset-block-end: var(--qs-spacing-lg);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+}

@@ -1,0 +1,56 @@
+/* Waiter terminal: a floor plan first, because a waiter thinks in tables. */
+
+.floor-head {
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-md);
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  background: var(--qs-color-surface);
+  border-block-end: 1px solid var(--qs-color-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.floor-head h1 { margin: 0; font-size: var(--qs-typography-size-lg); }
+
+.floor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--qs-spacing-md);
+  padding: var(--qs-spacing-lg);
+}
+
+.floor-table {
+  border: 1px solid var(--qs-color-border);
+  border-block-start: 5px solid var(--qs-color-border-strong);
+  border-radius: var(--qs-radius-lg);
+  background: var(--qs-color-surface);
+  padding: var(--qs-spacing-md);
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  min-height: 108px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.floor-table:hover { border-color: var(--qs-color-border-strong); }
+.floor-table[data-status="AVAILABLE"]       { border-block-start-color: var(--qs-color-success); }
+.floor-table[data-status="ORDERING"]        { border-block-start-color: var(--qs-color-info); }
+.floor-table[data-status="PREPARING"]       { border-block-start-color: var(--qs-color-primary); }
+.floor-table[data-status="READY"]           { border-block-start-color: var(--qs-color-warning); }
+.floor-table[data-status="WAITING_PAYMENT"] { border-block-start-color: var(--qs-color-error); }
+
+.floor-label { font-size: var(--qs-typography-size-lg); font-weight: var(--qs-typography-weight-bold); }
+.floor-status { font-size: var(--qs-typography-size-sm); color: var(--qs-color-text-muted); }
+.floor-count { margin-block-start: auto; font-size: var(--qs-typography-size-sm); }
+
+.floor-ready-flag { color: var(--qs-color-warning); font-weight: var(--qs-typography-weight-bold); }
+
+.waiter-order-list { display: grid; gap: var(--qs-spacing-sm); }
+.waiter-order {
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-radius-md);
+  padding: var(--qs-spacing-md);
+}

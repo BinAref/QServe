@@ -1,0 +1,344 @@
+/*
+ * Shared styling for every QServe terminal.
+ *
+ * Two rules hold throughout:
+ *
+ *  1. **No literal colours, radii or font sizes.** Everything reads a
+ *     `--qs-*` custom property served by the theme module, so a restaurant
+ *     switches theme without a rebuild and a new theme needs no CSS change.
+ *
+ *  2. **Logical properties only** — `margin-inline`, `inset-inline-start`,
+ *     `text-align: start`. Setting `dir="rtl"` on <html> is then the entire
+ *     cost of Arabic support; there is no mirrored stylesheet to maintain.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--qs-color-background);
+  color: var(--qs-color-text);
+  font-family: var(--qs-typography-font-family-base);
+  font-size: var(--qs-typography-size-md);
+  line-height: var(--qs-typography-line-height-normal);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--qs-typography-font-family-display);
+  line-height: var(--qs-typography-line-height-tight);
+  margin: 0 0 var(--qs-spacing-sm);
+}
+h1 { font-size: var(--qs-typography-size-xxl); }
+h2 { font-size: var(--qs-typography-size-xl); }
+h3 { font-size: var(--qs-typography-size-lg); }
+
+p { margin: 0 0 var(--qs-spacing-sm); }
+a { color: var(--qs-color-primary); }
+
+:focus-visible {
+  outline: 2px solid var(--qs-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.qs-muted { color: var(--qs-color-text-muted); }
+.qs-mono { font-family: var(--qs-typography-font-family-mono); font-size: var(--qs-typography-size-sm); }
+.qs-small { font-size: var(--qs-typography-size-sm); }
+.qs-xs { font-size: var(--qs-typography-size-xs); }
+.qs-strong { font-weight: var(--qs-typography-weight-bold); }
+.qs-center { text-align: center; }
+.qs-hidden { display: none !important; }
+.qs-grow { flex: 1 1 auto; }
+.qs-nowrap { white-space: nowrap; }
+
+/* ------------------------------------------------------------------ layout */
+
+.qs-row { display: flex; align-items: center; gap: var(--qs-spacing-sm); flex-wrap: wrap; }
+.qs-row-between { justify-content: space-between; }
+.qs-col { display: flex; flex-direction: column; gap: var(--qs-spacing-sm); }
+.qs-stack > * + * { margin-block-start: var(--qs-spacing-md); }
+
+.qs-grid { display: grid; gap: var(--qs-spacing-md); }
+.qs-grid-2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.qs-grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.qs-grid-cards { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+
+.qs-page {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: var(--qs-spacing-lg);
+}
+
+/* ------------------------------------------------------------------- cards */
+
+.qs-card {
+  background: var(--qs-color-surface);
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-component-card-radius);
+  padding: var(--qs-component-card-padding);
+  box-shadow: var(--qs-component-card-shadow);
+}
+.qs-card-tight { padding: var(--qs-spacing-md); }
+.qs-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qs-spacing-md);
+  margin-block-end: var(--qs-spacing-md);
+}
+
+.qs-section-title {
+  font-size: var(--qs-typography-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--qs-color-text-muted);
+  font-weight: var(--qs-typography-weight-medium);
+  margin-block: var(--qs-spacing-lg) var(--qs-spacing-sm);
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.qs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--qs-spacing-xs);
+  border: 1px solid var(--qs-color-border);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text);
+  padding: var(--qs-component-button-padding-y) var(--qs-component-button-padding-x);
+  border-radius: var(--qs-component-button-radius);
+  font: inherit;
+  font-weight: var(--qs-typography-weight-medium);
+  cursor: pointer;
+  /* Restaurant staff tap these with wet hands on a moving tablet. */
+  min-height: 44px;
+  transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
+}
+.qs-btn:hover { border-color: var(--qs-color-border-strong); }
+.qs-btn:active { transform: translateY(1px); }
+.qs-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.qs-btn-primary {
+  background: var(--qs-color-primary);
+  border-color: var(--qs-color-primary);
+  color: var(--qs-color-primary-contrast);
+}
+.qs-btn-secondary {
+  background: var(--qs-color-secondary);
+  border-color: var(--qs-color-secondary);
+  color: var(--qs-color-secondary-contrast);
+}
+.qs-btn-danger {
+  background: transparent;
+  border-color: var(--qs-color-error);
+  color: var(--qs-color-error);
+}
+.qs-btn-ghost { background: transparent; border-color: transparent; color: var(--qs-color-text-muted); }
+.qs-btn-lg { min-height: 56px; font-size: var(--qs-typography-size-lg); padding-inline: var(--qs-spacing-lg); }
+.qs-btn-block { width: 100%; }
+
+.qs-icon-btn {
+  border: none;
+  background: none;
+  color: var(--qs-color-text-muted);
+  font-size: var(--qs-typography-size-xl);
+  line-height: 1;
+  cursor: pointer;
+  padding: var(--qs-spacing-xs);
+  border-radius: var(--qs-radius-sm);
+}
+.qs-icon-btn:hover { color: var(--qs-color-text); background: var(--qs-color-surface-alt); }
+
+input, select, textarea {
+  width: 100%;
+  background: var(--qs-component-input-background);
+  border: 1px solid var(--qs-component-input-border-color);
+  border-radius: var(--qs-component-input-radius);
+  color: var(--qs-color-text);
+  padding: 10px 12px;
+  font: inherit;
+  min-height: 44px;
+}
+textarea { min-height: 84px; resize: vertical; }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--qs-color-primary);
+  outline: 2px solid var(--qs-color-focus-ring);
+  outline-offset: 1px;
+}
+
+.qs-field { display: block; margin-block-end: var(--qs-spacing-md); }
+.qs-field > span {
+  display: block;
+  margin-block-end: 5px;
+  font-size: var(--qs-typography-size-sm);
+  color: var(--qs-color-text-muted);
+}
+.qs-check { display: flex; align-items: center; gap: var(--qs-spacing-sm); }
+.qs-check input { width: auto; min-height: auto; }
+
+/* ------------------------------------------------------------------ badges */
+
+.qs-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--qs-radius-pill);
+  font-size: var(--qs-typography-size-xs);
+  font-weight: var(--qs-typography-weight-medium);
+  border: 1px solid var(--qs-color-border);
+  white-space: nowrap;
+}
+.qs-badge-success { color: var(--qs-color-success); border-color: var(--qs-color-success); }
+.qs-badge-warning { color: var(--qs-color-warning); border-color: var(--qs-color-warning); }
+.qs-badge-error   { color: var(--qs-color-error);   border-color: var(--qs-color-error); }
+.qs-badge-info    { color: var(--qs-color-info);    border-color: var(--qs-color-info); }
+.qs-badge-solid {
+  background: var(--qs-color-primary);
+  border-color: var(--qs-color-primary);
+  color: var(--qs-color-primary-contrast);
+}
+
+/* ------------------------------------------------------------------ tables */
+
+.qs-table-wrap { overflow-x: auto; }
+table.qs-table { width: 100%; border-collapse: collapse; }
+.qs-table th, .qs-table td {
+  text-align: start;
+  padding: 10px 12px;
+  border-block-end: 1px solid var(--qs-color-border);
+}
+.qs-table th {
+  font-size: var(--qs-typography-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--qs-color-text-muted);
+}
+.qs-table tbody tr:last-child td { border-block-end: none; }
+.qs-table-clickable tbody tr { cursor: pointer; }
+.qs-table-clickable tbody tr:hover { background: var(--qs-color-surface-alt); }
+
+/* ------------------------------------------------------------------ modals */
+
+.qs-modal {
+  border: none;
+  padding: 0;
+  background: transparent;
+  max-width: min(560px, 94vw);
+  width: 100%;
+}
+.qs-modal::backdrop { background: var(--qs-color-overlay); }
+.qs-modal-inner {
+  background: var(--qs-color-surface);
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-radius-lg);
+  box-shadow: var(--qs-shadow-lg);
+  overflow: hidden;
+}
+.qs-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qs-spacing-md);
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  border-block-end: 1px solid var(--qs-color-border);
+}
+.qs-modal-head h2 { margin: 0; font-size: var(--qs-typography-size-lg); }
+.qs-modal-body { padding: var(--qs-spacing-lg); max-height: 70vh; overflow-y: auto; }
+.qs-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  border-block-start: 1px solid var(--qs-color-border);
+  background: var(--qs-color-surface-alt);
+}
+
+/* ------------------------------------------------------------------ toasts */
+
+.qs-toasts {
+  position: fixed;
+  inset-block-end: var(--qs-spacing-lg);
+  inset-inline-end: var(--qs-spacing-lg);
+  display: grid;
+  gap: var(--qs-spacing-sm);
+  z-index: 1000;
+  pointer-events: none;
+}
+.qs-toast {
+  background: var(--qs-color-surface);
+  border: 1px solid var(--qs-color-border);
+  border-inline-start: 4px solid var(--qs-color-info);
+  border-radius: var(--qs-radius-md);
+  box-shadow: var(--qs-shadow-md);
+  padding: 11px 16px;
+  max-width: 360px;
+  transition: opacity 300ms ease;
+}
+.qs-toast-error   { border-inline-start-color: var(--qs-color-error); }
+.qs-toast-success { border-inline-start-color: var(--qs-color-success); }
+.qs-toast-warning { border-inline-start-color: var(--qs-color-warning); }
+
+/* ------------------------------------------------------------- connection */
+
+.qs-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--qs-typography-size-xs);
+  color: var(--qs-color-text-muted);
+}
+.qs-connection::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--qs-color-success);
+}
+.qs-connection[data-state="reconnecting"]::before,
+.qs-connection[data-state="connecting"]::before { background: var(--qs-color-warning); }
+.qs-connection[data-state="closed"]::before { background: var(--qs-color-error); }
+
+/* Reconnecting is worth interrupting for: a stale kitchen screen loses food. */
+.qs-offline-banner {
+  background: var(--qs-color-warning);
+  color: var(--qs-color-text-inverse);
+  text-align: center;
+  padding: var(--qs-spacing-sm);
+  font-weight: var(--qs-typography-weight-medium);
+}
+
+/* ------------------------------------------------------------------- misc */
+
+.qs-empty {
+  padding: var(--qs-spacing-xxl) var(--qs-spacing-lg);
+  text-align: center;
+  color: var(--qs-color-text-muted);
+}
+
+.qs-locked {
+  border: 1px dashed var(--qs-color-border-strong);
+  border-radius: var(--qs-radius-lg);
+  padding: var(--qs-spacing-xl);
+  text-align: center;
+  background: var(--qs-color-surface-alt);
+}
+
+.qs-spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--qs-color-border);
+  border-block-start-color: var(--qs-color-primary);
+  border-radius: 50%;
+  animation: qs-spin 700ms linear infinite;
+}
+@keyframes qs-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
