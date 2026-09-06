@@ -64,6 +64,8 @@ const BACKED_UP_TABLES: readonly string[] = [
   'printers',
   'print_jobs',
   'audit_log',
+  'custom_locales',
+  'custom_themes',
 ];
 
 /** Cleared before a restore, in reverse dependency order. */

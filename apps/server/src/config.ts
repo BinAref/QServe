@@ -27,7 +27,6 @@ export interface ServerConfig {
    * reprinting every table card (spec §8).
    */
   readonly publicHost: string | null;
-  readonly vendorWhatsApp: string | null;
   readonly webRoot: string;
   readonly localesDir: string;
   readonly themesDir: string;
@@ -51,7 +50,6 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
     lanPort: Number(env.QSERVE_LAN_PORT ?? 7020),
     licenseServerUrl: (env.QSERVE_LICENSE_SERVER_URL ?? 'http://localhost:8090').replace(/\/+$/, ''),
     publicHost: env.QSERVE_PUBLIC_HOST?.trim() || null,
-    vendorWhatsApp: env.QSERVE_VENDOR_WHATSAPP?.trim() || null,
     webRoot: resolve(env.QSERVE_WEB_ROOT ?? resolve(appRoot, '../web')),
     localesDir: resolve(env.QSERVE_LOCALES_DIR ?? resolve(appRoot, '../../locales')),
     themesDir: resolve(env.QSERVE_THEMES_DIR ?? resolve(appRoot, '../../themes')),

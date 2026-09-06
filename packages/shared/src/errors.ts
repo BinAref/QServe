@@ -44,6 +44,8 @@ export const ErrorCode = {
   /** The action needs a capability that SETUP mode does not grant (spec §2). */
   LICENSE_REQUIRED: 'LICENSE_REQUIRED',
   RATE_LIMITED: 'RATE_LIMITED',
+  /** The console is password-locked and this request arrived without an unlock. */
+  APP_LOCKED: 'APP_LOCKED',
   INTERNAL: 'INTERNAL',
   UNSUPPORTED: 'UNSUPPORTED',
 } as const;

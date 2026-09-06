@@ -32,6 +32,28 @@ export function createMenuRoutes(services: Services): Router<AppState> {
     services.bus.publish({ name: EventName.MENU_UPDATED, payload: { at: new Date().toISOString() } });
   };
 
+  /**
+   * Menu edits are audited as carefully as money is. "Who put the price up?"
+   * and "who hid that dish?" are questions restaurants really ask, and without
+   * a before/after pair the log cannot answer them (spec §19).
+   */
+  const log = (
+    ctx: { state: AppState; ip: string | null },
+    action: string,
+    entityType: string,
+    entityId: string,
+    snapshot: { before?: unknown; after?: unknown; detail?: Record<string, unknown> } = {},
+  ): void => {
+    services.audit.record({
+      action,
+      actor: ctx.state.auth!.actor,
+      entityType,
+      entityId,
+      ...snapshot,
+      clientIp: ctx.ip,
+    });
+  };
+
   /* --------------------------------------------------------------- read */
 
   /** The published menu, as a diner's phone renders it. */
@@ -84,13 +106,15 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       imageAssetId: optionalString(body, 'imageAssetId', { max: 64 }),
       visible: optionalBoolean(body, 'visible', true),
     });
+    log(ctx, 'menu.category_created', 'category', category.id, { after: category });
     announce();
     return category;
   }, [canManage]);
 
   router.patch('/menu/categories/:id', (ctx) => {
     const id = ctx.params['id']!;
-    if (!services.menu.getCategory(id)) throw notFound('category', id);
+    const before = services.menu.getCategory(id);
+    if (!before) throw notFound('category', id);
     const body = asObject(ctx.body);
 
     services.menu.updateCategory(id, {
@@ -101,20 +125,27 @@ export function createMenuRoutes(services: Services): Router<AppState> {
         ? { imageAssetId: optionalString(body, 'imageAssetId', { max: 64 }) } : {}),
       ...(body['visible'] !== undefined ? { visible: optionalBoolean(body, 'visible', true) } : {}),
     });
+    const after = services.menu.getCategory(id);
+    log(ctx, 'menu.category_updated', 'category', id, { before, after });
     announce();
-    return services.menu.getCategory(id);
+    return after;
   }, [canManage]);
 
   router.delete('/menu/categories/:id', (ctx) => {
     const id = ctx.params['id']!;
-    if (!services.menu.getCategory(id)) throw notFound('category', id);
+    const before = services.menu.getCategory(id);
+    if (!before) throw notFound('category', id);
 
     // Deleting a category takes its products with it (ON DELETE CASCADE), which
     // is destructive enough to be worth stating out loud in the response.
-    const productCount = services.menu.listProducts({ categoryId: id }).length;
+    const removed = services.menu.listProducts({ categoryId: id });
     services.menu.deleteCategory(id);
+    log(ctx, 'menu.category_deleted', 'category', id, {
+      before,
+      detail: { productsRemoved: removed.length, products: removed.map((p) => p.id) },
+    });
     announce();
-    return { deleted: id, productsRemoved: productCount };
+    return { deleted: id, productsRemoved: removed.length };
   }, [canManage]);
 
   /* ------------------------------------------------------------ products */
@@ -148,8 +179,10 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       : null;
     if (addonIds) services.menu.setProductAddons(product.id, addonIds);
 
+    const created = services.menu.getProduct(product.id);
+    log(ctx, 'menu.product_created', 'product', product.id, { after: created });
     announce();
-    return services.menu.getProduct(product.id);
+    return created;
   }, [canManage]);
 
   router.get('/menu/products/:id', (ctx) => {
@@ -160,7 +193,8 @@ export function createMenuRoutes(services: Services): Router<AppState> {
 
   router.patch('/menu/products/:id', (ctx) => {
     const id = ctx.params['id']!;
-    if (!services.menu.getProduct(id)) throw notFound('product', id);
+    const before = services.menu.getProduct(id);
+    if (!before) throw notFound('product', id);
     const body = asObject(ctx.body);
 
     services.menu.updateProduct(id, {
@@ -186,14 +220,18 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       services.menu.setProductAddons(id, requireStringArray(body, 'addonIds', { max: 100 }));
     }
 
+    const after = services.menu.getProduct(id);
+    log(ctx, 'menu.product_updated', 'product', id, { before, after });
     announce();
-    return services.menu.getProduct(id);
+    return after;
   }, [canManage]);
 
   router.delete('/menu/products/:id', (ctx) => {
     const id = ctx.params['id']!;
-    if (!services.menu.getProduct(id)) throw notFound('product', id);
+    const before = services.menu.getProduct(id);
+    if (!before) throw notFound('product', id);
     services.menu.deleteProduct(id);
+    log(ctx, 'menu.product_deleted', 'product', id, { before });
     announce();
     return { deleted: id };
   }, [canManage]);
@@ -209,7 +247,11 @@ export function createMenuRoutes(services: Services): Router<AppState> {
     if (target !== 'categories' && target !== 'products') {
       throw validationError('target must be "categories" or "products"', { field: 'target' });
     }
-    services.menu.reorder(target, requireStringArray(body, 'ids', { max: 2000 }));
+    const ids = requireStringArray(body, 'ids', { max: 2000 });
+    services.menu.reorder(target, ids);
+    log(ctx, 'menu.reordered', target === 'categories' ? 'category' : 'product', target, {
+      after: { order: ids },
+    });
     announce();
     return { ok: true };
   }, [canManage]);
@@ -242,13 +284,19 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       });
     }
 
+    const created = services.menu.getOption(option.id);
+    log(ctx, 'menu.option_created', 'option', option.id, {
+      after: created,
+      detail: { productId },
+    });
     announce();
-    return services.menu.getOption(option.id);
+    return created;
   }, [canManage]);
 
   router.patch('/menu/options/:optionId', (ctx) => {
     const optionId = ctx.params['optionId']!;
-    if (!services.menu.getOption(optionId)) throw notFound('option', optionId);
+    const before = services.menu.getOption(optionId);
+    if (!before) throw notFound('option', optionId);
     const body = asObject(ctx.body);
 
     services.menu.updateOption(optionId, {
@@ -261,14 +309,20 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       ...(body['sortOrder'] !== undefined
         ? { sortOrder: requireNumber(body, 'sortOrder', { min: 0, max: 9999 }) } : {}),
     });
+    const after = services.menu.getOption(optionId);
+    log(ctx, 'menu.option_updated', 'option', optionId, { before, after });
     announce();
-    return services.menu.getOption(optionId);
+    return after;
   }, [canManage]);
 
   router.delete('/menu/options/:optionId', (ctx) => {
-    services.menu.deleteOption(ctx.params['optionId']!);
+    const optionId = ctx.params['optionId']!;
+    const before = services.menu.getOption(optionId);
+    if (!before) throw notFound('option', optionId);
+    services.menu.deleteOption(optionId);
+    log(ctx, 'menu.option_deleted', 'option', optionId, { before });
     announce();
-    return { deleted: ctx.params['optionId'] };
+    return { deleted: optionId };
   }, [canManage]);
 
   router.post('/menu/options/:optionId/choices', (ctx) => {
@@ -283,13 +337,21 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       available: optionalBoolean(body, 'available', true),
       isDefault: optionalBoolean(body, 'isDefault', false),
     });
+    log(ctx, 'menu.choice_created', 'choice', choice.id, {
+      after: choice,
+      detail: { optionId },
+    });
     announce();
     return choice;
   }, [canManage]);
 
   router.patch('/menu/choices/:choiceId', (ctx) => {
+    const choiceId = ctx.params['choiceId']!;
+    const before = services.menu.getChoice(choiceId);
+    if (!before) throw notFound('choice', choiceId);
     const body = asObject(ctx.body);
-    services.menu.updateChoice(ctx.params['choiceId']!, {
+
+    services.menu.updateChoice(choiceId, {
       ...(body['name'] !== undefined ? { name: requireLocalised(body, 'name', { max: 120 }) } : {}),
       ...(body['priceDeltaMinor'] !== undefined
         ? { priceDeltaMinor: requireNumber(body, 'priceDeltaMinor', { min: -1_000_000, max: 1_000_000 }) } : {}),
@@ -300,14 +362,20 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       ...(body['sortOrder'] !== undefined
         ? { sortOrder: requireNumber(body, 'sortOrder', { min: 0, max: 9999 }) } : {}),
     });
+    const after = services.menu.getChoice(choiceId);
+    log(ctx, 'menu.choice_updated', 'choice', choiceId, { before, after });
     announce();
-    return { ok: true };
+    return after;
   }, [canManage]);
 
   router.delete('/menu/choices/:choiceId', (ctx) => {
-    services.menu.deleteChoice(ctx.params['choiceId']!);
+    const choiceId = ctx.params['choiceId']!;
+    const before = services.menu.getChoice(choiceId);
+    if (!before) throw notFound('choice', choiceId);
+    services.menu.deleteChoice(choiceId);
+    log(ctx, 'menu.choice_deleted', 'choice', choiceId, { before });
     announce();
-    return { deleted: ctx.params['choiceId'] };
+    return { deleted: choiceId };
   }, [canManage]);
 
   /* -------------------------------------------------------------- addons */
@@ -322,13 +390,15 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       sortOrder: optionalNumber(body, 'sortOrder', { min: 0, max: 9999 }) ?? 0,
       available: optionalBoolean(body, 'available', true),
     });
+    log(ctx, 'menu.addon_created', 'addon', addon.id, { after: addon });
     announce();
     return addon;
   }, [canManage]);
 
   router.patch('/menu/addons/:id', (ctx) => {
     const id = ctx.params['id']!;
-    if (!services.menu.getAddon(id)) throw notFound('addon', id);
+    const before = services.menu.getAddon(id);
+    if (!before) throw notFound('addon', id);
     const body = asObject(ctx.body);
 
     services.menu.updateAddon(id, {
@@ -340,14 +410,20 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       ...(body['sortOrder'] !== undefined
         ? { sortOrder: requireNumber(body, 'sortOrder', { min: 0, max: 9999 }) } : {}),
     });
+    const after = services.menu.getAddon(id);
+    log(ctx, 'menu.addon_updated', 'addon', id, { before, after });
     announce();
-    return services.menu.getAddon(id);
+    return after;
   }, [canManage]);
 
   router.delete('/menu/addons/:id', (ctx) => {
-    services.menu.deleteAddon(ctx.params['id']!);
+    const id = ctx.params['id']!;
+    const before = services.menu.getAddon(id);
+    if (!before) throw notFound('addon', id);
+    services.menu.deleteAddon(id);
+    log(ctx, 'menu.addon_deleted', 'addon', id, { before });
     announce();
-    return { deleted: ctx.params['id'] };
+    return { deleted: id };
   }, [canManage]);
 
   return router;

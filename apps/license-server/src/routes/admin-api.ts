@@ -227,5 +227,17 @@ export function createAdminApi(
 
   router.get('/signing-keys', () => ({ keys: store.listSigningKeys() }), [guard]);
 
+  /* --------------------------------------------------------- vendor info */
+
+  /**
+   * The vendor's own contact details and prices. This is the only place either
+   * is written: the application quotes no figure it was not given here, and
+   * takes no payment anywhere.
+   */
+  router.get('/vendor-info', () => service.vendorInfo(), [guard]);
+
+  router.put('/vendor-info', (ctx) =>
+    service.saveVendorInfo(ctx.body, ctx.state.admin!.username, ctx.ip), [guard]);
+
   return router;
 }

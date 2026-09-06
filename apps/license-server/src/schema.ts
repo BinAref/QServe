@@ -9,7 +9,7 @@
 
 import type { Migration } from '@qserve/db';
 
-export const LICENSE_SERVER_SCHEMA_VERSION = 1;
+export const LICENSE_SERVER_SCHEMA_VERSION = 2;
 
 export const migrations: readonly Migration[] = [
   {
@@ -131,6 +131,22 @@ export const migrations: readonly Migration[] = [
 
       db.prepare('INSERT INTO counters (name, value) VALUES (?, ?)').run('restaurant', 0);
       db.prepare('INSERT INTO counters (name, value) VALUES (?, ?)').run('license', 0);
+    },
+  },
+  {
+    version: 2,
+    name: 'vendor_settings',
+    up: (db) => {
+      db.exec(`
+        -- How restaurants reach the vendor, and what a licence costs. Free text
+        -- written by the vendor: the application takes no payment and knows
+        -- nothing about money beyond what is typed here.
+        CREATE TABLE vendor_settings (
+          key        TEXT PRIMARY KEY,
+          value_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
     },
   },
 ];

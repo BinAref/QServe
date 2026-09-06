@@ -20,10 +20,12 @@ import { LicenseGate, loadTrustStore } from './core/license-gate.js';
 import { SecurityService } from './core/security.js';
 import { RealtimeGateway } from './core/realtime.js';
 import { LocalDiscovery, lanAddresses, mdnsNameFor, publicBaseUrl } from './core/network.js';
+import { AppLockService } from './core/app-lock.js';
 
 import { AccessRepository } from './core/repositories/access.js';
 import { AuditRepository } from './core/repositories/audit.js';
 import { LicenseRepository } from './core/repositories/license.js';
+import { PackRepository } from './core/repositories/packs.js';
 import { SettingsRepository } from './core/repositories/settings.js';
 import { TerminalRepository } from './core/repositories/terminals.js';
 
@@ -38,6 +40,8 @@ import { BackupService } from './modules/backup/service.js';
 import { ReportService } from './modules/reports/service.js';
 import { LicensingService } from './modules/licensing/service.js';
 import { TranslationService } from './modules/translations/service.js';
+import { ContentTranslationRepository } from './modules/translations/content.js';
+import { PackAuthoringService } from './modules/translations/authoring.js';
 import { ThemeService } from './modules/themes/service.js';
 import { AssetService } from './modules/assets/service.js';
 
@@ -51,12 +55,15 @@ export interface Services {
   readonly realtime: RealtimeGateway;
   readonly discovery: LocalDiscovery;
   readonly fingerprint: FingerprintResult;
+  readonly appLock: AppLockService;
 
   readonly access: AccessRepository;
   readonly audit: AuditRepository;
   readonly licenseRepository: LicenseRepository;
   readonly settings: SettingsRepository;
   readonly terminalRepository: TerminalRepository;
+  readonly packs: PackRepository;
+  readonly contentTranslations: ContentTranslationRepository;
   readonly menu: MenuRepository;
   readonly tables: TableRepository;
   readonly orderRepository: OrderRepository;
@@ -70,6 +77,7 @@ export interface Services {
   readonly licensing: LicensingService;
   readonly translations: TranslationService;
   readonly themes: ThemeService;
+  readonly packAuthoring: PackAuthoringService;
   readonly assets: AssetService;
 
   /** The LAN base URL, or null before the LAN listener has bound. */
@@ -109,6 +117,8 @@ export function buildServices(options: BuildOptions = {}): Services {
   const access = new AccessRepository(db);
   const terminalRepository = new TerminalRepository(db);
   const licenseRepository = new LicenseRepository(db, paths);
+  const packs = new PackRepository(db);
+  const contentTranslations = new ContentTranslationRepository(db);
 
   const gate = new LicenseGate(
     licenseRepository,
@@ -120,6 +130,7 @@ export function buildServices(options: BuildOptions = {}): Services {
   const defaultLocale = (): string => settings.profile()?.defaultLocale ?? 'en';
 
   const security = new SecurityService(access, terminalRepository, gate, defaultLocale);
+  const appLock = new AppLockService(settings, audit);
   const realtime = new RealtimeGateway(bus, security);
   const discovery = new LocalDiscovery();
 
@@ -158,20 +169,28 @@ export function buildServices(options: BuildOptions = {}): Services {
 
   const translations = new TranslationService(config.localesDir, warn);
   translations.load();
+  // The restaurant's own languages are merged over the shipped ones, so an
+  // owner-authored pack survives a vendor update of the same locale file.
+  translations.useAuthoredPacks(packs);
 
   const themes = new ThemeService(config.themesDir, warn);
   themes.load();
+  themes.useAuthoredPacks(packs);
+
+  const packAuthoring = new PackAuthoringService(
+    packs, contentTranslations, translations, themes, settings, audit,
+  );
 
   // First evaluation of the licence, entirely offline. This is what decides
   // whether the LAN listener will be started at all.
   gate.evaluate(settings.profile()?.restaurantId as never);
 
   return {
-    config, paths, db, bus, gate, security, realtime, discovery, fingerprint,
+    config, paths, db, bus, gate, security, realtime, discovery, fingerprint, appLock,
     access, audit, licenseRepository, settings, terminalRepository,
-    menu, tables, orderRepository,
+    packs, contentTranslations, menu, tables, orderRepository,
     orders, payments, terminals, printing, backup, reports, licensing,
-    translations, themes, assets,
+    translations, themes, packAuthoring, assets,
     appVersion: APP_VERSION,
     lanBaseUrl: () => lanBaseUrl,
     setLanBaseUrl: (url) => { lanBaseUrl = url; },

@@ -10,8 +10,9 @@
 
 import { AppError, ErrorCode, LicenseErrorCode, normaliseLicenseKey, RestaurantMode,
          APP_VERSION, Capability, EventName, validationError,
+         EMPTY_VENDOR_INFO, vendorContactUrl,
          type ActivationRequest, type ActivationResponse, type DeactivationResponse,
-         type DeviceFingerprint, type RestaurantId } from '@qserve/shared';
+         type DeviceFingerprint, type RestaurantId, type VendorInfo } from '@qserve/shared';
 import { monotonicCode } from '@qserve/shared';
 import type { EventBus } from '../../core/event-bus.js';
 import type { AuditRepository } from '../../core/repositories/audit.js';
@@ -84,6 +85,80 @@ export class LicensingService {
       });
     }
     return payload as T;
+  }
+
+  private async getJson<T>(path: string): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${this.options.licenseServerUrl}${path}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return (await response.json()) as T;
+    } catch (error) {
+      throw new AppError(
+        LicenseErrorCode.SERVER_UNREACHABLE,
+        `could not reach the licence server at ${this.options.licenseServerUrl}`,
+        {
+          status: 503,
+          messageKey: 'license.error.server_unreachable',
+          details: { url: this.options.licenseServerUrl },
+          cause: error,
+        },
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /* --------------------------------------------------------- vendor info */
+
+  /**
+   * Who to contact for a licence, and what the vendor charges for one and for
+   * moving one. The application takes no payment: it shows the vendor's own
+   * words and a link to talk to them.
+   *
+   * Cached in settings, because a restaurant deciding to buy is often the same
+   * restaurant whose internet is not working — which is why it bought an
+   * offline system in the first place.
+   */
+  async refreshVendorInfo(): Promise<{ info: VendorInfo; fetchedAt: string }> {
+    const info = await this.getJson<VendorInfo>('/api/v1/vendor-info');
+    const cached = { info, fetchedAt: new Date().toISOString() };
+    this.settings.set('license.vendorInfoCache', cached);
+    return cached;
+  }
+
+  /** The cached copy, plus how to reach the vendor about *this* restaurant. */
+  vendorInfo(): {
+    info: VendorInfo;
+    fetchedAt: string | null;
+    stale: boolean;
+    contacts: { kind: string; label: string; value: string; url: string | null }[];
+    request: ReturnType<LicensingService['licenceRequest']>;
+  } {
+    const cached = this.settings.get<{ info: VendorInfo; fetchedAt: string } | null>(
+      'license.vendorInfoCache',
+    );
+    const info = cached?.info ?? EMPTY_VENDOR_INFO;
+
+    return {
+      info,
+      fetchedAt: cached?.fetchedAt ?? null,
+      // A month-old price list is worth re-checking before quoting it to anyone.
+      stale: cached
+        ? Date.now() - Date.parse(cached.fetchedAt) > 30 * 24 * 60 * 60 * 1000
+        : true,
+      contacts: info.contacts.map((contact) => ({
+        kind: contact.kind,
+        label: contact.label,
+        value: contact.value,
+        // No prefilled text here: the console appends its own, translated.
+        url: vendorContactUrl(contact),
+      })),
+      request: this.licenceRequest(),
+    };
   }
 
   /* ---------------------------------------------------------- activation */
@@ -270,25 +345,28 @@ export class LicensingService {
    * Carries only what the vendor needs to issue a key: no menu, no orders, no
    * customer data, no device secrets.
    */
-  licenceRequestMessage(vendorNumber: string | null): { text: string; url: string | null } {
+  /**
+   * The facts a vendor needs to identify this installation. Deliberately data,
+   * not prose: the console renders the actual message from translation keys, so
+   * a licence request goes out in the owner's own language rather than in text
+   * compiled into the server (spec §32).
+   */
+  licenceRequest(): {
+    restaurantName: string;
+    restaurantId: string | null;
+    appVersion: string;
+    deviceLabel: string;
+    deviceFingerprint: string;
+  } {
     const profile = this.settings.profile();
-    const name = profile ? Object.values(profile.name)[0] ?? '' : '';
-
-    const text = [
-      'مرحبًا،',
-      'أريد تفعيل ترخيص نظام المطعم.',
-      '',
-      `اسم المطعم: ${name}`,
-      `Restaurant ID: ${profile?.restaurantId ?? '-'}`,
-      `إصدار التطبيق: ${APP_VERSION}`,
-      '',
-      'أرغب في الحصول على الترخيص.',
-    ].join('\n');
-
-    const digits = vendorNumber?.replace(/[^\d]/g, '') ?? '';
     return {
-      text,
-      url: digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null,
+      restaurantName: profile
+        ? profile.name[profile.defaultLocale] ?? Object.values(profile.name)[0] ?? ''
+        : '',
+      restaurantId: profile?.restaurantId ?? null,
+      appVersion: APP_VERSION,
+      deviceLabel: this.options.deviceLabel,
+      deviceFingerprint: this.options.deviceFingerprint,
     };
   }
 }

@@ -198,7 +198,8 @@ export function createOperationsRoutes(services: Services): Router<AppState> {
 
   router.patch('/printers/:id', (ctx) => {
     const id = ctx.params['id']!;
-    if (!services.printing.printers.getPrinter(id)) throw notFound('printer', id);
+    const before = services.printing.printers.getPrinter(id);
+    if (!before) throw notFound('printer', id);
     const body = asObject(ctx.body);
 
     services.printing.printers.updatePrinter(id, {
@@ -215,20 +216,51 @@ export function createOperationsRoutes(services: Services): Router<AppState> {
         ? { charactersPerLine: requireNumber(body, 'charactersPerLine', { min: 24, max: 96 }) } : {}),
       ...(body['enabled'] !== undefined ? { enabled: optionalBoolean(body, 'enabled', true) } : {}),
     });
-    return services.printing.printers.getPrinter(id);
+
+    const after = services.printing.printers.getPrinter(id);
+    services.audit.record({
+      action: 'printer.updated',
+      actor: ctx.state.auth!.actor,
+      entityType: 'printer',
+      entityId: id,
+      before, after,
+      clientIp: ctx.ip,
+    });
+    return after;
   }, [canManagePrinting]);
 
   router.delete('/printers/:id', (ctx) => {
-    services.printing.printers.deletePrinter(ctx.params['id']!);
-    return { deleted: ctx.params['id'] };
+    const id = ctx.params['id']!;
+    const before = services.printing.printers.getPrinter(id);
+    if (!before) throw notFound('printer', id);
+
+    services.printing.printers.deletePrinter(id);
+    services.audit.record({
+      action: 'printer.deleted',
+      actor: ctx.state.auth!.actor,
+      entityType: 'printer',
+      entityId: id,
+      before,
+      clientIp: ctx.ip,
+    });
+    return { deleted: id };
   }, [canManagePrinting]);
 
   router.get('/print-jobs', () => ({
     jobs: services.printing.printers.recentJobs(100),
   }), [canUsePrinting]);
 
-  router.post('/print-jobs/:id/retry', (ctx) =>
-    services.printing.retry(ctx.params['id']!), [canUsePrinting]);
+  router.post('/print-jobs/:id/retry', (ctx) => {
+    const result = services.printing.retry(ctx.params['id']!);
+    services.audit.record({
+      action: 'print_job.retried',
+      actor: ctx.state.auth!.actor,
+      entityType: 'print_job',
+      entityId: ctx.params['id']!,
+      clientIp: ctx.ip,
+    });
+    return result;
+  }, [canUsePrinting]);
 
   /** Reprint a receipt — an everyday request at a till. */
   router.post('/orders/:id/print-receipt', async (ctx) => {
@@ -239,6 +271,17 @@ export function createOperationsRoutes(services: Services): Router<AppState> {
     const jobs = await services.printing.printReceipt(
       order, services.payments.billFor(order.id).payments, locale,
     );
+    // A reprinted receipt is a classic route to a disputed bill, so who asked
+    // for one and when is worth keeping.
+    services.audit.record({
+      action: 'order.receipt_reprinted',
+      actor: ctx.state.auth!.actor,
+      entityType: 'order',
+      entityId: order.id,
+      orderId: order.id,
+      detail: { jobs: jobs.length, locale },
+      clientIp: ctx.ip,
+    });
     return { jobs };
   }, [security.requireCapability(Capability.PRINTING_RUNTIME), canUsePrinting]);
 
@@ -247,7 +290,17 @@ export function createOperationsRoutes(services: Services): Router<AppState> {
     if (!order) throw notFound('order', ctx.params['id']!);
 
     const locale = ctx.query.get('locale') ?? services.settings.profile()?.defaultLocale ?? 'en';
-    return { jobs: await services.printing.printKitchenTicket(order, locale) };
+    const jobs = await services.printing.printKitchenTicket(order, locale);
+    services.audit.record({
+      action: 'order.ticket_reprinted',
+      actor: ctx.state.auth!.actor,
+      entityType: 'order',
+      entityId: order.id,
+      orderId: order.id,
+      detail: { jobs: jobs.length, locale },
+      clientIp: ctx.ip,
+    });
+    return { jobs };
   }, [security.requireCapability(Capability.PRINTING_RUNTIME), canUsePrinting]);
 
   /**
@@ -264,9 +317,22 @@ export function createOperationsRoutes(services: Services): Router<AppState> {
     const terminal = ctx.state.auth?.terminal;
     if (!terminal) throw notFound('terminal session');
 
+    const before = services.terminalRepository.soundProfile(terminal);
     const profile = asObject(ctx.body) as unknown as SoundProfile;
     services.terminalRepository.update(terminal.id, { soundProfile: profile });
-    return services.terminalRepository.soundProfile(services.terminalRepository.get(terminal.id)!);
+
+    const after = services.terminalRepository.soundProfile(
+      services.terminalRepository.get(terminal.id)!,
+    );
+    services.audit.record({
+      action: 'terminal.sound_changed',
+      actor: ctx.state.auth!.actor,
+      entityType: 'terminal',
+      entityId: terminal.id,
+      before, after,
+      clientIp: ctx.ip,
+    });
+    return after;
   });
 
   return router;

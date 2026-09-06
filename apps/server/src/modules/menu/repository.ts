@@ -289,6 +289,13 @@ export class MenuRepository {
     this.db.prepare(`UPDATE option_choices SET ${assignments.join(', ')} WHERE id = ?`).run(...values, id);
   }
 
+  getChoice(id: string): OptionChoice | null {
+    const row = this.db
+      .prepare('SELECT * FROM option_choices WHERE id = ?')
+      .get(id) as ChoiceRow | undefined;
+    return row ? toChoice(row) : null;
+  }
+
   deleteChoice(id: string): void {
     this.db.prepare('DELETE FROM option_choices WHERE id = ?').run(id);
   }

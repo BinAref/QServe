@@ -183,6 +183,17 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
   router.post('/auth/logout', (ctx) => {
     const token = readUserToken(ctx);
     if (token) services.access.deleteUserSession(token);
+
+    const auth = ctx.state.auth ?? security.resolve(ctx);
+    if (auth.user) {
+      services.audit.record({
+        action: 'user.logout',
+        actor: auth.actor,
+        entityType: 'user',
+        entityId: auth.user.id,
+        clientIp: ctx.ip,
+      });
+    }
     return new HttpResponse(200, JSON.stringify({ ok: true }), {
       'content-type': 'application/json; charset=utf-8',
       'set-cookie': clearUserCookie(),

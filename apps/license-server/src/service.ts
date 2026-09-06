@@ -21,6 +21,8 @@ import {
   type ActivationCertificate, type ActivationCertificatePayload, type ActivationRequest,
   type ActivationResponse, type DeactivationRequest, type DeactivationResponse,
   type DeviceFingerprint, type LicenseId, type RestaurantId,
+  EMPTY_VENDOR_INFO, VendorContactKind,
+  type VendorContact, type VendorInfo,
 } from '@qserve/shared';
 import { computeKeyId, hashToken, issueCertificate } from '@qserve/crypto';
 import type { LicenseStore, LicenseRow, RestaurantRow } from './store.js';
@@ -440,6 +442,33 @@ export class LicenseService {
     };
   }
 
+  /* -------------------------------------------------------- vendor info */
+
+  /**
+   * What a restaurant is shown on its licence screen. The vendor writes every
+   * word of it, including both prices: the application never quotes a figure
+   * of its own, and never takes a payment.
+   */
+  vendorInfo(): VendorInfo {
+    return this.store.getSetting<VendorInfo>(VENDOR_INFO_KEY, EMPTY_VENDOR_INFO);
+  }
+
+  saveVendorInfo(input: unknown, actor: string, clientIp: string | null): VendorInfo {
+    const info = parseVendorInfo(input);
+    this.store.setSetting(VENDOR_INFO_KEY, info);
+    this.store.audit({
+      actor,
+      action: 'vendor.info_updated',
+      detail: {
+        contacts: info.contacts.length,
+        activation: info.pricing.activation.price,
+        transfer: info.pricing.transfer.price,
+      },
+      clientIp,
+    });
+    return info;
+  }
+
   /** Publish the vendor public keys so an installer can pin them out of band. */
   publicKeys(): { keyId: string; publicKey: string }[] {
     return this.store.listSigningKeys()
@@ -457,3 +486,53 @@ export class LicenseService {
     return monotonicCode(12);
   }
 }
+
+const VENDOR_INFO_KEY = 'vendor.info';
+
+/**
+ * Coerce whatever the vendor console posted into the published shape. Text is
+ * trimmed and length-capped, because this is rendered on a restaurant's screen
+ * and a runaway paste should not be able to break the licence page.
+ */
+export function parseVendorInfo(input: unknown): VendorInfo {
+  const body = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
+  const pricing = (typeof body['pricing'] === 'object' && body['pricing'] !== null
+    ? body['pricing']
+    : {}) as Record<string, unknown>;
+
+  const rawContacts = Array.isArray(body['contacts']) ? body['contacts'] : [];
+  const contacts: VendorContact[] = [];
+  for (const entry of rawContacts.slice(0, 12)) {
+    const contact = (typeof entry === 'object' && entry !== null ? entry : {}) as Record<string, unknown>;
+    const value = text(contact['value'], 200);
+    if (value === '') continue;
+    const kind = String(contact['kind'] ?? '').toUpperCase();
+    contacts.push({
+      kind: (kind in VendorContactKind ? kind : VendorContactKind.OTHER) as VendorContactKind,
+      label: text(contact['label'], 60),
+      value,
+    });
+  }
+
+  return {
+    vendorName: text(body['vendorName'], 80),
+    tagline: textOrNull(body['tagline'], 160),
+    contacts,
+    pricing: {
+      activation: price(pricing['activation']),
+      transfer: price(pricing['transfer']),
+    },
+    instructions: textOrNull(body['instructions'], 2000),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+const text = (value: unknown, max: number): string =>
+  typeof value === 'string' ? value.trim().slice(0, max) : '';
+
+const textOrNull = (value: unknown, max: number): string | null => text(value, max) || null;
+
+const price = (value: unknown): { price: string; note: string | null } => {
+  const entry = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+  return { price: text(entry['price'], 80), note: textOrNull(entry['note'], 300) };
+};

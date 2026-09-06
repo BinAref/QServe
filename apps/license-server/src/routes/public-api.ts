@@ -93,5 +93,16 @@ export function createPublicApi(service: LicenseService): Router {
    */
   router.get('/public-keys', () => ({ keys: service.publicKeys() }));
 
+  /**
+   * Who to contact for a licence, and what it costs. Public and unauthenticated
+   * because a restaurant in SETUP mode has no licence yet — that is precisely
+   * when it needs to know who to call. Nothing here identifies a restaurant, so
+   * there is nothing to leak.
+   */
+  router.get('/vendor-info', (ctx) => {
+    limit(ctx);
+    return service.vendorInfo();
+  });
+
   return router;
 }

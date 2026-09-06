@@ -189,6 +189,15 @@ export function createEnrolmentRoutes(services: Services): Router<AppState> {
     if (!terminal) throw notFound('terminal session');
 
     services.terminalRepository.deleteSessionsForTerminal(terminal.id);
+    // A station signing itself out matters: it is how a lost tablet is cut off,
+    // and the log is where an owner checks that it actually happened.
+    services.audit.record({
+      action: 'terminal.left',
+      actor: ctx.state.auth!.actor,
+      entityType: 'terminal',
+      entityId: terminal.id,
+      clientIp: ctx.ip,
+    });
     return new HttpResponse(200, JSON.stringify({ ok: true }), {
       'content-type': 'application/json; charset=utf-8',
       'set-cookie': clearTerminalCookie(),

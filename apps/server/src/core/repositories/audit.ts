@@ -50,8 +50,21 @@ export interface AuditQuery {
   readonly since?: string;
   readonly until?: string;
   readonly action?: string;
+  /** Everything one person did — the question an owner actually asks. */
+  readonly actorUserId?: string;
+  readonly actorKind?: string;
+  readonly terminalId?: string;
+  /** Substring match over the action, the actor's name and the entity id. */
+  readonly search?: string;
   readonly limit?: number;
   readonly offset?: number;
+}
+
+/** The values present in the log, so the console can offer real filters. */
+export interface AuditFacets {
+  readonly actions: string[];
+  readonly entityTypes: string[];
+  readonly actors: { userId: string; userName: string }[];
 }
 
 export class AuditRepository {
@@ -78,7 +91,8 @@ export class AuditRepository {
       );
   }
 
-  query(query: AuditQuery = {}): AuditLogEntry[] {
+  /** Shared WHERE builder, so `query` and `count` can never disagree. */
+  private conditions(query: AuditQuery): { where: string; values: unknown[] } {
     const conditions: string[] = [];
     const values: unknown[] = [];
 
@@ -88,8 +102,27 @@ export class AuditRepository {
     if (query.action) { conditions.push('action = ?'); values.push(query.action); }
     if (query.since) { conditions.push('at >= ?'); values.push(query.since); }
     if (query.until) { conditions.push('at <= ?'); values.push(query.until); }
+    if (query.actorUserId) { conditions.push('actor_user_id = ?'); values.push(query.actorUserId); }
+    if (query.actorKind) { conditions.push('actor_kind = ?'); values.push(query.actorKind); }
+    if (query.terminalId) {
+      conditions.push('actor_terminal_id = ?');
+      values.push(query.terminalId);
+    }
+    if (query.search) {
+      // Deliberately narrow: an owner looking for "burger" wants the entity,
+      // not a match inside a JSON blob they cannot read.
+      conditions.push(`(
+        action LIKE ? OR actor_user_name LIKE ? OR actor_terminal_name LIKE ?
+        OR entity_id LIKE ? OR entity_type LIKE ?
+      )`);
+      const like = `%${query.search}%`;
+      values.push(like, like, like, like, like);
+    }
+    return { where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', values };
+  }
 
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  query(query: AuditQuery = {}): AuditLogEntry[] {
+    const { where, values } = this.conditions(query);
     const rows = this.db
       // rowid, not id: ids carry random suffixes, so within one millisecond
       // they would order arbitrarily. rowid is insertion order.
@@ -97,6 +130,39 @@ export class AuditRepository {
       .all(...values, Math.min(query.limit ?? 100, 1000), query.offset ?? 0) as AuditRow[];
 
     return rows.map(toEntry);
+  }
+
+  /** Total matching rows, so the console can page rather than truncate. */
+  count(query: AuditQuery = {}): number {
+    const { where, values } = this.conditions(query);
+    const row = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM audit_log ${where}`)
+      .get(...values) as { n: number };
+    return row.n;
+  }
+
+  /**
+   * What the log actually contains. The filter lists are built from the data
+   * rather than from a hard-coded vocabulary, so a module added later appears
+   * in the console's filters without anybody editing a dropdown.
+   */
+  facets(): AuditFacets {
+    const actions = (this.db
+      .prepare('SELECT DISTINCT action FROM audit_log ORDER BY action')
+      .all() as { action: string }[]).map((row) => row.action);
+
+    const entityTypes = (this.db
+      .prepare('SELECT DISTINCT entity_type FROM audit_log ORDER BY entity_type')
+      .all() as { entity_type: string }[]).map((row) => row.entity_type);
+
+    const actors = (this.db
+      .prepare(`SELECT actor_user_id AS userId, MAX(actor_user_name) AS userName
+                FROM audit_log WHERE actor_user_id IS NOT NULL
+                GROUP BY actor_user_id ORDER BY userName`)
+      .all() as { userId: string; userName: string | null }[])
+      .map((row) => ({ userId: row.userId, userName: row.userName ?? row.userId }));
+
+    return { actions, entityTypes, actors };
   }
 
   /** Chronological history for one order — the timeline the spec sketches. */

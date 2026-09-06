@@ -29,6 +29,8 @@ import { createMenuRoutes } from './http/routes/menu.js';
 import { createOrderRoutes } from './http/routes/orders.js';
 import { createOperationsRoutes } from './http/routes/operations.js';
 import { createManagementRoutes } from './http/routes/management.js';
+import { createLockRoutes, LOCK_ALLOWED_PATHS } from './http/routes/lock.js';
+import { createPackRoutes } from './http/routes/packs.js';
 import {
   createAssetFileRoutes, createContentRoutes, createEnrolmentRoutes,
 } from './http/routes/content.js';
@@ -42,9 +44,13 @@ const TERMINAL_APPS: Readonly<Record<string, string>> = {
   '/printer': 'printer',
 };
 
+/** How often expired sessions and unlock tokens are swept. */
+const MAINTENANCE_INTERVAL_MS = 5 * 60 * 1000;
+
 export class QServeApp {
   private adminServer: Server | null = null;
   private lanServer: Server | null = null;
+  private maintenance: NodeJS.Timeout | null = null;
   private stopping = false;
 
   constructor(private readonly services: Services) {}
@@ -73,8 +79,17 @@ export class QServeApp {
 
     const api = this.commonApi();
     api.mount('/', createManagementRoutes(this.services));
+    api.mount('/', createPackRoutes(this.services));
+    api.mount('/', createLockRoutes(this.services));
+    // Everything the console can read goes behind the optional app lock. The
+    // static files do not: they hold no restaurant data, and the lock screen is
+    // one of them.
+    api.use(this.services.appLock.guard(LOCK_ALLOWED_PATHS));
     router.mount('/api', api);
-    router.mount('/', createAssetFileRoutes(this.services));
+
+    const assetFiles = createAssetFileRoutes(this.services);
+    assetFiles.use(this.services.appLock.guard([]));
+    router.mount('/', assetFiles);
     this.mountSharedAssets(router);
 
     // The console itself: a plain directory of ES modules, no build step.
@@ -141,6 +156,7 @@ export class QServeApp {
 
     // Subscribe the gateway to the bus before any socket can attach to it.
     this.services.realtime.start();
+    this.startMaintenance();
 
     this.adminServer = createHttpServer<AppState>({
       router: this.createAdminRouter(),
@@ -245,6 +261,22 @@ export class QServeApp {
     if (reason) console.log(`[qserve] local restaurant server stopped (${reason})`);
   }
 
+  /**
+   * Expired staff sessions and unlock tokens are only *checked* on use, so
+   * without this they would accumulate in a restaurant that never restarts.
+   */
+  private startMaintenance(): void {
+    this.maintenance = setInterval(() => {
+      try {
+        this.services.access.purgeExpiredSessions();
+        this.services.appLock.prune();
+      } catch (error) {
+        this.logUnexpected(error);
+      }
+    }, MAINTENANCE_INTERVAL_MS);
+    this.maintenance.unref();
+  }
+
   private logUnexpected(error: unknown): void {
     // AppErrors are ordinary control flow — a wrong PIN, a sold-out dish. Only
     // the unexpected reaches the log, so the log stays worth reading.
@@ -269,6 +301,8 @@ export class QServeApp {
 
   async stop(): Promise<void> {
     this.stopping = true;
+    if (this.maintenance) clearInterval(this.maintenance);
+    this.maintenance = null;
     await this.services.realtime.stop();
     await this.stopLan();
 

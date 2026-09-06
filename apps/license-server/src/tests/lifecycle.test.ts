@@ -292,3 +292,55 @@ describe('status', () => {
     assert.equal((view as { key_hint: string }).key_hint, issued.licenseKey.slice(-5));
   });
 });
+
+describe('vendor info', () => {
+  test('a fresh server quotes nothing until the vendor writes it', () => {
+    const context = setup();
+    const info = context.service.vendorInfo();
+
+    assert.equal(info.vendorName, '');
+    assert.deepEqual(info.contacts, []);
+    assert.equal(info.pricing.activation.price, '');
+    assert.equal(info.pricing.transfer.price, '');
+  });
+
+  test('the vendor writes both prices and how to be reached', () => {
+    const context = setup();
+
+    const saved = context.service.saveVendorInfo({
+      vendorName: 'QServe Gulf',
+      tagline: 'Local restaurant systems',
+      contacts: [
+        { kind: 'whatsapp', label: 'Sales', value: '+966 50 123 4567' },
+        { kind: 'email', label: 'Support', value: 'help@example.com' },
+        { kind: 'nonsense', label: 'ignored', value: '' },
+      ],
+      pricing: {
+        activation: { price: '1,500 SAR', note: 'includes setup' },
+        transfer: { price: '150 SAR', note: null },
+      },
+      instructions: 'Transfer to the account we send you, then we issue the key.',
+    }, 'dev', null);
+
+    // Prices are the vendor's own words, not a number the software invented.
+    assert.equal(saved.pricing.activation.price, '1,500 SAR');
+    assert.equal(saved.pricing.transfer.price, '150 SAR');
+    // A contact with no value is not a contact.
+    assert.equal(saved.contacts.length, 2);
+    assert.equal(saved.contacts[0]?.kind, 'WHATSAPP');
+
+    assert.deepEqual(context.service.vendorInfo(), saved);
+
+    const actions = (context.store.recentAudit(5) as { action: string }[]).map((row) => row.action);
+    assert.ok(actions.includes('vendor.info_updated'));
+  });
+
+  test('an unknown contact kind degrades to OTHER rather than being trusted', () => {
+    const context = setup();
+    const saved = context.service.saveVendorInfo({
+      contacts: [{ kind: 'carrier-pigeon', label: 'Roof', value: 'the grey one' }],
+    }, 'dev', null);
+
+    assert.equal(saved.contacts[0]?.kind, 'OTHER');
+  });
+});

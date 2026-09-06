@@ -320,6 +320,14 @@ export function createManagementRoutes(services: Services): Router<AppState> {
     if (role.is_system === 1) throw conflict('built-in roles cannot be deleted');
 
     services.access.deleteRole(role.id);
+    services.audit.record({
+      action: 'role.deleted',
+      actor: ctx.state.auth!.actor,
+      entityType: 'role',
+      entityId: role.id,
+      before: { key: role.key, name: role.name_json },
+      clientIp: ctx.ip,
+    });
     return { deleted: role.id };
   }, [loopbackOnly, canManageRoles]);
 
@@ -417,24 +425,56 @@ export function createManagementRoutes(services: Services): Router<AppState> {
     return services.reports.cashierShift(range, userId);
   }, [security.requireCapability(Capability.REPORTS_RUNTIME), canViewReports]);
 
-  router.get('/audit', (ctx) => ({
-    entries: services.audit.query({
+  /**
+   * The activity log (spec §19).
+   *
+   * Everything every person and every station did, filterable by who, what,
+   * which station and when, and paged rather than truncated — a log an owner
+   * can only read the last 200 lines of is not a log they can rely on.
+   */
+  router.get('/audit', (ctx) => {
+    const filters = {
       ...(ctx.query.get('orderId') ? { orderId: ctx.query.get('orderId')! } : {}),
       ...(ctx.query.get('entityType') ? { entityType: ctx.query.get('entityType')! } : {}),
+      ...(ctx.query.get('entityId') ? { entityId: ctx.query.get('entityId')! } : {}),
       ...(ctx.query.get('action') ? { action: ctx.query.get('action')! } : {}),
+      ...(ctx.query.get('actorUserId') ? { actorUserId: ctx.query.get('actorUserId')! } : {}),
+      ...(ctx.query.get('actorKind') ? { actorKind: ctx.query.get('actorKind')! } : {}),
+      ...(ctx.query.get('terminalId') ? { terminalId: ctx.query.get('terminalId')! } : {}),
+      ...(ctx.query.get('search') ? { search: ctx.query.get('search')! } : {}),
       ...(ctx.query.get('since') ? { since: ctx.query.get('since')! } : {}),
-      limit: Number(ctx.query.get('limit') ?? 200),
-    }),
-  }), [canViewAudit]);
+      ...(ctx.query.get('until') ? { until: ctx.query.get('until')! } : {}),
+    };
+    const limit = Math.min(Math.max(Number(ctx.query.get('limit') ?? 100), 1), 500);
+    const offset = Math.max(Number(ctx.query.get('offset') ?? 0), 0);
+
+    return {
+      entries: services.audit.query({ ...filters, limit, offset }),
+      total: services.audit.count(filters),
+      limit,
+      offset,
+    };
+  }, [canViewAudit]);
+
+  /** The values present in the log, so the filters offer only what exists. */
+  router.get('/audit/facets', () => services.audit.facets(), [canViewAudit]);
 
   /* ------------------------------------------------------------ licence */
 
   router.get('/license', () => services.licensing.localStatus(),
     [loopbackOnly, security.requirePermission(Permission.LICENSE_MANAGE)]);
 
-  router.get('/license/request-message', () => services.licensing.licenceRequestMessage(
-    services.config.vendorWhatsApp,
-  ), [loopbackOnly, security.requirePermission(Permission.LICENSE_MANAGE)]);
+  /**
+   * Who to contact about a licence and what it costs — the vendor's own words,
+   * fetched once and cached. The application handles no payment: buying a
+   * licence is a conversation with the vendor, and this is the phone number.
+   */
+  router.get('/license/vendor', () => services.licensing.vendorInfo(),
+    [loopbackOnly, security.requirePermission(Permission.LICENSE_MANAGE)]);
+
+  /** Re-fetch the vendor's contact details and prices. Explicit, never automatic. */
+  router.post('/license/vendor/refresh', async () => services.licensing.refreshVendorInfo(),
+    [loopbackOnly, canManageLicense]);
 
   router.post('/license/activate', async (ctx) => {
     const body = asObject(ctx.body);

@@ -14,18 +14,28 @@ import {
   notFound, themeToCssText, validateThemePack,
   type ThemeIssue, type ThemePack, type ThemeSummary,
 } from '@qserve/shared';
+import type { PackRepository } from '../../core/repositories/packs.js';
 
 export class ThemeService {
+  /** Themes shipped by the vendor, read from disk. */
+  private fileThemes = new Map<string, ThemePack>();
+  /** The effective set: shipped themes plus the restaurant's own. */
   private themes = new Map<string, ThemePack>();
   private rejected = new Map<string, ThemeIssue[]>();
+  private authored: PackRepository | null = null;
 
   constructor(
     private readonly themesDir: string,
     private readonly onWarning: (message: string) => void = () => {},
   ) {}
 
+  useAuthoredPacks(repository: PackRepository): void {
+    this.authored = repository;
+    this.mergeAuthored();
+  }
+
   load(): void {
-    this.themes = new Map();
+    this.fileThemes = new Map();
     this.rejected = new Map();
 
     let files: string[];
@@ -65,8 +75,35 @@ export class ThemeService {
         this.onWarning(`theme ${file} was rejected: ${issues[0]?.detail ?? 'invalid'}`);
         continue;
       }
-      this.themes.set(theme.id, theme);
+      this.fileThemes.set(theme.id, theme);
     }
+
+    this.mergeAuthored();
+  }
+
+  private mergeAuthored(): void {
+    this.themes = new Map(this.fileThemes);
+    if (!this.authored) return;
+
+    for (const row of this.authored.listThemes()) {
+      this.themes.set(row.id, {
+        $schema: 'qserve.theme.v1',
+        id: row.id,
+        name: row.name,
+        colorScheme: row.color_scheme,
+        tokens: this.authored.themeTokens(row),
+      });
+    }
+  }
+
+  /** Call after the restaurant adds, edits or deletes one of its themes. */
+  refreshAuthored(): void {
+    this.mergeAuthored();
+  }
+
+  /** True when this theme came from a file rather than from the restaurant. */
+  isShipped(id: string): boolean {
+    return this.fileThemes.has(id);
   }
 
   get available(): string[] {

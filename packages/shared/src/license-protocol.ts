@@ -106,6 +106,97 @@ export interface LicenseStatusResponse {
   readonly transferCount: number;
 }
 
+/* ------------------------------------------------------------- vendor info */
+
+/**
+ * How a restaurant reaches whoever sells it a licence, and what that costs.
+ *
+ * The application handles no payment at all. Someone who wants a licence talks
+ * to the vendor — on WhatsApp, on the phone, by email — pays however the two of
+ * them agree, and is given a key to type in. So the only thing the software
+ * needs to know is *who to contact and what to expect to pay*, and both of
+ * those are the vendor's to write, not the developer's to hard-code and not the
+ * restaurant's to guess.
+ *
+ * The prices are free text on purpose. "1500 SAR", "‏٥٠٠ ر.س شامل التركيب",
+ * "first transfer free" — a vendor selling in three countries can say what is
+ * true, which a number and a currency code cannot.
+ */
+export interface VendorContact {
+  readonly kind: VendorContactKind;
+  /** What to show, e.g. "Sales" or "Support (Arabic)". */
+  readonly label: string;
+  /** The number, address or handle itself. */
+  readonly value: string;
+}
+
+export const VendorContactKind = {
+  WHATSAPP: 'WHATSAPP',
+  PHONE: 'PHONE',
+  EMAIL: 'EMAIL',
+  TELEGRAM: 'TELEGRAM',
+  WEBSITE: 'WEBSITE',
+  OTHER: 'OTHER',
+} as const;
+export type VendorContactKind = (typeof VendorContactKind)[keyof typeof VendorContactKind];
+
+export interface VendorPrice {
+  /** Free text, written by the vendor. Empty means "ask us". */
+  readonly price: string;
+  readonly note: string | null;
+}
+
+export interface VendorInfo {
+  readonly vendorName: string;
+  readonly tagline: string | null;
+  readonly contacts: readonly VendorContact[];
+  readonly pricing: {
+    /** What a first licence costs. */
+    readonly activation: VendorPrice;
+    /** What moving a licence to another machine costs (spec §6). */
+    readonly transfer: VendorPrice;
+  };
+  /** Free text shown under the prices: how to pay, opening hours, anything. */
+  readonly instructions: string | null;
+  readonly updatedAt: string;
+}
+
+/** Shown before the vendor has filled anything in, and when offline with no cache. */
+export const EMPTY_VENDOR_INFO: VendorInfo = {
+  vendorName: '',
+  tagline: null,
+  contacts: [],
+  pricing: {
+    activation: { price: '', note: null },
+    transfer: { price: '', note: null },
+  },
+  instructions: null,
+  updatedAt: '1970-01-01T00:00:00.000Z',
+};
+
+/** A tel:/mailto:/wa.me link for a contact, or null when it cannot be linked. */
+export function vendorContactUrl(contact: VendorContact, message?: string): string | null {
+  const digits = contact.value.replace(/[^\d]/g, '');
+  const query = message ? `?text=${encodeURIComponent(message)}` : '';
+
+  switch (contact.kind) {
+    case VendorContactKind.WHATSAPP:
+      return digits ? `https://wa.me/${digits}${query}` : null;
+    case VendorContactKind.PHONE:
+      return digits ? `tel:+${digits}` : null;
+    case VendorContactKind.EMAIL:
+      return contact.value.includes('@') ? `mailto:${contact.value}` : null;
+    case VendorContactKind.TELEGRAM: {
+      const handle = contact.value.replace(/^@/, '').trim();
+      return handle ? `https://t.me/${handle}` : null;
+    }
+    case VendorContactKind.WEBSITE:
+      return /^https?:\/\//i.test(contact.value) ? contact.value : `https://${contact.value}`;
+    default:
+      return null;
+  }
+}
+
 /* ------------------------------------------------------- failure vocabulary */
 
 /**

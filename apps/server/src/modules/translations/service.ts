@@ -17,6 +17,7 @@ import {
   hasBlockingIssues, interpolate, notFound, validateLocalePack,
   type LocaleIssue, type LocalePack, type LocaleSummary, type TextDirection,
 } from '@qserve/shared';
+import type { PackRepository } from '../../core/repositories/packs.js';
 
 /** The pack every other pack is validated against, and the last-resort fallback. */
 export const REFERENCE_LOCALE = 'en';
@@ -27,18 +28,31 @@ export interface LoadedLocale {
 }
 
 export class TranslationService {
+  /** Packs shipped by the vendor, read from disk. */
+  private filePacks = new Map<string, LocalePack>();
+  /** The effective set: shipped packs with the restaurant's own merged over. */
   private packs = new Map<string, LocalePack>();
   private issues = new Map<string, LocaleIssue[]>();
   private rejected = new Map<string, LocaleIssue[]>();
+  private authored: PackRepository | null = null;
 
   constructor(
     private readonly localesDir: string,
     private readonly onWarning: (message: string) => void = () => {},
   ) {}
 
+  /**
+   * Connect the restaurant's own languages. Set after construction because the
+   * database is opened before the pack repository exists.
+   */
+  useAuthoredPacks(repository: PackRepository): void {
+    this.authored = repository;
+    this.mergeAuthored();
+  }
+
   /** Read and validate every `*.json` in the locales directory. */
   load(): void {
-    this.packs = new Map();
+    this.filePacks = new Map();
     this.issues = new Map();
     this.rejected = new Map();
 
@@ -79,7 +93,7 @@ export class TranslationService {
         continue;
       }
 
-      const reference = this.packs.get(REFERENCE_LOCALE);
+      const reference = this.filePacks.get(REFERENCE_LOCALE);
       const issues = validateLocalePack(parsed, {
         rawSource: raw,
         ...(reference && expectedLocale !== REFERENCE_LOCALE ? { reference } : {}),
@@ -102,7 +116,7 @@ export class TranslationService {
         continue;
       }
 
-      this.packs.set(pack.locale, pack);
+      this.filePacks.set(pack.locale, pack);
       this.issues.set(pack.locale, issues);
 
       const missing = issues.filter((issue) => issue.kind === 'MISSING_KEY').length;
@@ -110,6 +124,46 @@ export class TranslationService {
         this.onWarning(`locale ${pack.locale} is missing ${missing} key(s); falling back for those`);
       }
     }
+
+    this.mergeAuthored();
+  }
+
+  /**
+   * Recompute the effective set. A restaurant pack for a shipped code overrides
+   * only the keys it defines, so correcting one wording never costs the rest of
+   * the translation.
+   */
+  private mergeAuthored(): void {
+    this.packs = new Map(this.filePacks);
+    if (!this.authored) return;
+
+    for (const row of this.authored.listLocales()) {
+      const base = this.filePacks.get(row.locale);
+      this.packs.set(row.locale, {
+        $schema: 'qserve.locale.v1',
+        locale: row.locale,
+        name: row.name,
+        englishName: row.english_name,
+        direction: row.direction,
+        fallback: row.fallback ?? REFERENCE_LOCALE,
+        strings: { ...(base?.strings ?? {}), ...this.authored.localeStrings(row) },
+      });
+    }
+  }
+
+  /** Call after the restaurant adds, edits or deletes one of its languages. */
+  refreshAuthored(): void {
+    this.mergeAuthored();
+  }
+
+  /** True when this language came from a file rather than from the restaurant. */
+  isShipped(locale: string): boolean {
+    return this.filePacks.has(locale);
+  }
+
+  /** The reference pack's keys — the empty template an owner starts from. */
+  referenceKeys(): string[] {
+    return Object.keys(this.filePacks.get(REFERENCE_LOCALE)?.strings ?? {}).sort();
   }
 
   get available(): string[] {

@@ -19,7 +19,7 @@
 import type { Migration } from '@qserve/db';
 import { DEFAULT_ROLE_PERMISSIONS, SystemRole } from '@qserve/shared';
 
-export const RESTAURANT_SCHEMA_VERSION = 1;
+export const RESTAURANT_SCHEMA_VERSION = 2;
 
 export const migrations: readonly Migration[] = [
   {
@@ -443,6 +443,48 @@ export const migrations: readonly Migration[] = [
           insertGrant.run(roleId, permission);
         }
       }
+    },
+  },
+
+  {
+    version: 2,
+    name: 'restaurant_authored_packs',
+    up: (db) => {
+      db.exec(`
+        /*
+         * Languages and themes a restaurant authors for itself.
+         *
+         * The packs shipped by the vendor live in files under locales/ and
+         * themes/. These are the restaurant's own, so they belong in the
+         * restaurant's database and travel in its backups — a restaurant that
+         * translated its whole menu into French must not lose that work when
+         * the computer is replaced.
+         *
+         * At read time a restaurant pack is merged over the file-based one of
+         * the same code, so a restaurant may also correct a shipped wording
+         * without waiting for a release.
+         */
+        CREATE TABLE custom_locales (
+          locale        TEXT PRIMARY KEY,
+          name          TEXT NOT NULL,
+          english_name  TEXT NOT NULL,
+          direction     TEXT NOT NULL,
+          fallback      TEXT,
+          -- Interface strings: the same dotted keys the shipped packs use.
+          strings_json  TEXT NOT NULL DEFAULT '{}',
+          created_at    TEXT NOT NULL,
+          updated_at    TEXT NOT NULL
+        );
+
+        CREATE TABLE custom_themes (
+          id           TEXT PRIMARY KEY,
+          name         TEXT NOT NULL,
+          color_scheme TEXT NOT NULL,
+          tokens_json  TEXT NOT NULL,
+          created_at   TEXT NOT NULL,
+          updated_at   TEXT NOT NULL
+        );
+      `);
     },
   },
 ];

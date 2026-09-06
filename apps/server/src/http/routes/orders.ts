@@ -347,7 +347,8 @@ export function createOrderRoutes(services: Services): Router<AppState> {
 
   router.patch('/tables/:id', (ctx) => {
     const id = ctx.params['id']!;
-    if (!services.tables.exists(id)) throw notFound('table', id);
+    const before = services.tables.get(id);
+    if (!before) throw notFound('table', id);
     const body = asObject(ctx.body);
 
     services.tables.update(id, {
@@ -358,7 +359,18 @@ export function createOrderRoutes(services: Services): Router<AppState> {
       ...(body['sortOrder'] !== undefined
         ? { sortOrder: requireNumber(body, 'sortOrder', { min: 0, max: 9999 }) } : {}),
     });
-    return services.tables.get(id);
+
+    const after = services.tables.get(id);
+    services.audit.record({
+      action: 'table.updated',
+      actor: ctx.state.auth!.actor,
+      entityType: 'table',
+      entityId: id,
+      tableId: id,
+      before, after,
+      clientIp: ctx.ip,
+    });
+    return after;
   }, [canManageTables]);
 
   router.delete('/tables/:id', (ctx) => {

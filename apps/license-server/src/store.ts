@@ -295,6 +295,31 @@ export class LicenseStore {
     }[];
   }
 
+  /* ------------------------------------------------------ vendor settings */
+
+  getSetting<T>(key: string, fallback: T): T {
+    const row = this.db
+      .prepare('SELECT value_json FROM vendor_settings WHERE key = ?')
+      .get(key) as { value_json: string } | undefined;
+    if (!row) return fallback;
+    try {
+      return JSON.parse(row.value_json) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
+  setSetting(key: string, value: unknown): void {
+    this.db
+      .prepare(`
+        INSERT INTO vendor_settings (key, value_json, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET
+          value_json = excluded.value_json,
+          updated_at = excluded.updated_at
+      `)
+      .run(key, JSON.stringify(value), nowIso());
+  }
+
   /* --------------------------------------------------------------- admin */
 
   countAdmins(): number {

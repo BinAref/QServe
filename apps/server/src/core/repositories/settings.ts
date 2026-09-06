@@ -69,7 +69,31 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, unknown>> = {
   'menu.showUnavailableProducts': true,
 
   'notifications.tableCallsWaiter': true,
+
+  /**
+   * Optional app lock (the owner's choice, off by default). When enabled the
+   * management console opens on a lock screen and stays locked after the idle
+   * timeout — for a PC sitting in a busy back room where anyone might walk past.
+   * The passphrase itself is a scrypt hash, never a readable setting.
+   */
+  'security.appLockEnabled': false,
+  'security.appLockHash': null,
+  'security.appLockIdleMinutes': 30,
+  /** Shown on the lock screen so staff know whose machine they are looking at. */
+  'security.appLockHint': null,
+
+  /**
+   * Last vendor contact and pricing seen on the licence screen, cached so the
+   * screen still reads sensibly with the internet unplugged.
+   */
+  'license.vendorInfoCache': null,
 };
+
+/** Settings that are credentials rather than preferences, and are never listed. */
+export const SECRET_SETTING_KEYS: readonly string[] = [
+  'backup.passphrase',
+  'security.appLockHash',
+];
 
 export class SettingsRepository {
   constructor(private readonly db: Db) {}
