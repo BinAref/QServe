@@ -83,8 +83,10 @@ function header() {
 }
 
 function openSignIn() {
+  // The dialog is titled "Sign in"; the line under it used to say "Sign in to
+  // take payments", which is the same sentence with the reason attached — and
+  // the reason is already on the panel the cashier pressed to get here.
   const form = h('div', {},
-    h('p', { class: 'qs-muted' }, t('cashier.sign_in_required')),
     h('label', { class: 'qs-field' },
       h('span', {}, t('common.username')),
       h('input', { id: 'till-user', autocomplete: 'username' })),
