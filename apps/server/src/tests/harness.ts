@@ -156,6 +156,28 @@ export function seedRestaurant(installation: Installation): {
   };
 }
 
+/**
+ * Provision stations. Needs a licence, so it is called after `activate()`.
+ *
+ * Which stations exist is not decoration: the order flow is derived from them.
+ * A test about the full chain — kitchen accepts, kitchen readies, floor carries
+ * — needs a kitchen to exist, and a test about a restaurant with one computer
+ * needs it not to.
+ */
+export function seedStations(
+  installation: Installation,
+  types: readonly string[],
+): void {
+  for (const type of types) {
+    installation.services.terminals.createTerminal({
+      type: type as never,
+      name: { en: type },
+      actor: installation.systemActor,
+      clientIp: null,
+    });
+  }
+}
+
 /** A staff member with a role, for accountability assertions. */
 export function seedUser(
   installation: Installation,

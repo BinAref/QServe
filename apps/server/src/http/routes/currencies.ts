@@ -11,7 +11,8 @@
  */
 
 import {
-  asObject, CURRENCY_CODE_PATTERN, EventName, optionalBoolean, optionalLocalised,
+  asObject, CURRENCY_CODE_PATTERN, CurrencyDisplay, EventName, optionalBoolean,
+  optionalLocalised,
   optionalNumber, optionalString, Permission, requireNumber, requireString,
   validationError,
 } from '@qserve/shared';
@@ -67,6 +68,7 @@ export function createCurrencyRoutes(services: Services): Router<AppState> {
       name: optionalLocalised(body, 'name', { max: 60 }),
       decimals: optionalNumber(body, 'decimals', { min: 0, max: 4 }) ?? 2,
       symbolPosition: parsePosition(body),
+      display: parseDisplay(body),
       // A rate of zero would make every price in this currency free.
       rateToBase: requireNumber(body, 'rateToBase', {
         min: 0.000001, max: 1_000_000, integer: false,
@@ -93,6 +95,7 @@ export function createCurrencyRoutes(services: Services): Router<AppState> {
         ? { decimals: requireNumber(body, 'decimals', { min: 0, max: 4 }) } : {}),
       ...(body['symbolPosition'] !== undefined
         ? { symbolPosition: parsePosition(body) } : {}),
+      ...(body['display'] !== undefined ? { display: parseDisplay(body) } : {}),
       ...(body['rateToBase'] !== undefined
         ? { rateToBase: requireNumber(body, 'rateToBase', {
             min: 0.000001, max: 1_000_000, integer: false,
@@ -148,6 +151,15 @@ export function createCurrencyRoutes(services: Services): Router<AppState> {
   }, [loopbackOnly, canManage]);
 
   return router;
+}
+
+/** Whether prices in this currency are written as the code or the symbol. */
+function parseDisplay(body: Record<string, unknown>): CurrencyDisplay {
+  const value = optionalString(body, 'display', { max: 6 }) ?? CurrencyDisplay.SYMBOL;
+  if (value !== CurrencyDisplay.CODE && value !== CurrencyDisplay.SYMBOL) {
+    throw validationError('display must be "CODE" or "SYMBOL"', { field: 'display' });
+  }
+  return value;
 }
 
 function parsePosition(body: Record<string, unknown>): 'before' | 'after' {

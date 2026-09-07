@@ -13,7 +13,7 @@ import {
   ActorKind, NotificationKind, NotificationUrgency, OrderSource, OrderStatus,
   Permission, TerminalType, WILDCARD_PERMISSION, type Actor,
 } from '@qserve/shared';
-import { createInstallation, seedRestaurant, seedUser, type Installation } from './harness.js';
+import { createInstallation, seedRestaurant, seedStations, seedUser, type Installation } from './harness.js';
 
 describe('notifications', () => {
   let installation: Installation;
@@ -26,6 +26,8 @@ describe('notifications', () => {
     installation = createInstallation();
     menu = seedRestaurant(installation);
     installation.activate('REST-000001');
+    // These tests are about the full chain, so the full chain exists.
+    seedStations(installation, ['KITCHEN']);
     installation.services.currencies.seedBase(
       installation.services.settings.profile()!.currency,
     );

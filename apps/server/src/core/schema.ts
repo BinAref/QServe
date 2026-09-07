@@ -19,7 +19,7 @@
 import type { Migration } from '@qserve/db';
 import { DEFAULT_ROLE_PERMISSIONS, SystemRole } from '@qserve/shared';
 
-export const RESTAURANT_SCHEMA_VERSION = 4;
+export const RESTAURANT_SCHEMA_VERSION = 5;
 
 export const migrations: readonly Migration[] = [
   {
@@ -597,6 +597,27 @@ export const migrations: readonly Migration[] = [
         CREATE INDEX idx_notifications_open
           ON notifications(created_at DESC) WHERE acknowledged_at IS NULL;
         CREATE INDEX idx_notifications_order ON notifications(order_id);
+      `);
+    },
+  },
+  {
+    version: 5,
+    name: 'currency_display',
+    up: (db) => {
+      db.exec(`
+        -- A currency is written two ways and a restaurant means both: "SAR" on
+        -- an invoice, "﷼" on the menu a diner reads. Both live on the currency;
+        -- this is which one is used when nothing says otherwise.
+        ALTER TABLE currencies ADD COLUMN display TEXT NOT NULL DEFAULT 'SYMBOL';
+
+        -- And per dish, because a menu often mixes the two deliberately: the
+        -- headline price in symbols, the wine list in codes.
+        ALTER TABLE products ADD COLUMN currency_display TEXT;
+        ALTER TABLE addons   ADD COLUMN currency_display TEXT;
+
+        -- Captured on the line, so a receipt reprinted next year is written the
+        -- way it was written on the night.
+        ALTER TABLE order_items ADD COLUMN currency_display TEXT;
       `);
     },
   },

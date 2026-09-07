@@ -14,7 +14,7 @@
 import type { Db } from '@qserve/db';
 import { fromDbJson, nowIso, toDbJson, transaction } from '@qserve/db';
 import {
-  conflict, notFound, validationError,
+  conflict, CurrencyDisplay, notFound, validationError,
   type Currency, type CurrencyConfig, type Localised,
 } from '@qserve/shared';
 
@@ -25,6 +25,7 @@ export interface CurrencyRow {
   decimals: number;
   symbol_position: 'before' | 'after';
   rate_to_base: number;
+  display: 'CODE' | 'SYMBOL';
   is_base: number;
   enabled: number;
   sort_order: number;
@@ -38,6 +39,7 @@ const toCurrency = (row: CurrencyRow): Currency => ({
   name: fromDbJson<Localised>(row.name_json, {}),
   decimals: row.decimals,
   symbolPosition: row.symbol_position,
+  display: row.display,
   rateToBase: row.rate_to_base,
   isBase: row.is_base === 1,
   enabled: row.enabled === 1,
@@ -80,6 +82,7 @@ export class CurrencyRepository {
 
     return row ? toCurrency(row) : {
       code: 'SAR', symbol: 'SAR', name: {}, decimals: 2, symbolPosition: 'after',
+      display: CurrencyDisplay.SYMBOL,
       rateToBase: 1, isBase: true, enabled: true, sortOrder: 0,
     };
   }
@@ -103,9 +106,9 @@ export class CurrencyRepository {
     this.db
       .prepare(`
         INSERT INTO currencies
-          (code, symbol, name_json, decimals, symbol_position,
+          (code, symbol, name_json, decimals, symbol_position, display,
            rate_to_base, is_base, enabled, sort_order, created_at, updated_at)
-        VALUES (?, ?, '{}', ?, ?, 1, 1, 1, 0, ?, ?)
+        VALUES (?, ?, '{}', ?, ?, 'SYMBOL', 1, 1, 1, 0, ?, ?)
         ON CONFLICT(code) DO UPDATE SET
           symbol = excluded.symbol,
           decimals = excluded.decimals,
@@ -125,6 +128,7 @@ export class CurrencyRepository {
     name?: Localised;
     decimals: number;
     symbolPosition: 'before' | 'after';
+    display?: CurrencyDisplay;
     rateToBase: number;
     sortOrder?: number;
   }): Currency {
@@ -135,14 +139,14 @@ export class CurrencyRepository {
     this.db
       .prepare(`
         INSERT INTO currencies
-          (code, symbol, name_json, decimals, symbol_position,
+          (code, symbol, name_json, decimals, symbol_position, display,
            rate_to_base, is_base, enabled, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?)
       `)
       .run(
         code, input.symbol, toDbJson(input.name ?? {}), input.decimals,
-        input.symbolPosition, input.rateToBase,
-        input.sortOrder ?? this.list().length, at, at,
+        input.symbolPosition, input.display ?? CurrencyDisplay.SYMBOL,
+        input.rateToBase, input.sortOrder ?? this.list().length, at, at,
       );
     return this.get(code)!;
   }
@@ -152,6 +156,7 @@ export class CurrencyRepository {
     name?: Localised;
     decimals?: number;
     symbolPosition?: 'before' | 'after';
+    display?: CurrencyDisplay;
     rateToBase?: number;
     enabled?: boolean;
     sortOrder?: number;
@@ -181,6 +186,7 @@ export class CurrencyRepository {
     if (patch.name !== undefined) set('name_json', toDbJson(patch.name));
     if (patch.decimals !== undefined) set('decimals', patch.decimals);
     if (patch.symbolPosition !== undefined) set('symbol_position', patch.symbolPosition);
+    if (patch.display !== undefined) set('display', patch.display);
     if (patch.rateToBase !== undefined) set('rate_to_base', patch.rateToBase);
     if (patch.enabled !== undefined) set('enabled', patch.enabled ? 1 : 0);
     if (patch.sortOrder !== undefined) set('sort_order', patch.sortOrder);

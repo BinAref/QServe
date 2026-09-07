@@ -13,6 +13,7 @@ import { boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t }
 import { h, mount, modal, confirmDialog } from '../shared/dom.js';
 import { formatMoney, pick, formatTime, availableLocales, setLocale, te } from '../shared/i18n.js';
 import { SoundEvent } from '../shared/events.js';
+import { displayed } from '../shared/money.js';
 
 const state = {
   session: null,
@@ -118,7 +119,8 @@ function productCard(product) {
       soldOut ? h('div', { class: 'menu-sold-out' }, t('menu.sold_out')) : null,
       showPrices
         ? h('div', { class: 'menu-item-price' },
-            formatMoney(product.priceMinor, currencyOf(product.currencyCode)))
+            formatMoney(product.priceMinor,
+              displayed(currencyOf(product.currencyCode), product.currencyDisplay)))
         : null),
     state.menu.display.showImages && product.imageAssetId
       ? h('img', { class: 'menu-item-img', src: `/assets/${product.imageAssetId}`, alt: '', loading: 'lazy' })
@@ -450,26 +452,75 @@ async function submitOrder(notes, dialog) {
   state.myOrders.unshift(order);
   dialog.close();
   sound.playFor(SoundEvent.NOTIFICATION);
-  toast(t('menu.order_sent'), 'success');
+
+  /*
+   * What the diner is told depends on what this restaurant actually has. With
+   * a till watching, the order has landed somewhere and nothing is asked of
+   * them. With only a waiter, somebody has to be fetched — so they are told to,
+   * plainly, rather than waiting for food nobody knows about.
+   */
+  const plan = state.plan ?? {};
+  toast(t(plan.afterOrderKey ?? 'menu.order_sent'), 'success');
+  if (plan.callWaiterAfterOrder) {
+    // And the ask is made for them, so "call a waiter" is a fact rather than
+    // an instruction they have to carry out.
+    void guard(() => notifications.raise('WAITER_CALLED', { orderId: order.id }));
+  }
   render();
 }
 
 /* ---------------------------------------------------------- order status */
 
-const TRACK = ['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'SERVED'];
+/**
+ * The steps a diner is shown.
+ *
+ * READY only appears where a kitchen exists to call it: in a restaurant with
+ * one computer, a five-step tracker that can only ever reach three would look
+ * like something had gone wrong.
+ */
+function trackSteps() {
+  const usesReady = state.plan?.usesReady !== false;
+  return usesReady
+    ? ['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'SERVED']
+    : ['NEW', 'PREPARING', 'SERVED'];
+}
+
+const STEP_KEYS = {
+  NEW: 'orders.step_placed',
+  ACCEPTED: 'orders.step_accepted',
+  PREPARING: 'orders.step_preparing',
+  READY: 'orders.step_ready',
+  SERVED: 'orders.step_served',
+  PAID: 'orders.step_paid',
+};
 
 function orderStatusBar() {
   const order = state.myOrders[0];
   if (!order) return null;
 
-  const reached = TRACK.indexOf(order.status);
+  const track = trackSteps();
+  // ACCEPTED collapses into PREPARING where there is no kitchen, so an order
+  // that skipped it still shows as under way rather than nowhere.
+  const effective = track.includes(order.status)
+    ? order.status
+    : order.status === 'ACCEPTED' ? 'PREPARING' : order.status;
+  const reached = track.indexOf(effective);
 
   return h('div', { class: 'menu-cart-bar' },
     h('div', { class: 'qs-row qs-row-between' },
       h('strong', {}, t('orders.order_number', { number: order.number })),
-      h('span', { class: 'qs-badge' }, te('orders.status', order.status))),
+      h('span', { class: 'qs-badge' },
+        t(STEP_KEYS[order.status] ?? 'orders.status.' + order.status.toLowerCase()))),
+
     h('div', { class: 'menu-track', style: { marginBlock: 'var(--qs-spacing-sm)' } },
-      TRACK.map((step, index) => h('span', { 'data-done': String(index <= reached) }))),
+      track.map((step, index) => h('span', {
+        'data-done': String(index <= reached),
+        // The step being worked on right now pulses, so a diner watching the
+        // bar can see the restaurant is doing something.
+        'data-current': String(index === reached),
+        title: t(STEP_KEYS[step] ?? step),
+      }))),
+
     h('div', { class: 'qs-row qs-row-between qs-small qs-muted' },
       h('span', {}, formatTime(order.createdAt)),
       h('span', {}, formatMoney(order.totals.totalMinor, order.currency))),
@@ -528,6 +579,8 @@ async function main() {
   state.session = started.session;
   realtime = started.realtime;
   notifications = started.notifications;
+  // What this restaurant has decides what the diner is told and shown.
+  state.plan = (await api.get('/api/system').catch(() => null))?.servicePlan ?? null;
 
   await reload();
   render();

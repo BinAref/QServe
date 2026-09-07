@@ -10,7 +10,7 @@ import type { Db } from '@qserve/db';
 import { fromDbBool, fromDbJson, nowIso, toDbBool, toDbJson } from '@qserve/db';
 import {
   newEntityId,
-  type Addon, type Category, type Localised, type OptionChoice,
+  type Addon, type Category, type CurrencyDisplay, type Localised, type OptionChoice,
   type Product, type ProductOption,
 } from '@qserve/shared';
 
@@ -22,7 +22,7 @@ interface CategoryRow {
 interface ProductRow {
   id: string; category_id: string; name_json: string; description_json: string;
   image_asset_id: string | null; price_minor: number; currency_code: string | null;
-  sort_order: number;
+  currency_display: 'CODE' | 'SYMBOL' | null; sort_order: number;
   visible: number; available: number; station: string | null;
   preparation_minutes: number | null; created_at: string; updated_at: string;
 }
@@ -39,7 +39,7 @@ interface ChoiceRow {
 
 interface AddonRow {
   id: string; name_json: string; price_minor: number; currency_code: string | null;
-  sort_order: number;
+  currency_display: 'CODE' | 'SYMBOL' | null; sort_order: number;
   available: number; created_at: string;
 }
 
@@ -59,6 +59,8 @@ export interface ProductInput {
   readonly priceMinor: number;
   /** Omitted or null means the restaurant's base currency. */
   readonly currencyCode?: string | null;
+  /** Written as the code or the symbol; omitted follows the currency's own. */
+  readonly currencyDisplay?: CurrencyDisplay | null;
   readonly visible?: boolean;
   readonly available?: boolean;
   readonly station?: string | null;
@@ -130,13 +132,14 @@ export class MenuRepository {
       .prepare(`
         INSERT INTO products
           (id, category_id, name_json, description_json, image_asset_id, price_minor,
-           currency_code, sort_order, visible, available, station, preparation_minutes,
-           created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           currency_code, currency_display, sort_order, visible, available, station,
+           preparation_minutes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         id, input.categoryId, toDbJson(input.name), toDbJson(input.description ?? {}),
         input.imageAssetId ?? null, input.priceMinor, input.currencyCode ?? null,
+        input.currencyDisplay ?? null,
         input.sortOrder ?? this.nextSortOrder('products', input.categoryId),
         toDbBool(input.visible ?? true), toDbBool(input.available ?? true),
         input.station ?? null, input.preparationMinutes ?? null, at, at,
@@ -184,6 +187,7 @@ export class MenuRepository {
     if (patch.imageAssetId !== undefined) push('image_asset_id', patch.imageAssetId);
     if (patch.priceMinor !== undefined) push('price_minor', patch.priceMinor);
     if (patch.currencyCode !== undefined) push('currency_code', patch.currencyCode);
+    if (patch.currencyDisplay !== undefined) push('currency_display', patch.currencyDisplay);
     if (patch.visible !== undefined) push('visible', toDbBool(patch.visible));
     if (patch.available !== undefined) push('available', toDbBool(patch.available));
     if (patch.station !== undefined) push('station', patch.station);
@@ -349,17 +353,20 @@ export class MenuRepository {
 
   createAddon(input: {
     name: Localised; priceMinor: number; currencyCode?: string | null;
+    currencyDisplay?: CurrencyDisplay | null;
     sortOrder?: number; available?: boolean;
   }): Addon {
     const id = newEntityId('ADD');
     this.db
       .prepare(`
         INSERT INTO addons
-          (id, name_json, price_minor, currency_code, sort_order, available, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+          (id, name_json, price_minor, currency_code, currency_display,
+           sort_order, available, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         id, toDbJson(input.name), input.priceMinor, input.currencyCode ?? null,
+        input.currencyDisplay ?? null,
         input.sortOrder ?? 0, toDbBool(input.available ?? true), nowIso(),
       );
     return this.getAddon(id)!;
@@ -377,6 +384,7 @@ export class MenuRepository {
 
   updateAddon(id: string, patch: {
     name?: Localised; priceMinor?: number; currencyCode?: string | null;
+    currencyDisplay?: CurrencyDisplay | null;
     sortOrder?: number; available?: boolean;
   }): void {
     const assignments: string[] = [];
@@ -384,6 +392,7 @@ export class MenuRepository {
     if (patch.name !== undefined) { assignments.push('name_json = ?'); values.push(toDbJson(patch.name)); }
     if (patch.priceMinor !== undefined) { assignments.push('price_minor = ?'); values.push(patch.priceMinor); }
     if (patch.currencyCode !== undefined) { assignments.push('currency_code = ?'); values.push(patch.currencyCode); }
+    if (patch.currencyDisplay !== undefined) { assignments.push('currency_display = ?'); values.push(patch.currencyDisplay); }
     if (patch.sortOrder !== undefined) { assignments.push('sort_order = ?'); values.push(patch.sortOrder); }
     if (patch.available !== undefined) { assignments.push('available = ?'); values.push(toDbBool(patch.available)); }
     if (assignments.length === 0) return;
@@ -469,6 +478,7 @@ function toProduct(row: ProductRow, options: ProductOption[], addons: Addon[]): 
     imageAssetId: row.image_asset_id,
     priceMinor: row.price_minor,
     currencyCode: row.currency_code,
+    currencyDisplay: row.currency_display,
     sortOrder: row.sort_order,
     visible: fromDbBool(row.visible),
     available: fromDbBool(row.available),
@@ -510,6 +520,7 @@ function toAddon(row: AddonRow): Addon {
     name: localised(row.name_json),
     priceMinor: row.price_minor,
     currencyCode: row.currency_code,
+    currencyDisplay: row.currency_display,
     sortOrder: row.sort_order,
     available: fromDbBool(row.available),
   };

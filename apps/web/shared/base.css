@@ -758,3 +758,80 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   border-color: transparent;
   color: var(--qs-color-text);
 }
+
+/* ------------------------------------------------------ the currency picker */
+
+/*
+ * Two across, because the choice is "which money" and then "how does it read",
+ * and a flat list of every combination asks somebody to hold the cross-product
+ * in their head. One card per currency, each offering both written forms.
+ */
+.qs-currency-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--qs-spacing-md);
+}
+@media (min-width: 520px) {
+  .qs-currency-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.qs-currency-card {
+  display: grid;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-md);
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-radius-lg);
+  background: var(--qs-color-surface);
+  transition: border-color var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+.qs-currency-card[data-selected="true"] { border-color: var(--qs-color-primary); }
+.qs-currency-head { display: flex; align-items: center; gap: var(--qs-spacing-sm); flex-wrap: wrap; }
+
+.qs-currency-forms { display: grid; grid-template-columns: 1fr 1fr; gap: var(--qs-spacing-sm); }
+.qs-currency-forms:has(> :only-child) { grid-template-columns: 1fr; }
+
+.qs-currency-form {
+  display: grid;
+  gap: 2px;
+  place-items: center;
+  padding: var(--qs-spacing-sm);
+  min-block-size: 64px;
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-radius-md);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    border-color var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    transform var(--qs-motion-fast) var(--qs-motion-ease-spring);
+}
+.qs-currency-form:active { transform: scale(0.97); }
+.qs-currency-form[aria-pressed="true"] {
+  background: var(--qs-color-primary);
+  border-color: var(--qs-color-primary);
+  color: var(--qs-color-primary-contrast);
+}
+/* The glyph is the whole point of the card, so it is the size of the decision. */
+.qs-currency-glyph {
+  font-size: var(--qs-typography-size-xl);
+  font-weight: var(--qs-typography-weight-bold);
+  line-height: 1;
+  /* Currency symbols read left to right even inside an Arabic layout. */
+  direction: ltr;
+}
+.qs-currency-form-label { font-size: var(--qs-typography-size-xs); opacity: 0.8; }
+
+/* The trigger in a money field: shows the form currently chosen. */
+button.qs-amount-currency {
+  min-inline-size: 72px;
+  border: 1px solid var(--qs-component-input-border-color);
+  border-radius: var(--qs-component-input-radius);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text);
+  font: inherit;
+  font-weight: var(--qs-typography-weight-medium);
+  cursor: pointer;
+  direction: ltr;
+}

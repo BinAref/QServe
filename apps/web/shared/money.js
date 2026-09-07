@@ -8,9 +8,16 @@
  * through but the server refused" cannot happen.
  */
 
-/** Digits and at most one decimal point, with the currency's precision. */
+/**
+ * Digits and at most one decimal point, with the currency's precision.
+ *
+ * A point left dangling at the end is not an error: somebody typing "12.50"
+ * passes through "12." on the way. It is accepted while typing and dropped
+ * here, so the field never stores one and nobody is warned about a keystroke
+ * they were in the middle of.
+ */
 export function parseAmount(raw, decimals) {
-  const text = String(raw ?? '').trim();
+  const text = String(raw ?? '').trim().replace(/\.$/, '');
   const fail = (messageKey, params) => ({
     ok: false,
     minor: 0,
@@ -27,7 +34,6 @@ export function parseAmount(raw, decimals) {
 
   const points = [...text].filter((character) => character === '.').length;
   if (points > 1) return fail('amount.error.one_point');
-  if (text.endsWith('.')) return fail('amount.error.trailing_point');
   if (text.startsWith('.')) return fail('amount.error.leading_point');
 
   const [whole = '', fraction = ''] = text.split('.');
@@ -75,4 +81,20 @@ export const amountToInput = (minor, decimals) =>
 export function toBaseMinor(minor, rateToBase, baseDecimals, currencyDecimals) {
   if (rateToBase === 1 && baseDecimals === currencyDecimals) return minor;
   return Math.round((minor / 10 ** currencyDecimals) * rateToBase * 10 ** baseDecimals);
+}
+
+/** Which of a currency's two written forms a price uses. */
+export const CurrencyDisplay = { CODE: 'CODE', SYMBOL: 'SYMBOL' };
+
+/**
+ * A currency as it should be *written* for this price.
+ *
+ * Formatting reads `symbol`, so choosing the code is a matter of handing the
+ * formatter a currency whose symbol is the code. One substitution, and every
+ * screen follows without knowing about the choice.
+ */
+export function displayed(currency, override) {
+  if (!currency) return currency;
+  const form = override ?? currency.display ?? CurrencyDisplay.SYMBOL;
+  return form === CurrencyDisplay.CODE ? { ...currency, symbol: currency.code } : currency;
 }

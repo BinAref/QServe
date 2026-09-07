@@ -50,6 +50,17 @@ export async function renderCurrencies(container) {
         currency.isBase
           ? t('currencies.base_explain')
           : `${formatMoney(oneUnit, currency)} = ${formatMoney(inBase, base)}`),
+      // Both written forms, with the default marked: the owner sees what a
+      // diner will actually read before any dish is priced.
+      h('div', { class: 'qs-row qs-xs' },
+        h('span', {
+          class: currency.display === 'SYMBOL' ? 'qs-badge qs-badge-success' : 'qs-badge',
+        }, `${currency.symbol} · ${t('currencies.as_symbol')}`),
+        currency.symbol === currency.code
+          ? null
+          : h('span', {
+              class: currency.display === 'CODE' ? 'qs-badge qs-badge-success' : 'qs-badge',
+            }, `${currency.code} · ${t('currencies.as_code')}`)),
       usage,
 
       h('div', { class: 'qs-row' },
@@ -141,6 +152,14 @@ function openCurrencyForm(container, currency, base, existing) {
     h('option', { value: 'after', selected: (currency?.symbolPosition ?? 'after') === 'after' },
       t('currencies.position_after')));
 
+  // Which form prices in this currency take unless a dish says otherwise. Most
+  // restaurants set it once here and never think about it again.
+  const displaySelect = h('select', { name: 'display' },
+    h('option', { value: 'SYMBOL', selected: (currency?.display ?? 'SYMBOL') === 'SYMBOL' },
+      t('currencies.as_symbol')),
+    h('option', { value: 'CODE', selected: currency?.display === 'CODE' },
+      t('currencies.as_code')));
+
   /**
    * The rate is money too, so it is typed through the same control — digits and
    * one decimal point, nothing else — and previewed in the base currency, where
@@ -190,7 +209,9 @@ function openCurrencyForm(container, currency, base, existing) {
         h('label', { class: 'qs-field' },
           h('span', {}, t('currencies.decimals')), decimalsSelect),
         h('label', { class: 'qs-field' },
-          h('span', {}, t('currencies.position')), positionSelect)),
+          h('span', {}, t('currencies.position')), positionSelect),
+        h('label', { class: 'qs-field' },
+          h('span', {}, t('currencies.display')), displaySelect)),
 
       isBase
         ? h('p', { class: 'qs-muted qs-small' }, t('currencies.base_explain'))
@@ -216,6 +237,7 @@ function openCurrencyForm(container, currency, base, existing) {
             name: nameInput.value.trim() ? { '*': nameInput.value.trim() } : {},
             decimals: Number(decimalsSelect.value),
             symbolPosition: positionSelect.value,
+            display: displaySelect.value,
             ...(isBase ? {} : { rateToBase: state.minor / 10 ** 6 }),
           };
 

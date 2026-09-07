@@ -9,7 +9,9 @@
 import test, { after, before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ActorKind, OrderSource, type Actor } from '@qserve/shared';
+import {
+  ActorKind, CurrencyDisplay, displayed, formatMoney, OrderSource, type Actor,
+} from '@qserve/shared';
 import { createInstallation, seedRestaurant, type Installation } from './harness.js';
 
 describe('currencies', () => {
@@ -236,5 +238,70 @@ describe('currencies', () => {
 
     assert.deepEqual(currencies.list().map((currency) => currency.code).sort(), before);
     assert.equal(currencies.get('TRY')!.symbol, '₺');
+  });
+});
+
+describe('how a price is written', () => {
+  let installation: Installation;
+  let menu: ReturnType<typeof seedRestaurant>;
+
+  before(() => {
+    installation = createInstallation();
+    menu = seedRestaurant(installation);
+    installation.services.currencies.seedBase(
+      installation.services.settings.profile()!.currency,
+    );
+  });
+  after(() => installation.dispose());
+
+  test('a currency keeps both forms and says which it prefers', () => {
+    const riyal = installation.services.currencies.update('SAR', {
+      symbol: '﷼',
+      display: CurrencyDisplay.SYMBOL,
+    });
+
+    assert.equal(riyal.code, 'SAR', 'the text form');
+    assert.equal(riyal.symbol, '﷼', 'and the symbol, together');
+    assert.equal(riyal.display, CurrencyDisplay.SYMBOL);
+  });
+
+  test('formatting follows the chosen form, not the stored symbol', () => {
+    const riyal = installation.services.currencies.get('SAR')!;
+
+    assert.equal(formatMoney(4_500, displayed(riyal), 'en'), '45.00 ﷼');
+    assert.equal(
+      formatMoney(4_500, displayed(riyal, CurrencyDisplay.CODE), 'en'),
+      '45.00 SAR',
+      'the code is written by handing the formatter the code as the symbol',
+    );
+  });
+
+  test('a dish may be written differently from the rest of the menu', () => {
+    const { menu: menuRepo } = installation.services;
+
+    // A wine list in codes while the food is in symbols.
+    const wine = menuRepo.createProduct({
+      categoryId: menu.categoryId,
+      name: { en: 'Sauvignon' },
+      priceMinor: 12_000,
+      currencyDisplay: CurrencyDisplay.CODE,
+    });
+
+    assert.equal(menuRepo.getProduct(wine.id)!.currencyDisplay, CurrencyDisplay.CODE);
+    // The rest of the menu carries nothing and follows the currency, so
+    // changing the currency's preference later moves them all at once.
+    assert.equal(menuRepo.getProduct(menu.burgerId)!.currencyDisplay, null);
+  });
+
+  test('an order line records the form it was written in', () => {
+    const { currencies } = installation.services;
+    const riyal = currencies.get('SAR')!;
+
+    // A receipt reprinted after the restaurant switches to codes should still
+    // read the way it read on the night.
+    assert.equal(displayed(riyal, 'SYMBOL').symbol, '﷼');
+    currencies.update('SAR', { display: CurrencyDisplay.CODE });
+    assert.equal(displayed(currencies.get('SAR')!).symbol, 'SAR', 'new prices read as codes');
+    assert.equal(displayed(riyal, 'SYMBOL').symbol, '﷼', 'the old line keeps its form');
   });
 });

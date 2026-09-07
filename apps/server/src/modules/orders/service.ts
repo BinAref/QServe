@@ -31,6 +31,7 @@ import type { TableRepository } from '../tables/repository.js';
 import { deriveTableStatus } from '../tables/repository.js';
 import { NotificationKind } from '@qserve/shared';
 import type { CurrencyRepository } from '../../core/repositories/currencies.js';
+import type { ServicePlanner } from '../../core/service-plan.js';
 
 /** The subset of the notification service this module needs, and no more. */
 export interface NotifyInput {
@@ -72,6 +73,7 @@ export class OrderService {
     private readonly audit: AuditRepository,
     private readonly bus: EventBus,
     private readonly currencies: CurrencyRepository,
+    private readonly plan: ServicePlanner,
   ) {}
 
   /**
@@ -152,6 +154,9 @@ export class OrderService {
         station: product.station,
         lineTotalMinor,
         currencyCode: currency.isBase ? null : currency.code,
+        // Captured with the price, so a receipt reprinted next year is written
+        // the way it was written on the night.
+        currencyDisplay: product.currencyDisplay ?? currency.display,
         rateToBase: currency.rateToBase,
         // Converted once, now, and stored: the bill is settled at the rate that
         // was true when the food was ordered, not the rate at closing time.
@@ -412,6 +417,24 @@ export class OrderService {
     }
 
     this.refreshTableStatus(current.tableId, input.actor.terminalId);
+
+    /*
+     * A restaurant with no kitchen screen has nobody to press "start cooking":
+     * accepting the order *is* starting it. Rather than leaving the ticket
+     * parked in ACCEPTED where a diner watches nothing happen, it moves on by
+     * itself — and the log says it was the absence of a kitchen that did it,
+     * not a person.
+     */
+    if (input.next === OrderStatus.ACCEPTED && this.plan.current().autoPreparing) {
+      return this.changeStatus({
+        orderId: input.orderId,
+        next: OrderStatus.PREPARING,
+        actor: input.actor,
+        permissions: input.permissions,
+        reason: 'there is no kitchen station, so accepting starts it',
+        clientIp: input.clientIp,
+      });
+    }
 
     // A pre-paid order (counter service, or a diner who settled while the food
     // was still cooking) should not need a second visit from the cashier: once

@@ -257,8 +257,18 @@ test('anything that is not a digit or a point is refused, and named', () => {
   });
 });
 
+test('a point still being typed is kept, and dropped on the way out', () => {
+  // "12." is where every decimal price passes on the way to "12.50", so the
+  // keystroke is allowed and the point simply does not survive parsing.
+  assert.deepEqual(parseAmount('12.', 2), { ok: true, minor: 1200, problem: null });
+  assert.equal(sanitiseAmountInput('12.', 2), '12.', 'and the field may hold it');
+  assert.equal(amountToInput(parseAmount('12.', 2).minor, 2), '12.00');
+
+  // A point on its own is still nothing.
+  assert.equal(parseAmount('.', 2).problem?.messageKey, 'amount.error.required');
+});
+
 test('the decimal point is refused where it cannot mean anything', () => {
-  assert.equal(parseAmount('12.', 2).problem?.messageKey, 'amount.error.trailing_point');
   assert.equal(parseAmount('1.2.3', 2).problem?.messageKey, 'amount.error.one_point');
   assert.equal(parseAmount('.5', 2).problem?.messageKey, 'amount.error.leading_point');
   assert.equal(parseAmount('12.345', 2).problem?.messageKey, 'amount.error.too_many_decimals');
@@ -276,9 +286,9 @@ test('the keystroke filter refuses what the parser would reject', () => {
 
   // Whatever the filter allows through, the parser must accept — otherwise a
   // field could sit in a state the typist cannot fix.
-  for (const raw of ['12a.5x0', '1.2.3', '12.999', '0.07']) {
+  for (const raw of ['12a.5x0', '1.2.3', '12.999', '0.07', '12.']) {
     const filtered = sanitiseAmountInput(raw, 2);
-    if (filtered !== '' && !filtered.endsWith('.')) {
+    if (filtered !== '') {
       assert.equal(parseAmount(filtered, 2).ok, true, `${filtered} should parse`);
     }
   }

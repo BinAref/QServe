@@ -10,7 +10,7 @@ import {
   ActorKind, OrderSource, OrderStatus, PaymentMethod, Permission, TableStatus,
   WILDCARD_PERMISSION, type Actor,
 } from '@qserve/shared';
-import { createInstallation, seedRestaurant, seedUser, type Installation } from './harness.js';
+import { createInstallation, seedRestaurant, seedStations, seedUser, type Installation } from './harness.js';
 
 const ALL: readonly string[] = [WILDCARD_PERMISSION];
 
@@ -26,6 +26,8 @@ describe('orders', () => {
     installation = createInstallation();
     menu = seedRestaurant(installation);
     installation.activate('REST-000001');
+    // These tests are about the full chain, so the full chain exists.
+    seedStations(installation, ['KITCHEN']);
 
     waiter = seedUser(installation, 'ahmed', 'Ahmed', ['WAITER']);
     cashier = seedUser(installation, 'sara', 'Sara', ['CASHIER']);
@@ -174,6 +176,9 @@ describe('orders', () => {
     try {
       const fixture = seedRestaurant(fresh);
       fresh.activate('REST-000002');
+      // With a kitchen, ACCEPTED and PREPARING are two separate steps taken by
+      // two different people; without one they collapse into a single move.
+      seedStations(fresh, ['KITCHEN']);
       const { tableId: id } = fresh.services.terminals.createTable({
         label: 'Table 09', actor: fresh.systemActor, clientIp: null,
       });

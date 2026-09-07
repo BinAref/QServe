@@ -12,7 +12,8 @@
  */
 
 import {
-  asObject, EventName, notFound, optionalBoolean, optionalLocalised, optionalNumber,
+  asObject, CurrencyDisplay, EventName, notFound, optionalBoolean, optionalLocalised,
+  optionalNumber,
   optionalString, Permission, requireArray, requireLocalised, requireNumber,
   requireString, requireStringArray, validationError,
 } from '@qserve/shared';
@@ -49,6 +50,21 @@ export function createMenuRoutes(services: Services): Router<AppState> {
     // The base is stored as null, so changing which currency is the base never
     // leaves a product pointing at a stale code.
     return currency.isBase ? null : currency.code;
+  };
+
+  /**
+   * Which of the currency's two written forms this price uses. `null` follows
+   * the currency's own preference, which is what most dishes do.
+   */
+  const currencyDisplay = (body: Record<string, unknown>): CurrencyDisplay | null => {
+    const value = optionalString(body, 'currencyDisplay', { max: 6 });
+    if (value === null) return null;
+    if (value !== CurrencyDisplay.CODE && value !== CurrencyDisplay.SYMBOL) {
+      throw validationError('the price is written as the code or the symbol', {
+        field: 'currencyDisplay',
+      });
+    }
+    return value;
   };
 
   /**
@@ -192,6 +208,7 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       imageAssetId: optionalString(body, 'imageAssetId', { max: 64 }),
       priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 100_000_000 }),
       currencyCode: currencyCode(body),
+      currencyDisplay: currencyDisplay(body),
       visible: optionalBoolean(body, 'visible', true),
       available: optionalBoolean(body, 'available', true),
       station: optionalString(body, 'station', { max: 40 }),
@@ -232,6 +249,8 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       ...(body['priceMinor'] !== undefined
         ? { priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 100_000_000 }) } : {}),
       ...(body['currencyCode'] !== undefined ? { currencyCode: currencyCode(body) } : {}),
+      ...(body['currencyDisplay'] !== undefined
+        ? { currencyDisplay: currencyDisplay(body) } : {}),
       ...(body['visible'] !== undefined ? { visible: optionalBoolean(body, 'visible', true) } : {}),
       ...(body['available'] !== undefined
         ? { available: optionalBoolean(body, 'available', true) } : {}),
@@ -413,6 +432,7 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       name: requireLocalised(body, 'name', { max: 120 }),
       priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 1_000_000 }),
       currencyCode: currencyCode(body),
+      currencyDisplay: currencyDisplay(body),
       sortOrder: optionalNumber(body, 'sortOrder', { min: 0, max: 9999 }) ?? 0,
       available: optionalBoolean(body, 'available', true),
     });
@@ -432,6 +452,8 @@ export function createMenuRoutes(services: Services): Router<AppState> {
       ...(body['priceMinor'] !== undefined
         ? { priceMinor: requireNumber(body, 'priceMinor', { min: 0, max: 1_000_000 }) } : {}),
       ...(body['currencyCode'] !== undefined ? { currencyCode: currencyCode(body) } : {}),
+      ...(body['currencyDisplay'] !== undefined
+        ? { currencyDisplay: currencyDisplay(body) } : {}),
       ...(body['available'] !== undefined
         ? { available: optionalBoolean(body, 'available', true) } : {}),
       ...(body['sortOrder'] !== undefined

@@ -272,7 +272,19 @@
   border-radius: var(--qs-radius-pill);
   background: var(--qs-color-border);
 }
+.menu-track span {
+  transition: background var(--qs-motion-normal) var(--qs-motion-ease-standard);
+}
 .menu-track span[data-done="true"] { background: var(--qs-color-primary); }
+/* The step being worked on right now breathes, so a diner watching the bar can
+ * see the restaurant is doing something rather than a static bar. */
+.menu-track span[data-current="true"] {
+  animation: qs-track-pulse 1.8s var(--qs-motion-ease-standard) infinite;
+}
+@keyframes qs-track-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
 
 .menu-sold-out { color: var(--qs-color-error); font-size: var(--qs-typography-size-sm); }
 

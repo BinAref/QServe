@@ -21,6 +21,7 @@ import { SecurityService } from './core/security.js';
 import { RealtimeGateway } from './core/realtime.js';
 import { LocalDiscovery, lanAddresses, mdnsNameFor, publicBaseUrl } from './core/network.js';
 import { AppLockService } from './core/app-lock.js';
+import { ServicePlanner } from './core/service-plan.js';
 
 import { AccessRepository } from './core/repositories/access.js';
 import { AuditRepository } from './core/repositories/audit.js';
@@ -59,6 +60,7 @@ export interface Services {
   readonly discovery: LocalDiscovery;
   readonly fingerprint: FingerprintResult;
   readonly appLock: AppLockService;
+  readonly servicePlan: ServicePlanner;
 
   readonly access: AccessRepository;
   readonly audit: AuditRepository;
@@ -139,6 +141,8 @@ export function buildServices(options: BuildOptions = {}): Services {
   const security = new SecurityService(access, terminalRepository, gate, defaultLocale);
   const appLock = new AppLockService(settings, audit);
   const notifications = new NotificationService(db, bus);
+  // What this restaurant actually has, and therefore how an order flows.
+  const servicePlan = new ServicePlanner(terminalRepository);
   const realtime = new RealtimeGateway(bus, security);
   // A notice for the floor is not sent to the pass at all. Filtering in the
   // browser instead would still mean the payload reached the wrong screen.
@@ -153,7 +157,7 @@ export function buildServices(options: BuildOptions = {}): Services {
   const printingRepository = new PrintingRepository(db);
 
   const orders = new OrderService(
-    orderRepository, menu, tables, settings, audit, bus, currencies,
+    orderRepository, menu, tables, settings, audit, bus, currencies, servicePlan,
   );
   const payments = new PaymentService(paymentRepository, orderRepository, orders, audit, bus);
   // Closes the loop between the two: orders can ask whether a bill is settled
@@ -219,6 +223,7 @@ export function buildServices(options: BuildOptions = {}): Services {
 
   return {
     config, paths, db, bus, gate, security, realtime, discovery, fingerprint, appLock,
+    servicePlan,
     access, audit, licenseRepository, settings, terminalRepository,
     currencies, packs, contentTranslations, menu, tables, orderRepository,
     orders, payments, terminals, printing, backup, notifications, reports, licensing,
@@ -279,6 +284,9 @@ export function systemStatus(services: Services, lanRunning: boolean): Record<st
     },
     locales: services.translations.summaries(profile?.enabledLocales ?? ['en']),
     themes: services.themes.summaries(profile?.themeId ?? 'light'),
+    // Every screen adapts to what the restaurant actually has, rather than
+    // being told separately what to hide.
+    servicePlan: services.servicePlan.current(),
   };
 }
 

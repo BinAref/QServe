@@ -37,9 +37,27 @@ export const DEFAULT_CURRENCY: CurrencyConfig = {
  * units is worth, and **every order line stores the rate it used**, so a bill
  * printed last month never changes because the rate moved this morning.
  */
+/**
+ * Which of a currency's two written forms a price is shown in.
+ *
+ * A currency is written two ways and a restaurant means both: `SAR` on a
+ * printed invoice, `﷼` on the menu a diner reads. Neither is more correct, so
+ * the owner keeps both on the currency and picks per dish which one the diner
+ * is shown.
+ */
+export const CurrencyDisplay = {
+  /** The three-letter code: SAR, TRY, USD. */
+  CODE: 'CODE',
+  /** The symbol: ﷼, ₺, $. */
+  SYMBOL: 'SYMBOL',
+} as const;
+export type CurrencyDisplay = (typeof CurrencyDisplay)[keyof typeof CurrencyDisplay];
+
 export interface Currency extends CurrencyConfig {
   /** Shown in the picker; the owner's own words, translatable. */
   readonly name: Readonly<Record<string, string>>;
+  /** Which form this currency is written in unless a dish says otherwise. */
+  readonly display: CurrencyDisplay;
   /** Base minor units per one minor unit of this currency. The base is 1. */
   readonly rateToBase: number;
   readonly isBase: boolean;
@@ -49,6 +67,23 @@ export interface Currency extends CurrencyConfig {
 
 /** ISO-4217 shape: three letters. Restaurants type it, so be forgiving of case. */
 export const CURRENCY_CODE_PATTERN = /^[A-Za-z]{3}$/;
+
+/**
+ * A currency as it should be *written* for this price.
+ *
+ * Formatting reads `symbol`, so choosing the code is a matter of handing the
+ * formatter a currency whose symbol is the code. One substitution, and every
+ * receipt, screen and printed ticket follows without knowing about the choice.
+ */
+export function displayed(
+  currency: CurrencyConfig & { display?: CurrencyDisplay },
+  override?: CurrencyDisplay | null,
+): CurrencyConfig {
+  const form = override ?? currency.display ?? CurrencyDisplay.SYMBOL;
+  return form === CurrencyDisplay.CODE
+    ? { ...currency, symbol: currency.code }
+    : currency;
+}
 
 /**
  * Convert an amount into the base currency, rounded once, at the end.
@@ -118,20 +153,27 @@ export interface ParsedAmount {
  * The one place that decides whether typed text is a price.
  *
  * Every rule here exists because of a way a real till gets a wrong number into
- * a real bill: a stray letter, a decimal point left dangling at the end of
- * "12.", a second point in "1.2.3", more decimals than the currency has. The
- * same function runs in the browser as the field is typed and on the server
- * before the value is stored, so the two can never disagree about what a price
- * is.
+ * a real bill: a stray letter, a second point in "1.2.3", more decimals than
+ * the currency has. The same function runs in the browser as the field is typed
+ * and on the server before the value is stored, so the two can never disagree
+ * about what a price is.
+ *
+ * A point left dangling at the end is the one case that is *not* an error.
+ * Somebody typing "12.50" passes through "12." on the way, and refusing that
+ * keystroke would force them to type the digits first and then go back to
+ * insert the point. So it is accepted while typing and simply dropped when they
+ * leave: "12." is twelve, and there is nothing to warn anybody about.
  */
 export function parseAmount(raw: string, decimals: number): ParsedAmount {
-  const text = raw.trim();
+  // A trailing point carries no value, so it is removed rather than rejected.
+  const text = raw.trim().replace(/\.$/, '');
   const fail = (messageKey: string, params?: Record<string, unknown>): ParsedAmount => ({
     ok: false,
     minor: 0,
     problem: params ? { messageKey, params } : { messageKey },
   });
 
+  // Empty, or a lone point that the trim above reduced to nothing.
   if (text === '') return fail('amount.error.required');
 
   // Digits and at most one dot. Not a regex on the whole string, because the
@@ -144,7 +186,6 @@ export function parseAmount(raw: string, decimals: number): ParsedAmount {
 
   const points = [...text].filter((character) => character === '.').length;
   if (points > 1) return fail('amount.error.one_point');
-  if (text.endsWith('.')) return fail('amount.error.trailing_point');
   if (text.startsWith('.')) return fail('amount.error.leading_point');
 
   const [whole = '', fraction = ''] = text.split('.');
@@ -168,6 +209,10 @@ export function parseAmount(raw: string, decimals: number): ParsedAmount {
  * decimal point, and never more decimals than the currency has. Used for the
  * live keystroke filter — it never reports an error, it just refuses to let
  * the character in, so the field cannot hold nonsense in the first place.
+ *
+ * A point at the end is allowed through, because it is where every decimal
+ * price passes on its way to being typed. `parseAmount` drops it on the way
+ * out, so the field never *stores* one.
  */
 export function sanitiseAmountInput(raw: string, decimals: number): string {
   let out = '';

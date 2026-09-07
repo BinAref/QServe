@@ -10,6 +10,7 @@
 import { api, guard, t } from '../../shared/boot.js';
 import { h, mount, modal, debounce } from '../../shared/dom.js';
 import { formatMoney, pick, te, formatDateTime, formatTime } from '../../shared/i18n.js';
+import { moneyField } from '../../shared/fields.js';
 import { Capability, Permission } from '../../shared/events.js';
 import { state, has, can, pageHeader, lockedPanel } from '../app.js';
 
@@ -109,6 +110,10 @@ async function openOrder(orderId) {
             h('span', {}, formatMoney(bill.outstandingMinor, order.currency)))
         : null,
 
+      // A restaurant with no till still has to take money, and this is where
+      // it does: the console is the whole restaurant when nothing else exists.
+      settlePanel(order, bill),
+
       availableTransitions.length > 0
         ? h('div', {},
             h('div', { class: 'qs-section-title' }, t('common.actions')),
@@ -139,6 +144,54 @@ async function openOrder(orderId) {
                 event.after ? JSON.stringify(event.after) : ''))))))),
     actions: [h('button', { class: 'qs-btn qs-btn-primary', value: 'close' }, t('common.close'))],
   });
+}
+
+/**
+ * Take payment from the console.
+ *
+ * A restaurant with a till terminal never sees this — the cashier screen is
+ * better at it. A restaurant with one computer has nowhere else to do it, and
+ * an order that can be advanced but never paid is an order stuck for ever.
+ */
+function settlePanel(order, bill) {
+  if (bill.outstandingMinor <= 0) return null;
+  if (!has(Permission.PAYMENTS_CREATE)) return null;
+
+  const amount = moneyField({
+    label: t('cashier.amount'),
+    value: bill.outstandingMinor,
+    currencies: [{ ...order.currency, isBase: true }],
+    baseCurrency: order.currency,
+  });
+
+  const method = h('select', { name: 'method' },
+    ['CASH', 'CARD', 'TRANSFER', 'OTHER'].map((entry) =>
+      h('option', { value: entry }, te('payments.method', entry))));
+
+  const take = h('button', { class: 'qs-btn qs-btn-primary' }, t('cashier.take_payment'));
+  take.addEventListener('click', async () => {
+    const state = amount.validate();
+    if (!state.ok) { amount.focus(); return; }
+
+    take.dataset.busy = 'true';
+    const done = await guard(() => api.post(`/api/orders/${order.id}/payments`, {
+      method: method.value,
+      amountMinor: state.minor,
+    }));
+    take.dataset.busy = 'false';
+    if (!done) return;
+
+    toast(t('payments.status.captured'), 'success');
+    document.querySelector('dialog[open]')?.close();
+    await renderOrders(document.querySelector('.qs-page'));
+  });
+
+  return h('div', { class: 'qs-card qs-card-tight', style: { marginBlock: 'var(--qs-spacing-md)' } },
+    h('div', { class: 'qs-section-title' }, t('cashier.take_payment')),
+    h('div', { class: 'qs-grid qs-grid-2' },
+      amount.node,
+      h('label', { class: 'qs-field' }, h('span', {}, t('payments.method')), method)),
+    take);
 }
 
 /* -------------------------------------------------------------- reports */

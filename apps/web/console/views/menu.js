@@ -14,6 +14,7 @@ import { api, guard, t, toast } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { formatMoney, pick } from '../../shared/i18n.js';
 import { moneyField, integerField } from '../../shared/fields.js';
+import { displayed } from '../../shared/money.js';
 import { Permission } from '../../shared/events.js';
 import { state, has, pageHeader, reroute } from '../app.js';
 
@@ -253,7 +254,8 @@ function productPanel() {
       !product.visible ? h('span', { class: 'qs-badge' }, t('common.hidden')) : null,
       !product.available ? h('span', { class: 'qs-badge qs-badge-error' }, t('menu.sold_out')) : null,
       h('span', { class: 'qs-strong' },
-        formatMoney(product.priceMinor, currencyOf(product.currencyCode))),
+        formatMoney(product.priceMinor,
+          displayed(currencyOf(product.currencyCode), product.currencyDisplay))),
       canManage()
         ? h('button', { class: 'qs-btn qs-btn-ghost', onClick: () => openProductForm(product) },
             t('common.edit'))
@@ -283,6 +285,7 @@ function openProductForm(product) {
     value: product?.priceMinor ?? 0,
     currencies,
     currencyCode: product?.currencyCode ?? null,
+    currencyDisplay: product?.currencyDisplay ?? null,
     hint: currencies.length > 1 ? t('menu.currency') : null,
   });
   const prep = integerField({
@@ -386,6 +389,7 @@ function openProductForm(product) {
             description: collectLocalised(data, 'description'),
             priceMinor: amount.minor,
             currencyCode: amount.currencyCode,
+            currencyDisplay: amount.currencyDisplay,
             station: String(data.station ?? '').trim() || null,
             preparationMinutes: minutes.value || null,
             visible: data.visible === 'on',
@@ -490,7 +494,8 @@ function optionEditor(product) {
               h('span', { class: 'qs-row' },
                 h('span', { class: 'qs-muted' },
                   choice.priceDeltaMinor
-                    ? `+${formatMoney(choice.priceDeltaMinor, currencyOf(product.currencyCode))}`
+                    ? `+${formatMoney(choice.priceDeltaMinor,
+                        displayed(currencyOf(product.currencyCode), product.currencyDisplay))}`
                     : '—'),
                 h('button', {
                   class: 'qs-btn qs-btn-ghost', type: 'button',
@@ -618,8 +623,8 @@ function addonPanel() {
           h('button', {
             class: 'qs-btn qs-btn-ghost',
             onClick: () => canManage() && openAddonForm(addon),
-          }, `${pick(addon.name)} · ${
-            formatMoney(addon.priceMinor, currencyOf(addon.currencyCode))}`))));
+          }, `${pick(addon.name)} · ${formatMoney(addon.priceMinor,
+            displayed(currencyOf(addon.currencyCode), addon.currencyDisplay))}`))));
 }
 
 function openAddonForm(addon) {
@@ -628,6 +633,7 @@ function openAddonForm(addon) {
     value: addon?.priceMinor ?? 0,
     currencies,
     currencyCode: addon?.currencyCode ?? null,
+    currencyDisplay: addon?.currencyDisplay ?? null,
   });
 
   const form = h('form', {},
@@ -665,6 +671,7 @@ function openAddonForm(addon) {
             name: collectLocalised(data, 'name'),
             priceMinor: amount.minor,
             currencyCode: amount.currencyCode,
+            currencyDisplay: amount.currencyDisplay,
             available: data.available === 'on',
           };
           const saved = await guard(() => addon
