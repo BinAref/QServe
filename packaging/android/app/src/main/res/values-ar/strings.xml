@@ -2,10 +2,11 @@
 <resources>
     <string name="app_name">كيوسيرف — جهاز</string>
     <string name="address_title">وجّه هذا الجهاز إلى مطعمك</string>
-    <string name="address_intro">افتح لوحة تحكم كيوسيرف على حاسوب المطعم، واذهب إلى الأجهزة، ثم امسح رمز هذا الجهاز أو انسخ عنوانه. الصق العنوان هنا مرة واحدة — وسيتذكره الجهاز.</string>
+    <string name="address_intro">هذا التطبيق نافذة على الحاسوب الذي يُشغّل مطعمك. افتح لوحة تحكم كيوسيرف على ذلك الحاسوب، واذهب إلى الأجهزة، ثم وجّه كاميرا الهاتف إلى رمز المحطة — وسيعرض عليك أندرويد فتحه هنا. أو انسخ العنوان والصقه بالأسفل، وسيتذكره الجهاز.</string>
+    <string name="address_needs">يجب أن يكون حاسوب المطعم يعمل ببرنامج كيوسيرف، وعلى شبكة الواي فاي نفسها، وترخيصه مُفعَّل. قبل التفعيل لا يُقدَّم شيء للأجهزة إطلاقًا.</string>
     <string name="address_hint">http://qserve-rest-000001.local:7020</string>
     <string name="connect">اتصال</string>
     <string name="unreachable_title">تعذّر الوصول إلى المطعم</string>
-    <string name="unreachable_body">هذا الجهاز ليس على شبكة المطعم، أو أن الحاسوب الرئيسي مُطفأ.</string>
+    <string name="unreachable_body">هذا الجهاز ليس على شبكة المطعم، أو أن الحاسوب الرئيسي مُطفأ، أو أن الترخيص لم يُفعَّل بعد.</string>
     <string name="address_needed">أدخل عنوان حاسوب المطعم.</string>
 </resources>

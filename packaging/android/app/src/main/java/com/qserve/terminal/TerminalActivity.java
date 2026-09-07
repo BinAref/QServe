@@ -95,13 +95,39 @@ public class TerminalActivity extends Activity {
             open(url);
         });
 
+        // A scanned code wins over anything remembered: somebody pointing a
+        // camera at a station's code is telling this device where it belongs.
+        if (openFromIntent(getIntent())) return;
+
         String saved = prefs().getString(KEY_ADDRESS, null);
-        if (saved == null) {
-            address.setText("http://");
-            address.setSelection(address.getText().length());
-        } else {
-            open(saved);
+        // The box is left empty so the example address shows through as a hint.
+        // Pre-filling it with "http://" hid the one thing a person needed to
+        // see: the shape of what they are being asked for.
+        if (saved != null) open(saved);
+    }
+
+    /**
+     * The app was opened by a link — a station's code, scanned with the
+     * phone's own camera. That link is the address, so remember it and go.
+     */
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        openFromIntent(intent);
+    }
+
+    private boolean openFromIntent(android.content.Intent intent) {
+        if (intent == null || !android.content.Intent.ACTION_VIEW.equals(intent.getAction())) {
+            return false;
         }
+        android.net.Uri data = intent.getData();
+        if (data == null) return false;
+
+        String url = normalise(data.toString());
+        prefs().edit().putString(KEY_ADDRESS, url).apply();
+        open(url);
+        return true;
     }
 
     /** The station this device is bound to, or nothing on a fresh install. */

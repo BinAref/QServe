@@ -58,3 +58,17 @@ screen now says one thing at a time:
 And the things that only turn up when someone reads every line: the kitchen no
 longer prints "863 min ago" or a raw `CUSTOMER`, counts read as sentences in
 every language, and Delete now sits at the far end of a dialog, away from Save.
+
+## What changed in 1.0.3
+
+**Setting up a device is now: point the camera at the station's code.** The
+Android terminal registers itself as the opener for a station link, so scanning
+the code the console shows under **Terminals** opens the app already pointed at
+the restaurant — nothing to read off one screen and type into another.
+
+The setup screen also says what it never said: this app is a window onto the
+computer that runs the restaurant, and that computer has to be running QServe
+on the same Wi-Fi **with its licence activated**. Before activation the
+restaurant server does not open to the network at all, so no address would have
+answered. The address box no longer arrives pre-filled with "http://", which had
+been hiding the example.

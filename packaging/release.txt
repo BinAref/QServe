@@ -1,4 +1,4 @@
-v1.0.2
+v1.0.3
 
 Writing a version here and pushing it is how a release is cut: the workflow in
 .github/workflows/release.yml builds the Windows bundle and the Android
@@ -12,5 +12,3 @@ Before cutting a release anyone is meant to pay for: run `npm run keygen` and
 put the public half in the QSERVE_TRUSTED_KEYS repository secret, and prepare
 the vendor details in the console's Developer section (or QSERVE_VENDOR_INFO),
 or the build ships unable to activate anything and with nobody to ask.
-
-Re-cut for the label fixes on the till and the printer bridge.

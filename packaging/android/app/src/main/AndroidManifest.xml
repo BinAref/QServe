@@ -33,6 +33,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+              A station's code is a link to the restaurant's own computer. Point
+              any camera at it and Android offers to open it here, which is the
+              whole of the setup: no address to read off one screen and type
+              into another.
+
+              Scoped to ".local" — the mDNS name the restaurant server
+              advertises — so this app never offers itself as a browser for the
+              rest of the internet.
+            -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" android:host="*.local" android:pathPrefix="/r/" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>
