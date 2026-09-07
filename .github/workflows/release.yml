@@ -60,12 +60,19 @@ jobs:
       # The vendor's public keys, so an activation certificate can be verified
       # on a restaurant's computer with the internet unplugged. Only ever the
       # public half; the signing key never leaves the vendor's own machine.
+      # A secret cannot be tested in an `if:` — GitHub refuses the whole
+      # workflow for it — so the emptiness is checked where it is readable.
       - name: Write the trust store
-        if: ${{ secrets.QSERVE_TRUSTED_KEYS != '' }}
         env:
           TRUSTED_KEYS: ${{ secrets.QSERVE_TRUSTED_KEYS }}
         shell: bash
-        run: printf '%s' "$TRUSTED_KEYS" > apps/server/config/trusted-keys.json
+        run: |
+          if [ -n "$TRUSTED_KEYS" ]; then
+            printf '%s' "$TRUSTED_KEYS" > apps/server/config/trusted-keys.json
+            echo "trust store written from QSERVE_TRUSTED_KEYS"
+          else
+            echo "no QSERVE_TRUSTED_KEYS secret: this build cannot activate anything"
+          fi
 
       - name: Build QServe.exe
         run: node packaging/windows/build.mjs
