@@ -10,14 +10,19 @@ Two things a restaurant installs, and neither is the repository:
 Neither can be built honestly on one machine: the Windows bundle carries a
 native SQLite that must be compiled on Windows, and the Android package needs
 the Android SDK. `.github/workflows/release.yml` builds each on a runner that
-has what it needs, so cutting a release is a tag:
+has what it needs, so cutting a release is a commit:
 
 ```
-git tag v1.0.0 && git push origin v1.0.0
+echo v1.0.1 > packaging/release.txt   # then commit and push it
 ```
 
-The same workflow can be run by hand from the Actions tab; without a tag it
-builds both artifacts and attaches them to the run, without publishing.
+Pushing that file is the trigger. The workflow builds both artifacts, tags the
+commit, and publishes a release carrying them — no tag push and no token with
+special powers, and the reason for the release sits in the commit message beside
+it. Only the first line of the file is read.
+
+The same workflow can be run by hand from the Actions tab; given a tag it
+publishes, and without one it builds both artifacts and attaches them to the run.
 
 ---
 

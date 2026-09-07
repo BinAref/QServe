@@ -5,8 +5,6 @@
     <string name="address_intro">Open the QServe console on the restaurant computer, find this station under Terminals, and scan or copy its code. Paste the address here once — this device remembers it.</string>
     <string name="address_hint">http://qserve-rest-000001.local:7020</string>
     <string name="connect">Connect</string>
-    <string name="change_address">Change address</string>
-    <string name="retry">Try again</string>
     <string name="unreachable_title">Cannot reach the restaurant</string>
     <string name="unreachable_body">This device is not on the restaurant network, or the main computer is switched off.</string>
     <string name="address_needed">Enter the address of the restaurant computer.</string>

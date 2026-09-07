@@ -16,6 +16,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 /**
@@ -39,6 +40,7 @@ public class TerminalActivity extends Activity {
     private WebView web;
     private View setup;
     private EditText address;
+    private TextView title;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -49,6 +51,7 @@ public class TerminalActivity extends Activity {
         web = findViewById(R.id.web);
         setup = findViewById(R.id.setup);
         address = findViewById(R.id.address);
+        title = findViewById(R.id.title);
         Button connect = findViewById(R.id.connect);
 
         // A kitchen screen that sleeps is a kitchen screen that misses a
@@ -74,8 +77,10 @@ public class TerminalActivity extends Activity {
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                // Only the page itself: one missing image is not a reason to
+                // throw a member of staff back to a settings screen.
                 if (!request.isForMainFrame()) return;
-                showSetup(getString(R.string.unreachable_body));
+                showSetup(true);
             }
         });
 
@@ -132,12 +137,19 @@ public class TerminalActivity extends Activity {
         web.loadUrl(url);
     }
 
-    private void showSetup(String message) {
+    /**
+     * Back to the address form. After a failure it says why, in the words a
+     * member of staff can act on: the device is off the restaurant's Wi-Fi, or
+     * the computer behind the counter is switched off.
+     */
+    private void showSetup(boolean afterFailure) {
         web.setVisibility(View.GONE);
         setup.setVisibility(View.VISIBLE);
-        String saved = prefs().getString(KEY_ADDRESS, "");
-        address.setText(saved);
-        if (message != null) Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        address.setText(prefs().getString(KEY_ADDRESS, ""));
+        title.setText(afterFailure ? R.string.unreachable_title : R.string.address_title);
+        if (afterFailure) {
+            Toast.makeText(this, R.string.unreachable_body, Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
@@ -150,7 +162,7 @@ public class TerminalActivity extends Activity {
             return;
         }
         if (web.getVisibility() == View.VISIBLE) {
-            showSetup(null);
+            showSetup(false);
             return;
         }
         super.onBackPressed();
