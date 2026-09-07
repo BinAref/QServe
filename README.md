@@ -46,6 +46,10 @@ immediately — with everything you just built intact.
 npm run check       # build + validate the packs, the audit labels and the settings + tests
 ```
 
+Working on the product from your own machine — what to install, the two ports,
+how to get a licence for your own testing — is in
+[DEVELOPING.md](docs/DEVELOPING.md).
+
 ### Running it without a checkout
 
 A restaurant does not clone a repository. Each release carries two files: a
