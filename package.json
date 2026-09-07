@@ -1,6 +1,6 @@
 {
   "name": "qserve",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "QServe — Local Restaurant Operating System. Offline-first, modular, perpetual-licensed restaurant operations platform.",
   "license": "UNLICENSED",
@@ -20,7 +20,8 @@
     "validate:i18n": "node tools/validate-i18n.mjs",
     "validate:themes": "node tools/validate-themes.mjs",
     "validate:audit": "node tools/validate-audit-labels.mjs",
-    "validate": "npm run validate:i18n && npm run validate:themes && npm run validate:audit",
+    "validate:version": "node tools/validate-version.mjs",
+    "validate": "npm run validate:i18n && npm run validate:themes && npm run validate:audit && npm run validate:version",
     "start": "node apps/server/dist/main.js",
     "start:license-server": "node apps/license-server/dist/main.js",
     "dev": "npm run build && npm run start",
