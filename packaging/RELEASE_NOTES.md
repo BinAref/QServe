@@ -34,3 +34,27 @@ What a licence turns on is the running of the restaurant: real tables and their
 QR codes, staff stations, the kitchen board, the till, printing, reports, and
 the server on your own Wi-Fi. The console's **Licence** page says how to ask for
 one and what it costs; QServe itself takes no payment.
+
+## What changed in 1.0.2
+
+The management console was rebuilt around one layout rather than several. Every
+screen now says one thing at a time:
+
+- **A list is a list.** Languages, themes, roles, stations, currencies, shipped
+  packs and licence prices are rows — the thing on one side, what you can do to
+  it on the other, and the sentence that explains it underneath. They are held
+  to a reading width, so a name and its buttons are no longer a screen apart.
+- **Reference is folded away.** The activity log's filters, a pack's rejected
+  files, the licence message, the capability list: each is one line you can open
+  rather than a wall you have to read past.
+- **Settings and the developer screen have tabs**, so you see the section you
+  came for.
+- **One mark per row.** "Default", "In use" and "Online" are worth a pill;
+  everything else is a word in a sentence.
+- **A considered type scale.** Six sizes, each a visible step from the last.
+- **The setup wizard shows you the theme and language you are picking**, as you
+  pick them.
+
+And the things that only turn up when someone reads every line: the kitchen no
+longer prints "863 min ago" or a raw `CUSTOMER`, counts read as sentences in
+every language, and Delete now sits at the far end of a dialog, away from Save.
