@@ -124,7 +124,12 @@ function categoryPanel() {
     h('div', { class: 'qs-card-head' },
       h('h3', { style: { margin: 0 } }, t('menu.categories')),
       canManage()
-        ? h('button', { class: 'qs-btn qs-btn-ghost', onClick: () => openCategoryForm(null) }, '+')
+        // A bare "+" is a guess; every other panel on the console names its
+        // action, and there is room here for two words.
+        ? h('button', {
+            class: 'qs-btn qs-btn-ghost qs-btn-sm',
+            onClick: () => openCategoryForm(null),
+          }, t('menu.add_category'))
         : null),
     categories.length === 0
       ? h('p', { class: 'qs-muted qs-small' }, t('menu.empty_categories'))
@@ -157,7 +162,7 @@ function openCategoryForm(category) {
               const ok = await confirmDialog({
                 title: t('common.delete'),
                 message: count > 0
-                  ? `${pick(category.name)} — ${count} ${t('menu.products')}`
+                  ? `${pick(category.name)} — ${t('menu.product_count', { count })}`
                   : pick(category.name),
                 confirmLabel: t('common.delete'),
                 cancelLabel: t('common.cancel'),
@@ -227,8 +232,12 @@ function productPanel() {
         h('div', {}, pick(product.name)),
         h('div', { class: 'qs-xs qs-muted' },
           product.station ? `${t('menu.station')}: ${product.station}` : '',
-          product.options.length > 0 ? ` · ${product.options.length} ${t('menu.options')}` : '',
-          product.addons.length > 0 ? ` · ${product.addons.length} ${t('menu.addons')}` : '')),
+          product.options.length > 0
+            ? ` · ${t('menu.option_count', { count: product.options.length })}`
+            : '',
+          product.addons.length > 0
+            ? ` · ${t('menu.addon_count', { count: product.addons.length })}`
+            : '')),
       !product.visible ? h('span', { class: 'qs-badge' }, t('common.hidden')) : null,
       !product.available ? h('span', { class: 'qs-badge qs-badge-error' }, t('menu.sold_out')) : null,
       h('span', { class: 'qs-strong' },
@@ -596,7 +605,10 @@ function addonPanel() {
     h('div', { class: 'qs-card-head' },
       h('h3', { style: { margin: 0 } }, t('menu.addons')),
       canManage()
-        ? h('button', { class: 'qs-btn qs-btn-ghost', onClick: () => openAddonForm(null) }, '+')
+        ? h('button', {
+            class: 'qs-btn qs-btn-ghost qs-btn-sm',
+            onClick: () => openAddonForm(null),
+          }, t('menu.add_addon'))
         : null),
     addons.length === 0
       ? h('p', { class: 'qs-muted qs-small' }, t('common.empty'))

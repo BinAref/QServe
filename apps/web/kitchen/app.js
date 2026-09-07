@@ -103,9 +103,28 @@ function header() {
     connectionIndicator(realtime));
 }
 
-function ticket(entry) {
-  const { order, ageSeconds, urgent, sourceLabel } = entry;
+/** "Waiter — Ahmed", "Customer": who sent it, in the console's own words. */
+function sourceLine(order) {
+  const who = order.createdBy.userName ?? order.createdBy.terminalName ?? null;
+  const source = te('orders.source', order.source);
+  return who && who !== order.tableLabel ? `${source} — ${who}` : source;
+}
+
+/**
+ * How long a ticket has been waiting, in the largest unit that still says
+ * something. "863 min ago" is a number nobody converts at a hot pass.
+ */
+function age(ageSeconds) {
   const minutes = Math.floor(ageSeconds / 60);
+  if (minutes < 60) return t('orders.age_minutes', { minutes });
+  const hours = Math.floor(minutes / 60);
+  return hours < 24
+    ? t('orders.age_hours', { hours, minutes: minutes % 60 })
+    : t('orders.age_days', { days: Math.floor(hours / 24) });
+}
+
+function ticket(entry) {
+  const { order, ageSeconds, urgent } = entry;
 
   // The one ticket on the board that is waiting on somebody carries the
   // travelling light. Anything else lit at the same time would dilute it.
@@ -123,10 +142,13 @@ function ticket(entry) {
         class: 'kds-age',
         'data-urgent': String(urgent),
         title: formatTime(order.createdAt),
-      }, t('orders.age_minutes', { minutes }))),
+      }, age(ageSeconds))),
 
+    // Where the ticket came from, in the word the rest of the product uses —
+    // and the person only when they are somebody other than the table already
+    // printed above, which is the difference between a fact and a repetition.
     state.settings.showSourceBadge
-      ? h('div', { class: 'kds-source' }, `${t('orders.source')}: ${sourceLabel}`)
+      ? h('div', { class: 'kds-source' }, sourceLine(order))
       : null,
 
     h('div', { class: 'kds-items' }, order.items.map((item) =>
@@ -210,17 +232,21 @@ function render() {
   mount(root,
     offlineBanner(realtime),
     notifications.banner(),
-    h('div', { class: 'kds' },
+    h('div', { class: 'kds', 'data-sound': sound.unlocked ? 'on' : 'locked' },
       header(),
       queue.length === 0
         ? h('div', { class: 'qs-empty' }, t('kitchen.no_orders'))
         : h('div', { class: 'kds-board' }, queue.map(ticket)),
+      // A browser will not make a sound until somebody has touched the page,
+      // so a kitchen screen left alone on a wall is silent until asked. The
+      // prompt says what tapping does — "Sound enabled" read like a status,
+      // which is the one thing it was not.
       !sound.unlocked
         ? h('div', { class: 'kds-sound-prompt' },
             h('button', {
-              class: 'qs-btn qs-btn-primary qs-btn-lg',
+              class: 'qs-btn qs-btn-primary',
               onClick: () => { sound.unlock(); render(); },
-            }, `🔔 ${t('sound.enabled')}`))
+            }, `🔔 ${t('sound.turn_on')}`))
         : null));
 }
 

@@ -18,6 +18,24 @@ import {
 
 /* -------------------------------------------------------------- settings */
 
+/**
+ * Settings.
+ *
+ * This screen used to be one page two and a half thousand pixels long with
+ * forty-nine controls on it, which is not a settings screen — it is an inventory
+ * of every decision anyone ever made, handed to somebody looking for one of
+ * them. It is five jobs, so it is five sections, and one is shown at a time.
+ */
+const SETTINGS_SECTIONS = [
+  { id: 'restaurant', label: 'settings.restaurant' },
+  { id: 'money', label: 'settings.currency' },
+  { id: 'appearance', label: 'settings.appearance' },
+  { id: 'operations', label: 'settings.operations' },
+  { id: 'lock', label: 'lock.title' },
+];
+
+let settingsSection = 'restaurant';
+
 export async function renderSettings(container) {
   const [restaurant, settingsResult, lock] = await Promise.all([
     api.get('/api/restaurant'),
@@ -29,119 +47,56 @@ export async function renderSettings(container) {
   const themes = state.status.themes ?? [];
   const canEdit = has(Permission.SETTINGS_MANAGE);
 
-  const profileForm = h('form', { class: 'qs-card' },
-    h('h2', {}, t('settings.restaurant')),
-
-    // The name in the language the console is in. A restaurant set up before it
-    // had a second language holds its name under "any language", which is what
-    // the placeholder shows: what a diner reads today.
-    localisedField(t('setup.restaurant_name'), 'name', restaurant.name),
-    languageNote(enabledLocales()),
-
-    h('div', { class: 'qs-grid qs-grid-2' },
-      field(t('settings.address'), 'address', restaurant.address),
-      field(t('settings.phone'), 'phone', restaurant.phone),
-      field(t('settings.email'), 'email', restaurant.email),
-      field(t('settings.tax_number'), 'taxNumber', restaurant.taxNumber)),
-
-    h('div', { class: 'qs-section-title' }, t('settings.currency')),
-    h('div', { class: 'qs-grid qs-grid-3' },
-      field(t('currencies.code'), 'currencyCode', restaurant.currency.code),
-      field(t('currencies.symbol'), 'currencySymbol', restaurant.currency.symbol),
-      h('label', { class: 'qs-field' },
-        h('span', {}, t('currencies.decimals')),
-        h('input', { name: 'currencyDecimals', type: 'number', min: '0', max: '4', value: String(restaurant.currency.decimals) }))),
-
-    h('div', { class: 'qs-grid qs-grid-3' },
-      h('label', { class: 'qs-field' },
-        h('span', {}, t('settings.tax_rate')),
-        h('input', { name: 'taxRatePercent', type: 'number', step: '0.01', min: '0', max: '100', value: String(restaurant.taxRatePercent) })),
-      h('label', { class: 'qs-field' },
-        h('span', {}, t('settings.service_rate')),
-        h('input', { name: 'serviceRatePercent', type: 'number', step: '0.01', min: '0', max: '100', value: String(restaurant.serviceRatePercent) })),
-      h('label', { class: 'qs-check', style: { alignSelf: 'end', marginBlockEnd: 'var(--qs-spacing-md)' } },
-        h('input', { type: 'checkbox', name: 'taxInclusive', checked: restaurant.taxInclusive }),
-        h('span', {}, t('settings.tax_inclusive')))),
-
-    h('div', { class: 'qs-section-title' }, t('settings.appearance')),
-    h('div', { class: 'qs-grid qs-grid-2' },
-      h('label', { class: 'qs-field' },
-        h('span', {}, t('common.theme')),
-        h('select', { name: 'themeId' }, themes.map((theme) =>
-          h('option', { value: theme.id, selected: theme.id === restaurant.themeId }, theme.name)))),
-      h('label', { class: 'qs-field' },
-        h('span', {}, t('settings.default_language')),
-        h('select', { name: 'defaultLocale' }, locales.map((entry) =>
-          h('option', { value: entry.locale, selected: entry.locale === restaurant.defaultLocale },
-            `${entry.name} (${entry.englishName})`))))),
-
-    h('div', { class: 'qs-field' },
-      h('span', {}, t('settings.enabled_languages')),
-      // Any installed language can be offered to diners; adding one is dropping
-      // a file into locales/ (spec §32).
-      locales.map((entry) =>
-        h('label', { class: 'qs-check' },
-          h('input', {
-            type: 'checkbox', name: `locale.${entry.locale}`,
-            checked: restaurant.enabledLocales.includes(entry.locale),
-          }),
-          h('span', {}, `${entry.name} — ${entry.englishName} (${entry.direction})`)))),
-
-    canEdit
-      ? h('button', { class: 'qs-btn qs-btn-primary', type: 'submit' }, t('common.save'))
-      : null);
-
-  profileForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(profileForm).entries());
-
-    const name = mergeLocalised(restaurant.name, data, 'name');
-    const chosenLocales = locales
-      .filter((entry) => data[`locale.${entry.locale}`] === 'on')
-      .map((entry) => entry.locale);
-
-    const saved = await guard(() => api.patch('/api/restaurant', {
-      ...(Object.keys(name).length > 0 ? { name } : {}),
-      address: String(data.address ?? '').trim() || null,
-      phone: String(data.phone ?? '').trim() || null,
-      email: String(data.email ?? '').trim() || null,
-      taxNumber: String(data.taxNumber ?? '').trim() || null,
-      currency: {
-        code: String(data.currencyCode).toUpperCase(),
-        symbol: String(data.currencySymbol),
-        decimals: Number(data.currencyDecimals),
-        symbolPosition: restaurant.currency.symbolPosition,
-      },
-      taxRatePercent: Number(data.taxRatePercent),
-      serviceRatePercent: Number(data.serviceRatePercent),
-      taxInclusive: data.taxInclusive === 'on',
-      themeId: data.themeId,
-      defaultLocale: data.defaultLocale,
-      ...(chosenLocales.length > 0 ? { enabledLocales: chosenLocales } : {}),
-    }));
+  /** Save only what this section owns; the rest of the profile is untouched. */
+  const savePatch = async (patch) => {
+    const saved = await guard(() => api.patch('/api/restaurant', patch));
     if (!saved) return;
     toast(t('common.saved'), 'success');
     await refreshStatus();
     await renderSettings(container);
-  });
+  };
+
+  const body = h('div', {});
+  const paint = () => {
+    if (settingsSection === 'restaurant') mount(body, restaurantPanel(restaurant, canEdit, savePatch));
+    else if (settingsSection === 'money') mount(body, moneyPanel(restaurant, canEdit, savePatch));
+    else if (settingsSection === 'appearance') {
+      mount(body, appearancePanel(restaurant, locales, themes, canEdit, savePatch));
+    } else if (settingsSection === 'operations') {
+      mount(body, operationalSettings(settings, canEdit, container));
+    } else {
+      mount(body, lock ? appLockPanel(lock, canEdit, container) : null);
+    }
+  };
 
   mount(container,
     pageHeader(t('settings.title')),
-    profileForm,
-    lock ? appLockPanel(lock, canEdit, container) : null,
-    operationalSettings(settings, canEdit, container));
+    h('div', { class: 'qs-tabs', role: 'tablist' },
+      SETTINGS_SECTIONS.map((section) => h('button', {
+        class: 'qs-tab',
+        role: 'tab',
+        'aria-selected': String(section.id === settingsSection),
+        onClick: (event) => {
+          settingsSection = section.id;
+          for (const tab of event.target.parentElement.children) {
+            tab.setAttribute('aria-selected', String(tab === event.target));
+          }
+          paint();
+        },
+      }, t(section.label)))),
+    body);
+
+  paint();
 }
 
 /**
- * The optional app lock (spec §20, §51).
+ * Whether this computer asks for a password when QServe opens.
  *
- * Each restaurant decides: a password when this computer opens QServe, or no
- * password at all. It guards the console only — the panel says so, because an
- * owner who thinks a forgotten password could stop service would never turn it
- * on, and the fear would be misplaced.
+ * The tables, the kitchen and the till keep working while the console is
+ * locked: locking a manager's screen must never close a restaurant.
  */
 function appLockPanel(lock, canEdit, container) {
-  const form = h('form', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } });
+  const form = h('form', { class: 'qs-card' });
 
   const enableCheck = h('input', {
     type: 'checkbox', name: 'enabled', checked: lock.enabled, disabled: !canEdit,
@@ -252,6 +207,157 @@ function appLockPanel(lock, canEdit, container) {
   return form;
 }
 
+/** Who the restaurant is. The name a diner reads, and how to reach it. */
+function restaurantPanel(restaurant, canEdit, savePatch) {
+  // Five boxes of the same width in two columns. The name used to run the whole
+  // card while the phone number sat in a third of it — the same form, three
+  // widths, for no reason a person could name.
+  const form = h('form', { class: 'qs-card' },
+    h('div', { class: 'qs-grid qs-grid-2' },
+      localisedField(t('setup.restaurant_name'), 'name', restaurant.name),
+      field(t('settings.address'), 'address', restaurant.address),
+      field(t('settings.phone'), 'phone', restaurant.phone),
+      field(t('settings.email'), 'email', restaurant.email),
+      field(t('settings.tax_number'), 'taxNumber', restaurant.taxNumber)),
+    languageNote(enabledLocales()),
+
+    canEdit ? h('button', { class: 'qs-btn qs-btn-primary', type: 'submit' }, t('common.save')) : null);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    const name = mergeLocalised(restaurant.name, data, 'name');
+    void savePatch({
+      ...(Object.keys(name).length > 0 ? { name } : {}),
+      address: String(data.address ?? '').trim() || null,
+      phone: String(data.phone ?? '').trim() || null,
+      email: String(data.email ?? '').trim() || null,
+      taxNumber: String(data.taxNumber ?? '').trim() || null,
+    });
+  });
+  return form;
+}
+
+/** What the restaurant counts in, and what it adds to a bill. */
+function moneyPanel(restaurant, canEdit, savePatch) {
+  const form = h('form', { class: 'qs-card' },
+    h('div', { class: 'qs-panel-head' },
+      h('h2', {}, t('settings.currency')),
+      h('p', {}, t('settings.money_intro'))),
+
+    h('div', { class: 'qs-grid qs-grid-3' },
+      field(t('currencies.code'), 'currencyCode', restaurant.currency.code),
+      field(t('currencies.symbol'), 'currencySymbol', restaurant.currency.symbol),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('currencies.decimals')),
+        h('input', {
+          name: 'currencyDecimals', type: 'number', min: '0', max: '4',
+          value: String(restaurant.currency.decimals),
+        }))),
+
+    h('div', { class: 'qs-rows' },
+      h('div', { class: 'qs-row-item' },
+        h('div', {},
+          h('div', { class: 'qs-row-label' }, t('settings.tax_rate')),
+          h('p', { class: 'qs-row-hint' }, t('settings.tax_rate_hint'))),
+        h('div', { class: 'qs-row-control' },
+          h('input', {
+            name: 'taxRatePercent', type: 'number', step: '0.01', min: '0', max: '100',
+            value: String(restaurant.taxRatePercent),
+          }), '%')),
+
+      h('div', { class: 'qs-row-item' },
+        h('div', {},
+          h('div', { class: 'qs-row-label' }, t('settings.service_rate')),
+          h('p', { class: 'qs-row-hint' }, t('settings.service_rate_hint'))),
+        h('div', { class: 'qs-row-control' },
+          h('input', {
+            name: 'serviceRatePercent', type: 'number', step: '0.01', min: '0', max: '100',
+            value: String(restaurant.serviceRatePercent),
+          }), '%')),
+
+      h('label', { class: 'qs-row-item' },
+        h('div', {},
+          h('div', { class: 'qs-row-label' }, t('settings.tax_inclusive')),
+          h('p', { class: 'qs-row-hint' }, t('settings.tax_inclusive_hint'))),
+        h('div', { class: 'qs-row-control' },
+          h('input', { type: 'checkbox', name: 'taxInclusive', checked: restaurant.taxInclusive })))),
+
+    h('p', { class: 'qs-summary' },
+      t('settings.more_currencies'), ' ',
+      h('button', {
+        class: 'qs-btn qs-btn-ghost qs-btn-sm', type: 'button',
+        onClick: () => navigate('currencies'),
+      }, t('nav.currencies'))),
+
+    canEdit ? h('button', { class: 'qs-btn qs-btn-primary', type: 'submit' }, t('common.save')) : null);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    void savePatch({
+      currency: {
+        code: String(data.currencyCode).toUpperCase(),
+        symbol: String(data.currencySymbol),
+        decimals: Number(data.currencyDecimals),
+        symbolPosition: restaurant.currency.symbolPosition,
+      },
+      taxRatePercent: Number(data.taxRatePercent),
+      serviceRatePercent: Number(data.serviceRatePercent),
+      taxInclusive: data.taxInclusive === 'on',
+    });
+  });
+  return form;
+}
+
+/** What it looks like, and which languages a diner may read it in. */
+function appearancePanel(restaurant, locales, themes, canEdit, savePatch) {
+  const form = h('form', { class: 'qs-card' },
+    h('div', { class: 'qs-grid qs-grid-2' },
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('common.theme')),
+        h('select', { name: 'themeId' }, themes.map((theme) =>
+          h('option', { value: theme.id, selected: theme.id === restaurant.themeId }, theme.name)))),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('settings.default_language')),
+        h('select', { name: 'defaultLocale' }, locales.map((entry) =>
+          h('option', { value: entry.locale, selected: entry.locale === restaurant.defaultLocale },
+            entry.name))))),
+
+    h('div', { class: 'qs-panel-head', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+      h('h2', {}, t('settings.enabled_languages')),
+      h('p', {}, t('settings.enabled_languages_hint'))),
+
+    // Any installed language can be offered to diners; adding one is dropping
+    // a file into locales/ (spec §32).
+    h('div', { class: 'qs-rows' }, locales.map((entry) =>
+      h('label', { class: 'qs-row-item' },
+        h('div', {},
+          h('div', { class: 'qs-row-label' }, entry.name),
+          h('p', { class: 'qs-row-hint' }, `${entry.englishName} · ${entry.direction}`)),
+        h('div', { class: 'qs-row-control' },
+          h('input', {
+            type: 'checkbox', name: `locale.${entry.locale}`,
+            checked: restaurant.enabledLocales.includes(entry.locale),
+          }))))),
+
+    canEdit ? h('button', { class: 'qs-btn qs-btn-primary', type: 'submit' }, t('common.save')) : null);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    const chosen = locales
+      .filter((entry) => data[`locale.${entry.locale}`] === 'on')
+      .map((entry) => entry.locale);
+    void savePatch({
+      themeId: data.themeId,
+      defaultLocale: data.defaultLocale,
+      ...(chosen.length > 0 ? { enabledLocales: chosen } : {}),
+    });
+  });
+  return form;
+}
+
 function field(label, name, value) {
   return h('label', { class: 'qs-field' },
     h('span', {}, label),
@@ -307,35 +413,57 @@ function operationalSettings(settings, canEdit, container) {
     groups.get(group).push([key, value]);
   }
 
-  const form = h('form', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-    h('h2', {}, t('settings.operations')),
-    [...groups.entries()].map(([group, entries]) =>
-      h('div', { class: 'settings-group' },
-        h('div', { class: 'qs-section-title' }, settingGroupLabel(group)),
-        h('div', { class: 'settings-rows' }, entries.map(([key, value]) =>
-          typeof value === 'boolean'
-            ? h('label', { class: 'qs-check settings-switch' },
-                h('input', { type: 'checkbox', name: key, checked: value, disabled: !canEdit }),
-                h('span', {},
-                  settingLabel(key),
-                  settingHint(key)
-                    ? h('span', { class: 'qs-xs qs-muted settings-hint' }, settingHint(key))
-                    : null))
-            // A number gets a box the size of a number, not the width of the
-            // card: "3" in a 900px field looks like a mistake.
-            : h('label', { class: 'qs-field settings-value' },
-                h('span', {}, settingLabel(key)),
-                settingHint(key)
-                  ? h('span', { class: 'qs-xs qs-muted settings-hint' }, settingHint(key))
-                  : null,
-                h('input', {
-                  name: key,
-                  type: typeof value === 'number' ? 'number' : 'text',
-                  inputmode: typeof value === 'number' ? 'numeric' : undefined,
-                  value: value === null ? '' : String(value),
-                  disabled: !canEdit,
-                })))))),
-    canEdit ? h('button', { class: 'qs-btn qs-btn-primary', type: 'submit' }, t('common.save')) : null);
+  /** One switch or one number, with the sentence that explains it. */
+  const row = (key, value) => {
+    const control = typeof value === 'boolean'
+      ? h('input', { type: 'checkbox', name: key, checked: value, disabled: !canEdit })
+      : h('input', {
+          name: key,
+          type: typeof value === 'number' ? 'number' : 'text',
+          inputmode: typeof value === 'number' ? 'numeric' : undefined,
+          value: value === null ? '' : String(value),
+          disabled: !canEdit,
+        });
+
+    const hint = settingHint(key);
+    return h('label', { class: 'qs-row-item' },
+      h('div', {},
+        h('div', { class: 'qs-row-label' }, settingLabel(key)),
+        hint ? h('p', { class: 'qs-row-hint' }, hint) : null),
+      h('div', { class: 'qs-row-control' }, control));
+  };
+
+  /*
+   * Nine areas, closed. An owner comes here for one of them — "stop printing a
+   * receipt every time" — and a wall of twenty-two switches makes them read all
+   * twenty-two to find it. The summary says what is inside so the right one can
+   * be opened without hunting.
+   */
+  const form = h('form', { class: 'qs-card' },
+    h('div', { class: 'qs-panel-head' },
+      h('h2', {}, t('settings.operations')),
+      h('p', {}, t('settings.operations_intro'))),
+
+    [...groups.entries()].map(([group, entries]) => {
+      const on = entries.filter(([, value]) => value === true).length;
+      const switches = entries.filter(([, value]) => typeof value === 'boolean').length;
+
+      return h('details', { class: 'qs-details' },
+        h('summary', {},
+          h('span', { class: 'qs-row-label' }, settingGroupLabel(group)),
+          h('span', { class: 'qs-summary', style: { marginInlineStart: 'var(--qs-spacing-sm)' } },
+            switches > 0
+              ? t('settings.group_summary', { on, of: switches })
+              : t('settings.group_count', { count: entries.length }))),
+        h('div', { class: 'qs-rows' }, entries.map(([key, value]) => row(key, value))));
+    }),
+
+    canEdit
+      ? h('button', {
+          class: 'qs-btn qs-btn-primary', type: 'submit',
+          style: { marginBlockStart: 'var(--qs-spacing-lg)' },
+        }, t('common.save'))
+      : null);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -401,7 +529,7 @@ export async function renderUsers(container) {
             t('users.add'))
         : null),
 
-    h('div', { class: 'qs-card' },
+    h('div', { class: 'qs-card qs-narrow' },
       h('div', { class: 'qs-table-wrap' },
         h('table', { class: 'qs-table qs-table-clickable' },
           h('thead', {}, h('tr', {},
@@ -422,7 +550,7 @@ export async function renderUsers(container) {
               h('td', { class: 'qs-muted qs-small' },
                 user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '—'))))))),
 
-    h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+    h('div', { class: 'qs-card qs-narrow', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
       h('div', { class: 'qs-row qs-row-between' },
         h('h2', {}, t('users.roles')),
         canManageRoles
@@ -434,27 +562,36 @@ export async function renderUsers(container) {
       // The point worth making to an owner, in a sentence rather than a word:
       // these are real grants, checked on every request.
       h('p', { class: 'qs-muted qs-small' }, t('users.roles_intro')),
-      h('div', { class: 'qs-role-grid qs-stagger' }, roles.map((role) =>
-        h('div', { class: 'qs-card qs-card-tight qs-role-card' },
-          h('div', { class: 'qs-row qs-row-between' },
-            h('strong', {}, roleLabel(role)),
-            h('span', { class: 'qs-row' },
-              h('span', { class: `qs-badge ${role.system ? '' : 'qs-badge-accent'}` },
-                role.system ? t('users.system_role') : t('users.own_role')),
-              canManageRoles
-                ? h('button', {
-                    class: 'qs-btn qs-btn-ghost',
-                    onClick: () => openRoleForm(container, role, availablePermissions, roles),
-                  }, role.system ? t('users.rename') : t('common.edit'))
-                : null)),
-          // The key never changes and staff never see it, but an owner who has
-          // renamed three roles needs one fixed thing to recognise them by.
-          h('div', { class: 'qs-xs qs-muted qs-mono' }, role.key),
-          h('div', { class: 'qs-role-grants' },
-            role.permissions.includes('*')
-              ? h('span', { class: 'qs-badge qs-badge-accent' }, '★ ' + t('users.all_permissions'))
-              : role.permissions.map((permission) =>
-                  h('span', { class: 'qs-chip' }, permissionLabel(permission)))))))));
+      /*
+       * A role is a name and a size, not a word cloud. Printing every grant on
+       * every card put sixty-one chips on this screen, which is a list nobody
+       * reads and a page nobody scans. The card says what the role is and how
+       * much it may do; the grants themselves are one click away, in the dialog
+       * where they are edited anyway.
+       */
+      h('div', { class: 'qs-rows', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
+        roles.map((role) => h('div', { class: 'qs-row-item' },
+          h('div', {},
+            h('div', { class: 'qs-row-label' },
+              roleLabel(role),
+              role.system
+                ? null
+                : h('span', { class: 'qs-badge qs-badge-accent' }, t('users.own_role'))),
+            h('p', { class: 'qs-row-hint' },
+              role.permissions.includes('*')
+                ? t('users.all_permissions')
+                : t('users.permission_count', { count: role.permissions.length }),
+              ' · ',
+              // The key never changes and staff never see it, but an owner who
+              // has renamed three roles needs one fixed thing to know them by.
+              h('span', { class: 'qs-mono qs-xs' }, role.key))),
+          h('div', { class: 'qs-row-control' },
+            canManageRoles
+              ? h('button', {
+                  class: 'qs-btn qs-btn-ghost',
+                  onClick: () => openRoleForm(container, role, availablePermissions, roles),
+                }, role.system ? t('users.rename') : t('common.edit'))
+              : null))))));
 }
 
 function openUserForm(container, user, roles) {
@@ -909,7 +1046,7 @@ export async function renderBackup(container) {
     h('div', { class: 'qs-grid qs-grid-2' }, createForm, restorePanel(container)),
 
     h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-      h('h3', {}, t('backup.title')),
+      h('h3', {}, t('backup.on_this_computer')),
       backups.length === 0
         ? h('p', { class: 'qs-muted qs-small' }, t('common.empty'))
         : h('div', { class: 'qs-table-wrap' },
@@ -917,7 +1054,7 @@ export async function renderBackup(container) {
               h('thead', {}, h('tr', {},
                 h('th', {}, t('common.created')),
                 h('th', {}, t('common.name')),
-                h('th', {}, 'size'),
+                h('th', {}, t('common.size')),
                 h('th', {}, t('backup.note')),
                 h('th', {}, ''))),
               h('tbody', {}, backups.map((backup) =>
@@ -1062,7 +1199,7 @@ export async function renderLicense(container) {
     // In SETUP the licence panel is the thing waiting on a person, so it is
     // what carries the travelling light. Once activated it stops — nothing on
     // an activated console is asking for anything.
-    h('div', { class: `license-hero${isSetup() ? ' qs-lit' : ''}` },
+    h('div', { class: `license-hero qs-narrow${isSetup() ? ' qs-lit' : ''}` },
       h('div', { class: 'qs-row qs-row-between' },
         h('h2', { style: { margin: 0 } }, t(status.explanation)),
         h('span', { class: 'mode-badge', 'data-mode': status.mode },
@@ -1072,11 +1209,7 @@ export async function renderLicense(container) {
         h('div', {},
           h('div', { class: 'qs-section-title' }, t('license.device')),
           h('p', { class: 'qs-small' }, status.deviceLabel),
-          h('p', { class: 'qs-mono qs-xs' }, status.deviceFingerprint),
-          h('p', { class: 'qs-xs qs-muted' },
-            // Explaining this up front prevents the support call that follows a
-            // hardware change.
-            t('license.deactivate_hint'))),
+          h('p', { class: 'qs-mono qs-xs' }, status.deviceFingerprint)),
         h('div', {},
           h('div', { class: 'qs-section-title' }, t('license.title')),
           h('p', { class: 'qs-small' },
@@ -1098,35 +1231,52 @@ export async function renderLicense(container) {
             h('h2', {}, t('license.have_key')),
             activateForm),
           vendorPanel(vendor, container))
-      : h('div', { class: 'qs-grid qs-grid-2', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-        vendorPanel(vendor, container),
-        h('div', { class: 'qs-card' },
-          h('h2', {}, t('license.deactivate')),
-          h('p', { class: 'qs-muted' }, t('license.deactivate_hint')),
-          h('button', {
-            class: 'qs-btn qs-btn-danger',
-            onClick: async () => {
-              const ok = await confirmDialog({
-                title: t('license.deactivate'),
-                message: t('license.deactivate_hint'),
-                confirmLabel: t('license.deactivate'),
-                cancelLabel: t('common.cancel'),
-              });
-              if (!ok) return;
-              const done = await guard(() => api.post('/api/license/deactivate', {
-                reason: 'moving to another computer',
-              }));
-              if (!done) return;
-              await refreshStatus();
-              await renderLicense(container);
-            },
-          }, t('license.deactivate')))),
+      // Once licensed there is one thing left to do here and it is rare, so it
+      // is a line at the end rather than a card beside a card — a half-empty
+      // panel holding one button was the emptiest space on the console.
+      : h('div', { style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+          vendorPanel(vendor, container),
+          h('div', {
+            class: 'qs-card qs-narrow',
+            style: { marginBlockStart: 'var(--qs-spacing-lg)' },
+          },
+            h('div', { class: 'qs-row-item' },
+              h('div', {},
+                h('div', { class: 'qs-row-label' }, t('license.deactivate')),
+                h('p', { class: 'qs-row-hint' }, t('license.deactivate_hint'))),
+              h('div', { class: 'qs-row-control' },
+                h('button', {
+                  class: 'qs-btn qs-btn-danger',
+                  onClick: async () => {
+                    const ok = await confirmDialog({
+                      title: t('license.deactivate'),
+                      message: t('license.deactivate_hint'),
+                      confirmLabel: t('license.deactivate'),
+                      cancelLabel: t('common.cancel'),
+                    });
+                    if (!ok) return;
+                    const done = await guard(() => api.post('/api/license/deactivate', {
+                      reason: 'moving to another computer',
+                    }));
+                    if (!done) return;
+                    await refreshStatus();
+                    await renderLicense(container);
+                  },
+                }, t('license.deactivate')))))),
 
-    h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-      h('h3', {}, isSetup() ? t('license.locked_features') : t('common.enabled')),
-      h('div', { class: 'capability-list' },
-        Object.values(Capability).map((capability) =>
-          capabilityRow(capability, status.capabilities.includes(capability))))));
+    h('div', { class: 'qs-card qs-narrow', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+      h('h2', {}, isSetup() ? t('license.locked_features') : t('common.enabled')),
+      // Thirteen lines of reference: worth having, not worth reading every
+      // time somebody opens this screen to check whether they are licensed.
+      h('details', { class: 'qs-details' },
+        h('summary', {},
+          t('license.capabilities_summary', {
+            unlocked: status.capabilities.length,
+            of: Object.values(Capability).length,
+          })),
+        h('div', { class: 'capability-list' },
+          Object.values(Capability).map((capability) =>
+            capabilityRow(capability, status.capabilities.includes(capability)))))));
 }
 
 /**
@@ -1147,11 +1297,16 @@ function vendorPanel(vendor, container) {
       })
     : '';
 
+  // What it costs, on the same kind of line as everything else the console
+  // lists: the thing on the left, its sentence under it, the number on the
+  // right. Two filled blocks made a price list look like a warning.
   const priceRow = (labelKey, price) =>
-    h('div', { class: 'price-row' },
-      h('span', { class: 'qs-muted qs-small' }, t(labelKey)),
-      h('strong', {}, price?.price || t('license.price_ask')),
-      price?.note ? h('span', { class: 'qs-xs qs-muted' }, price.note) : null);
+    h('div', { class: 'qs-row-item' },
+      h('div', {},
+        h('div', { class: 'qs-row-label' }, t(labelKey)),
+        price?.note ? h('p', { class: 'qs-row-hint' }, price.note) : null),
+      h('div', { class: 'qs-row-control' },
+        h('strong', {}, price?.price || t('license.price_ask'))));
 
   const contactLink = (contact) => {
     const label = contact.label || t(`license.contact_${contact.kind.toLowerCase()}`);
@@ -1161,12 +1316,12 @@ function vendorPanel(vendor, container) {
       : contact.url;
 
     return href
-      ? h('a', { class: 'qs-btn qs-btn-secondary', href, target: '_blank', rel: 'noopener' },
+      ? h('a', { class: 'qs-btn', href, target: '_blank', rel: 'noopener' },
           `${label} · ${contact.value}`)
       : h('span', { class: 'qs-badge' }, `${label} · ${contact.value}`);
   };
 
-  return h('div', { class: 'qs-card' },
+  return h('div', { class: 'qs-card qs-narrow' },
     h('h2', {}, t('license.request')),
     h('p', { class: 'qs-muted qs-small' }, t('license.no_payment')),
 
@@ -1175,7 +1330,7 @@ function vendorPanel(vendor, container) {
           info.tagline ? h('span', { class: 'qs-muted qs-small' }, ` — ${info.tagline}`) : null)
       : null,
 
-    h('div', { class: 'price-list' },
+    h('div', { class: 'qs-rows' },
       priceRow('license.price_activation', info?.pricing?.activation),
       priceRow('license.price_transfer', info?.pricing?.transfer)),
 
@@ -1186,6 +1341,15 @@ function vendorPanel(vendor, container) {
     (info?.contacts ?? []).length > 0
       ? h('div', { class: 'qs-row', style: { flexWrap: 'wrap' } },
           vendor.contacts.map(contactLink))
+      : null,
+
+    // The message a restaurant sends, ready to copy — kept closed, because the
+    // contact buttons already carry it and an owner who taps one never needs to
+    // read it. Loose on the card it looked like something had gone wrong.
+    message
+      ? h('details', { class: 'qs-details' },
+          h('summary', {}, t('license.message_preview')),
+          h('pre', { class: 'qs-xs qs-muted', style: { whiteSpace: 'pre-wrap' } }, message))
       : null,
 
     h('div', { class: 'qs-row', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
@@ -1208,12 +1372,5 @@ function vendorPanel(vendor, container) {
               : formatDateTime(vendor.fetchedAt))
           : vendor?.source === 'shipped'
             ? t('license.source_shipped')
-            : t('license.vendor_never'))),
-
-    message
-      ? h('pre', {
-          class: 'qs-xs qs-muted',
-          style: { whiteSpace: 'pre-wrap', marginBlockStart: 'var(--qs-spacing-md)' },
-        }, message)
-      : null);
+            : t('license.vendor_never'))));
 }

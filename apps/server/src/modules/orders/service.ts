@@ -603,9 +603,15 @@ export class OrderService {
 
   /* ---------------------------------------------------------------- views */
 
-  /** Kitchen queue: what to cook, oldest first, with the source badge. */
-  kitchenQueue(statuses: readonly Status[], locale: string): {
-    order: Order; ageSeconds: number; urgent: boolean; sourceLabel: string;
+  /**
+   * Kitchen queue: what to cook, oldest first.
+   *
+   * The board says where a ticket came from in its own language, from the
+   * order's source and actor — so this returns the facts and not a sentence
+   * assembled here, where the reader's language is not known.
+   */
+  kitchenQueue(statuses: readonly Status[]): {
+    order: Order; ageSeconds: number; urgent: boolean;
   }[] {
     const urgentAfter = this.settings.get<number>('kitchen.urgentAfterMinutes') * 60;
     const now = Date.now();
@@ -615,28 +621,13 @@ export class OrderService {
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .map((order) => {
         const ageSeconds = Math.floor((now - new Date(order.createdAt).getTime()) / 1000);
-        return {
-          order,
-          ageSeconds,
-          urgent: ageSeconds > urgentAfter,
-          sourceLabel: describeSource(order, locale),
-        };
+        return { order, ageSeconds, urgent: ageSeconds > urgentAfter };
       });
   }
 
   get repository(): OrderRepository {
     return this.orders;
   }
-}
-
-/**
- * "WAITER — Ahmed", "CUSTOMER", "CASHIER — Sara". Rendered from the persisted
- * source and actor so the kitchen sees who is responsible for an order without
- * the kitchen screen having to know the permission model.
- */
-export function describeSource(order: Order, _locale: string): string {
-  const who = order.createdBy.userName ?? order.createdBy.terminalName;
-  return who ? `${order.source} — ${who}` : order.source;
 }
 
 /**

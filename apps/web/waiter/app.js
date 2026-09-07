@@ -130,8 +130,8 @@ function floor() {
         : h('span', { class: 'floor-status' }, te('tables.status', table.status)),
       h('span', { class: 'floor-count qs-muted' },
         table.openOrders.length > 0
-          ? `${table.openOrders.length} ${t('tables.open_orders')}`
-          : `${table.seats} ${t('common.seats')}`));
+          ? t('tables.open_count', { count: table.openOrders.length })
+          : t('tables.seat_count', { count: table.seats })));
   }));
 }
 

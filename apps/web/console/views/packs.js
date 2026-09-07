@@ -79,31 +79,40 @@ export async function renderLanguages(container) {
   ]);
   const enabled = new Set((status.locales ?? []).filter((l) => l.enabled).map((l) => l.locale));
 
-  const card = (language) => {
+  /**
+   * One language, one line: what it is called, what it is, and how far along.
+   *
+   * The four pills this used to carry (default, shown, direction, built-in)
+   * said in colour what a muted sentence says in words, four times per row.
+   * Only being the default earns a mark, because only one row can have it.
+   */
+  const row = (language) => {
     const { coverage } = language;
-    return h('div', { class: 'qs-card pack-card' },
-      h('div', { class: 'qs-row qs-row-between' },
-        h('div', {},
-          h('h3', { style: { margin: 0 } }, language.name),
-          h('span', { class: 'qs-muted qs-small' },
-            `${language.englishName} · `, h('span', { class: 'qs-mono' }, language.locale))),
-        h('div', { class: 'qs-row' },
-          language.isDefault ? h('span', { class: 'qs-badge qs-badge-success' }, t('languages.default')) : null,
-          enabled.has(language.locale) ? h('span', { class: 'qs-badge' }, t('common.enabled')) : null,
-          h('span', { class: 'qs-badge' },
-            t(language.direction === 'rtl' ? 'languages.direction_rtl' : 'languages.direction_ltr')),
-          h('span', { class: 'qs-badge' },
-            t(language.shipped ? 'languages.shipped' : 'languages.authored')))),
+    const facts = [
+      language.englishName,
+      language.locale,
+      t(language.shipped ? 'languages.shipped' : 'languages.authored'),
+      enabled.has(language.locale) ? null : t('common.hidden'),
+    ].filter(Boolean);
 
-      h('div', { class: 'coverage' },
-        h('div', { class: 'coverage-bar' },
-          h('span', { style: { inlineSize: `${coverage.percent}%` } })),
-        h('span', { class: 'qs-xs qs-muted' },
-          `${t('languages.coverage')} ${coverage.percent}% · `,
-          `${t('languages.ui_section')} ${coverage.uiTranslated}/${coverage.uiTotal} · `,
-          `${t('languages.content_section')} ${coverage.contentTranslated}/${coverage.contentTotal}`)),
+    return h('div', { class: 'qs-row-item' },
+      h('div', {},
+        h('div', { class: 'qs-row-label' },
+          language.name,
+          language.isDefault
+            ? h('span', { class: 'qs-badge qs-badge-success' }, t('languages.default'))
+            : null),
+        h('p', { class: 'qs-row-hint' }, facts.join(' · ')),
 
-      h('div', { class: 'qs-row' },
+        h('div', { class: 'coverage' },
+          h('div', { class: 'coverage-bar' },
+            h('span', { style: { inlineSize: `${coverage.percent}%` } })),
+          h('span', { class: 'qs-xs qs-muted' },
+            `${t('languages.coverage')} ${coverage.percent}%`,
+            ` · ${t('languages.ui_section')} ${coverage.uiTranslated}/${coverage.uiTotal}`,
+            ` · ${t('languages.content_section')} ${coverage.contentTranslated}/${coverage.contentTotal}`))),
+
+      h('div', { class: 'qs-row-control' },
         h('button', {
           class: 'qs-btn qs-btn-sm',
           onClick: () => openLanguageEditor(container, language, languages),
@@ -120,7 +129,8 @@ export async function renderLanguages(container) {
 
         language.authored
           ? h('button', {
-              class: 'qs-btn qs-btn-sm qs-btn-danger',
+              class: 'qs-btn qs-btn-sm qs-btn-ghost',
+              title: t('languages.delete'),
               onClick: async () => {
                 const ok = await confirmDialog({
                   title: t('languages.delete'),
@@ -134,7 +144,7 @@ export async function renderLanguages(container) {
                 await refreshAll();
               },
             }, t('common.delete'))
-          : h('span', { class: 'qs-xs qs-muted' }, t('languages.delete_shipped'))));
+          : null));
   };
 
   mount(container,
@@ -144,9 +154,11 @@ export async function renderLanguages(container) {
         onClick: () => openLanguageEditor(container, null, languages),
       }, t('languages.add'))),
 
-    h('p', { class: 'qs-muted' }, t('languages.subtitle')),
-    h('div', { class: 'qs-section-title' }, t('languages.current')),
-    h('div', { class: 'qs-grid qs-grid-2' }, languages.map(card)));
+    h('section', { class: 'qs-panel' },
+      h('div', { class: 'qs-panel-head' },
+        h('p', {}, t('languages.subtitle'))),
+      h('div', { class: 'qs-card qs-narrow' },
+        h('div', { class: 'qs-rows' }, languages.map(row)))));
 }
 
 /**
@@ -319,19 +331,20 @@ function openLanguageEditor(container, language, languages) {
 export async function renderThemes(container) {
   const { themes } = await api.get('/api/themes-authoring');
 
-  const card = (theme) => h('div', { class: 'qs-card pack-card' },
-    h('div', { class: 'qs-row qs-row-between' },
-      h('div', {},
-        h('h3', { style: { margin: 0 } }, theme.name),
-        h('span', { class: 'qs-mono qs-muted qs-small' }, theme.id)),
-      h('div', { class: 'qs-row' },
-        theme.active ? h('span', { class: 'qs-badge qs-badge-success' }, t('themes.active')) : null,
-        h('span', { class: 'qs-badge' },
-          t(theme.colorScheme === 'dark' ? 'themes.scheme_dark' : 'themes.scheme_light')),
-        h('span', { class: 'qs-badge' },
-          t(theme.shipped ? 'languages.shipped' : 'languages.authored')))),
+  /** One theme, one line. Only the one in use is marked. */
+  const row = (theme) => h('div', { class: 'qs-row-item' },
+    h('div', {},
+      h('div', { class: 'qs-row-label' },
+        theme.name,
+        theme.active ? h('span', { class: 'qs-badge qs-badge-success' }, t('themes.active')) : null),
+      h('p', { class: 'qs-row-hint' },
+        [
+          theme.id,
+          t(theme.colorScheme === 'dark' ? 'themes.scheme_dark' : 'themes.scheme_light'),
+          t(theme.shipped ? 'languages.shipped' : 'languages.authored'),
+        ].join(' · '))),
 
-    h('div', { class: 'qs-row' },
+    h('div', { class: 'qs-row-control' },
       h('button', {
         class: 'qs-btn qs-btn-sm',
         onClick: () => openThemeEditor(container, theme),
@@ -343,11 +356,12 @@ export async function renderThemes(container) {
           const pack = await guard(() => api.get(`/api/themes-authoring/${theme.id}/pack`));
           if (pack) await copyText(pretty(pack));
         },
-      }, t('themes.copy')),
+      }, t('common.copy')),
 
       theme.authored
         ? h('button', {
-            class: 'qs-btn qs-btn-sm qs-btn-danger',
+            class: 'qs-btn qs-btn-sm qs-btn-ghost',
+            title: t('themes.delete'),
             onClick: async () => {
               const ok = await confirmDialog({
                 title: t('themes.delete'),
@@ -361,7 +375,7 @@ export async function renderThemes(container) {
               await refreshAll();
             },
           }, t('common.delete'))
-        : h('span', { class: 'qs-xs qs-muted' }, t('themes.delete_shipped'))));
+        : null));
 
   mount(container,
     pageHeader(t('themes.title'),
@@ -370,8 +384,11 @@ export async function renderThemes(container) {
         onClick: () => openThemeEditor(container, null),
       }, t('themes.add'))),
 
-    h('p', { class: 'qs-muted' }, t('themes.subtitle')),
-    h('div', { class: 'qs-grid qs-grid-2' }, themes.map(card)));
+    h('section', { class: 'qs-panel' },
+      h('div', { class: 'qs-panel-head' },
+        h('p', {}, t('themes.subtitle'))),
+      h('div', { class: 'qs-card qs-narrow' },
+        h('div', { class: 'qs-rows' }, themes.map(row)))));
 }
 
 function openThemeEditor(container, theme) {

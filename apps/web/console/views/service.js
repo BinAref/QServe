@@ -97,10 +97,10 @@ export async function renderTables(container) {
               h('h3', { style: { margin: 0 } }, table.label),
               h('span', { class: 'qs-badge' }, te('tables.status', table.status))),
             h('p', { class: 'qs-small qs-muted' },
-              `${table.seats} ${t('common.seats')}`,
+              t('tables.seat_count', { count: table.seats }),
               table.zone ? ` · ${table.zone}` : '',
               table.activeOrderIds.length > 0
-                ? ` · ${table.activeOrderIds.length} ${t('tables.open_orders')}`
+                ? ` · ${t('tables.open_count', { count: table.activeOrderIds.length })}`
                 : ''),
             h('p', { class: 'qs-mono qs-xs' }, table.id),
             h('div', { class: 'qs-row no-print' },
@@ -213,9 +213,9 @@ function openBulkForm(container) {
           }));
           if (!result) return;
           dialog.close();
-          toast(`${result.created.length} ${t('nav.tables')}`, 'success');
+          toast(t('tables.created_count', { count: result.created.length }), 'success');
           if (result.skipped.length > 0) {
-            toast(`${result.skipped.length} ${t('error.conflict')}`, 'warning');
+            toast(t('tables.skipped_count', { count: result.skipped.length }), 'warning');
           }
           await renderTables(container);
         },
@@ -244,36 +244,40 @@ export async function renderTerminals(container) {
 
     h('p', { class: 'qs-muted' }, t('terminals.scan_hint')),
 
+    // One station per line, the same shape as every other list in the console.
+    // Each card used to carry two pills — what it is and whether it is on —
+    // where what it is never changes and only one of the two is news.
     terminals.length === 0
       ? h('div', { class: 'qs-card' }, h('div', { class: 'qs-empty' }, t('common.empty')))
-      : h('div', { class: 'qs-grid qs-grid-cards qr-print-sheet' }, terminals.map((terminal) =>
-          h('div', { class: 'qs-card' },
-            h('div', { class: 'qs-card-head' },
-              h('h3', { style: { margin: 0 } }, pick(terminal.name)),
-              h('span', {
-                class: `qs-badge ${terminal.online ? 'qs-badge-success' : ''}`,
-              }, terminal.online ? t('common.online') : t('common.offline'))),
-            h('p', { class: 'qs-small' },
-              h('span', { class: 'qs-badge' }, typeLabel(terminal.type)),
-              terminal.status !== 'ACTIVE'
-                ? h('span', { class: 'qs-badge qs-badge-warning' }, t('common.disabled'))
-                : null),
-            h('p', { class: 'qs-xs qs-muted' },
-              `${t('terminals.last_seen')}: `,
-              terminal.lastSeenAt ? formatDateTime(terminal.lastSeenAt) : '—'),
-            h('p', { class: 'qs-mono qs-xs' }, terminal.id),
-            h('div', { class: 'qs-row no-print' },
-              h('button', {
-                class: 'qs-btn',
-                onClick: () => void openQr(`/api/terminals/${terminal.id}/qr`,
-                  pick(terminal.name), typeLabel(terminal.type)),
-              }, t('terminals.qr')),
-              canManage
-                ? h('button', {
-                    class: 'qs-btn qs-btn-ghost',
-                    onClick: () => openTerminalForm(container, terminal),
-                  }, t('common.edit'))
-                : null)))));
+      : h('div', { class: 'qs-card qs-narrow qr-print-sheet' },
+          h('div', { class: 'qs-rows' }, terminals.map((terminal) =>
+            h('div', { class: 'qs-row-item' },
+              h('div', {},
+                h('div', { class: 'qs-row-label' },
+                  pick(terminal.name),
+                  h('span', { class: `qs-badge ${terminal.online ? 'qs-badge-success' : ''}` },
+                    terminal.online ? t('common.online') : t('common.offline')),
+                  terminal.status !== 'ACTIVE'
+                    ? h('span', { class: 'qs-badge qs-badge-warning' }, t('common.disabled'))
+                    : null),
+                h('p', { class: 'qs-row-hint' },
+                  typeLabel(terminal.type),
+                  ` · ${t('terminals.last_seen')} `,
+                  terminal.lastSeenAt ? formatDateTime(terminal.lastSeenAt) : '—'),
+                h('p', { class: 'qs-mono qs-xs qs-muted' }, terminal.id)),
+
+              h('div', { class: 'qs-row-control no-print' },
+                h('button', {
+                  class: 'qs-btn qs-btn-sm',
+                  onClick: () => void openQr(`/api/terminals/${terminal.id}/qr`,
+                    pick(terminal.name), typeLabel(terminal.type)),
+                }, t('terminals.qr')),
+                canManage
+                  ? h('button', {
+                      class: 'qs-btn qs-btn-sm qs-btn-ghost',
+                      onClick: () => openTerminalForm(container, terminal),
+                    }, t('common.edit'))
+                  : null))))));
 }
 
 function openTerminalForm(container, terminal) {

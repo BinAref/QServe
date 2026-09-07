@@ -298,10 +298,17 @@ function actionLabel(action) {
  * from what the log actually contains, so a module added later shows up here
  * without anybody editing a dropdown, and results are paged rather than
  * truncated — a log you can only see the newest page of is not evidence.
+ *
+ * The screen is a search box and a list of sentences. Everything a sentence
+ * cannot carry — the name in the code, the record touched, the before and
+ * after — lives one tap under the row that mentions it, and the five ways of
+ * narrowing live behind one line saying how many are in force. A log is read
+ * by somebody looking for a single event; six open dropdowns above a wall of
+ * machine names is the fastest way to hide it.
  */
 export async function renderActivityLog(container) {
   const filters = { search: '', actorUserId: '', action: '', entityType: '', since: '', until: '' };
-  const page = { limit: 100, offset: 0 };
+  const page = { limit: 25, offset: 0 };
 
   const facets = await api.get('/api/audit/facets').catch(
     () => ({ actions: [], entityTypes: [], actors: [] }));
@@ -324,50 +331,39 @@ export async function renderActivityLog(container) {
     draw(response.total);
   };
 
-  const reload = debounce(() => void load(), 250);
-
-  /** One row, expandable into its before/after pair. */
+  /** One row: when, what, who. Everything else is under it. */
   const row = (entry) => {
     const who = entry.actor.userName ?? entry.actor.terminalName
       ?? t(`audit.kind.${entry.actor.kind.toLowerCase()}`);
-    const hasChange = entry.before !== null || entry.after !== null
+    const hasDetail = entry.before !== null || entry.after !== null
       || Object.keys(entry.detail ?? {}).length > 0;
 
-    const tr = h('tr', { 'data-expandable': String(hasChange) },
+    const tr = h('tr', { 'data-expandable': String(hasDetail) },
       h('td', { class: 'qs-xs qs-muted qs-nowrap' }, formatDateTime(entry.at)),
-      h('td', { class: 'qs-small' },
-        actionLabel(entry.action),
-        // The machine name stays underneath: an owner reads the sentence, and
-        // whoever is being shown the log as evidence can match it to the code.
-        h('div', { class: 'qs-mono qs-xs qs-muted' }, entry.action)),
-      h('td', { class: 'qs-small' },
-        who,
-        entry.actor.terminalName && entry.actor.userName
-          ? h('span', { class: 'qs-xs qs-muted' }, ` · ${entry.actor.terminalName}`)
-          : null),
-      h('td', { class: 'qs-xs' },
-        entry.entityType,
-        entry.entityId ? h('span', { class: 'qs-mono qs-muted' }, ` ${entry.entityId}`) : null));
+      h('td', {}, actionLabel(entry.action)),
+      h('td', { class: 'qs-muted qs-small' }, who));
 
-    if (!hasChange) return [tr];
+    if (!hasDetail) return [tr];
+
+    const pane = (title, value) => h('div', {},
+      h('div', { class: 'qs-section-title' }, title),
+      h('pre', { class: 'qs-xs' }, JSON.stringify(value, null, 2)));
 
     const detail = h('tr', { class: 'qs-row-detail qs-hidden' },
-      h('td', { colspan: '4' },
+      h('td', { colspan: '3' },
+        // The name in the code, the record it touched and the station it came
+        // from. An owner reads the sentence in the row; whoever is being shown
+        // the log as evidence needs to match it to the source.
+        h('p', { class: 'qs-mono qs-xs qs-muted' },
+          entry.action,
+          ` · ${entry.entityType}`,
+          entry.entityId ? ` ${entry.entityId}` : '',
+          entry.actor.terminalName ? ` · ${entry.actor.terminalName}` : ''),
         h('div', { class: 'qs-grid qs-grid-2' },
-          entry.before !== null
-            ? h('div', {},
-                h('div', { class: 'qs-section-title' }, t('audit.before')),
-                h('pre', { class: 'qs-xs' }, JSON.stringify(entry.before, null, 2)))
-            : null,
-          entry.after !== null
-            ? h('div', {},
-                h('div', { class: 'qs-section-title' }, t('audit.after')),
-                h('pre', { class: 'qs-xs' }, JSON.stringify(entry.after, null, 2)))
-            : null,
+          entry.before !== null ? pane(t('audit.before'), entry.before) : null,
+          entry.after !== null ? pane(t('audit.after'), entry.after) : null,
           Object.keys(entry.detail ?? {}).length > 0
-            ? h('div', {},
-                h('div', { class: 'qs-section-title' }, t('audit.detail')),
-                h('pre', { class: 'qs-xs' }, JSON.stringify(entry.detail, null, 2)))
+            ? pane(t('audit.detail'), entry.detail)
             : null)));
 
     tr.addEventListener('click', () => detail.classList.toggle('qs-hidden'));
@@ -376,8 +372,7 @@ export async function renderActivityLog(container) {
 
   const draw = (total) => {
     mount(results,
-      h('p', { class: 'qs-small qs-muted' },
-        t('audit.showing', { shown: rows.length, total })),
+      h('p', { class: 'qs-summary' }, t('audit.showing', { shown: rows.length, total })),
 
       rows.length === 0
         ? h('div', { class: 'qs-empty' }, t('audit.empty'))
@@ -386,8 +381,7 @@ export async function renderActivityLog(container) {
               h('thead', {}, h('tr', {},
                 h('th', {}, t('audit.when')),
                 h('th', {}, t('audit.action')),
-                h('th', {}, t('audit.who')),
-                h('th', {}, t('audit.entity')))),
+                h('th', {}, t('audit.who')))),
               h('tbody', {}, rows.map(row)))),
 
       rows.length < total
@@ -401,52 +395,82 @@ export async function renderActivityLog(container) {
         : null);
   };
 
+  /* ------------------------------------------------------------- filters */
+
+  /** How many ways of narrowing are in force, for the line on the closed row. */
+  const narrowed = () => Object.entries(filters)
+    .filter(([key, value]) => key !== 'search' && value !== '').length;
+
+  const applied = h('span', { class: 'qs-summary' });
+
+  // Nothing to clear means no button: a control that does nothing is still one
+  // more thing to read past.
+  const clearButton = h('button', {
+    class: 'qs-btn qs-btn-ghost qs-btn-sm',
+    hidden: true,
+    onClick: async () => {
+      for (const key of Object.keys(filters)) filters[key] = '';
+      for (const node of controls.querySelectorAll('input, select')) node.value = '';
+      paintApplied();
+      await load();
+    },
+  }, t('audit.clear_filters'));
+
+  const paintApplied = () => {
+    const count = narrowed();
+    applied.textContent = count === 0
+      ? t('audit.filters_none')
+      : t('audit.filters_applied', { count });
+    clearButton.hidden = count === 0 && filters.search === '';
+  };
+
+  const reload = debounce(() => void load(), 250);
   const filterInput = (key, node) => {
-    node.addEventListener('input', () => { filters[key] = node.value; reload(); });
-    node.addEventListener('change', () => { filters[key] = node.value; reload(); });
+    const take = () => { filters[key] = node.value; paintApplied(); reload(); };
+    node.addEventListener('input', take);
+    node.addEventListener('change', take);
     return node;
   };
 
-  const controls = h('div', { class: 'qs-card filter-bar' },
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('audit.search')),
-      filterInput('search', h('input', { type: 'search', placeholder: t('audit.search') }))),
+  const filterRow = (label, control) => h('div', { class: 'qs-row-item' },
+    h('div', {}, h('div', { class: 'qs-row-label' }, label)),
+    h('div', { class: 'qs-row-control' }, control));
 
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('audit.filter_actor')),
-      filterInput('actorUserId', h('select', {},
-        h('option', { value: '' }, t('audit.everyone')),
-        facets.actors.map((actor) => h('option', { value: actor.userId }, actor.userName))))),
+  const controls = h('div', { class: 'qs-card qs-form' },
+    h('div', { class: 'log-search' },
+      filterInput('search', h('input', {
+        type: 'search',
+        placeholder: t('audit.search'),
+        'aria-label': t('audit.search'),
+      })),
+      clearButton),
 
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('audit.filter_action')),
-      filterInput('action', h('select', {},
-        h('option', { value: '' }, t('audit.anything')),
-        facets.actions.map((action) => h('option', { value: action }, actionLabel(action)))))),
+    h('details', { class: 'qs-details' },
+      h('summary', {}, h('span', {}, t('audit.filters')), applied),
+      h('div', { class: 'qs-rows' },
+        filterRow(t('audit.filter_actor'),
+          filterInput('actorUserId', h('select', {},
+            h('option', { value: '' }, t('audit.everyone')),
+            facets.actors.map((actor) => h('option', { value: actor.userId }, actor.userName))))),
 
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('audit.filter_entity')),
-      filterInput('entityType', h('select', {},
-        h('option', { value: '' }, t('audit.anything')),
-        facets.entityTypes.map((kind) => h('option', { value: kind }, kind))))),
+        filterRow(t('audit.filter_action'),
+          filterInput('action', h('select', {},
+            h('option', { value: '' }, t('audit.anything')),
+            facets.actions.map((action) =>
+              h('option', { value: action }, actionLabel(action)))))),
 
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('audit.filter_from')),
-      filterInput('since', h('input', { type: 'date' }))),
+        filterRow(t('audit.filter_entity'),
+          filterInput('entityType', h('select', {},
+            h('option', { value: '' }, t('audit.anything')),
+            facets.entityTypes.map((kind) => h('option', { value: kind }, kind))))),
 
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('audit.filter_to')),
-      filterInput('until', h('input', { type: 'date' }))),
+        filterRow(t('audit.filter_from'), filterInput('since', h('input', { type: 'date' }))),
+        filterRow(t('audit.filter_to'), filterInput('until', h('input', { type: 'date' }))))));
 
-    h('button', {
-      class: 'qs-btn qs-btn-ghost qs-btn-sm',
-      onClick: async () => {
-        for (const key of Object.keys(filters)) filters[key] = '';
-        for (const node of controls.querySelectorAll('input, select')) node.value = '';
-        await load();
-      },
-    }, t('audit.clear_filters')));
-
-  mount(container, pageHeader(t('audit.title')), controls, results);
+  paintApplied();
+  // The log reads at the width of a page of text; three short columns stretched
+  // across a desk monitor put the time and the person a hand's width apart.
+  mount(container, pageHeader(t('audit.title')),
+    h('div', { class: 'log-page' }, controls, results));
   await load();
 }

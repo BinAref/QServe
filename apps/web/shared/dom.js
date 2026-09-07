@@ -8,6 +8,8 @@
  * items and leaves nothing to debug at 9pm on a Friday.
  */
 
+import { t } from './i18n.js';
+
 export function h(tag, props = {}, ...children) {
   const el = document.createElement(tag);
 
@@ -83,7 +85,9 @@ export function modal({ title, body, actions = [], onClose }) {
     h('form', { method: 'dialog', class: 'qs-modal-inner' },
       h('header', { class: 'qs-modal-head' },
         h('h2', {}, title),
-        h('button', { class: 'qs-icon-btn', value: 'cancel', 'aria-label': 'Close' }, '×')),
+        // Named in the reader's language, like every other control: a screen
+        // reader in Arabic should not meet one English word in a dialog.
+        h('button', { class: 'qs-icon-btn', value: 'cancel', 'aria-label': t('common.close') }, '×')),
       h('div', { class: 'qs-modal-body' }, body),
       h('footer', { class: 'qs-modal-foot' }, actions)));
 

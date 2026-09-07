@@ -194,10 +194,24 @@
   margin-inline-start: var(--qs-spacing-xs);
 }
 
+/* While the notice is up the board ends above it, so the last ticket is whole. */
+.kds[data-sound="locked"] .kds-board { padding-block-end: 88px; }
+
+/*
+ * A bar along the foot of the board, not a pill floating in the middle of it:
+ * any tap unlocks the sound, so this is a notice, and a notice that lands on
+ * top of a ticket's items hides the one thing the screen is for.
+ */
 .kds-sound-prompt {
   position: fixed;
-  inset-block-end: var(--qs-spacing-lg);
-  inset-inline-start: 50%;
-  transform: translateX(-50%);
+  inset-inline: 0;
+  inset-block-end: 0;
   z-index: 500;
+  display: flex;
+  justify-content: center;
+  padding: var(--qs-spacing-sm) var(--qs-spacing-lg);
+  padding-block-end: calc(var(--qs-spacing-sm) + env(safe-area-inset-bottom, 0px));
+  background: var(--qs-color-surface);
+  border-block-start: 1px solid var(--qs-color-border);
+  box-shadow: var(--qs-shadow-lg);
 }

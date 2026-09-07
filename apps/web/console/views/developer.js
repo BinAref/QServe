@@ -10,6 +10,12 @@
  * The difference that matters is strictness. A restaurant may paste a partial
  * translation and let the rest fall back; a shipped pack may not, because a key
  * missing here is a key missing in every restaurant.
+ *
+ * Three jobs, so three tabs: the languages that ship, the themes that ship, and
+ * who the restaurant pays. Each one shows what is installed as a list, and puts
+ * the authoring form — five fields and a page of JSON — behind "add", because
+ * this screen is opened to check what shipped far more often than to write a
+ * new pack.
  */
 
 import { api, guard, t, toast } from '../../shared/boot.js';
@@ -19,54 +25,74 @@ import { pageHeader, reroute } from '../app.js';
 
 const pretty = (value) => JSON.stringify(value, null, 2);
 
+const DEVELOPER_SECTIONS = [
+  { id: 'locales', label: 'developer.shipped_languages' },
+  { id: 'themes', label: 'developer.shipped_themes' },
+  { id: 'vendor', label: 'developer.vendor_tab' },
+];
+
+// Survives a repaint, so saving a theme does not throw the developer back to
+// the languages tab.
+let developerSection = 'locales';
+
 export async function renderDeveloper(container) {
   const [overview, vendor] = await Promise.all([
     api.get('/api/dev/packs'),
     api.get('/api/dev/vendor'),
   ]);
 
+  const body = h('div', {});
+  const paint = () => {
+    if (developerSection === 'vendor') {
+      mount(body, vendorEditor(container, vendor));
+      return;
+    }
+    const isLocale = developerSection === 'locales';
+    mount(body, packEditor(container, {
+      kind: isLocale ? 'locale' : 'theme',
+      title: t(isLocale ? 'developer.shipped_languages' : 'developer.shipped_themes'),
+      folder: isLocale ? overview.localesDir : overview.themesDir,
+      reference: isLocale ? overview.referenceKeys : null,
+      files: isLocale ? overview.files.locales : overview.files.themes,
+      loaded: isLocale
+        ? overview.locales.loaded.map((entry) => entry.locale)
+        : overview.themes.loaded,
+      rejected: isLocale
+        ? overview.locales.rejected.map((entry) => ({ name: `${entry.locale}.json`, issues: entry.issues }))
+        : overview.themes.rejected.map((entry) => ({ name: `${entry.theme}.json`, issues: entry.issues })),
+    }));
+  };
+
   mount(container,
     pageHeader(t('developer.title')),
-    h('p', { class: 'qs-muted' }, t('developer.subtitle')),
 
-    h('div', { class: 'qs-card' },
-      h('div', { class: 'qs-grid qs-grid-2' },
-        h('div', {},
-          h('div', { class: 'qs-section-title' }, t('developer.locales_dir')),
-          h('p', { class: 'qs-mono qs-xs' }, overview.localesDir),
-          h('p', { class: 'qs-xs qs-muted' },
-            `${t('developer.reference')}: ${overview.referenceKeys}`)),
-        h('div', {},
-          h('div', { class: 'qs-section-title' }, t('developer.themes_dir')),
-          h('p', { class: 'qs-mono qs-xs' }, overview.themesDir))),
-      h('p', { class: 'qs-xs qs-muted' }, t('developer.strict_note'))),
+    h('div', { class: 'qs-tabs', role: 'tablist' },
+      DEVELOPER_SECTIONS.map((section) => h('button', {
+        class: 'qs-tab',
+        role: 'tab',
+        'aria-selected': String(section.id === developerSection),
+        onClick: (event) => {
+          developerSection = section.id;
+          for (const tab of event.target.parentElement.children) {
+            tab.setAttribute('aria-selected', String(tab === event.target));
+          }
+          paint();
+        },
+      }, t(section.label)))),
 
-    rejectedPanel(overview),
-    packEditor(container, {
-      kind: 'locale',
-      title: t('developer.shipped_languages'),
-      files: overview.files.locales,
-      loaded: overview.locales.loaded.map((entry) => entry.locale),
-    }),
-    packEditor(container, {
-      kind: 'theme',
-      title: t('developer.shipped_themes'),
-      files: overview.files.themes,
-      loaded: overview.themes.loaded,
-    }),
-    vendorEditor(container, vendor));
+    body);
+
+  paint();
 }
 
 /** A file on disk that did not load, and the reason. Silence here would hurt. */
-function rejectedPanel(overview) {
-  const rejected = [
-    ...overview.locales.rejected.map((entry) => ({ name: `${entry.locale}.json`, issues: entry.issues })),
-    ...overview.themes.rejected.map((entry) => ({ name: `${entry.theme}.json`, issues: entry.issues })),
-  ];
+function rejectedPanel(rejected) {
   if (rejected.length === 0) return null;
 
-  return h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-    h('h3', {}, t('developer.rejected')),
+  return h('details', { class: 'qs-details' },
+    h('summary', {},
+      h('span', {}, t('developer.rejected')),
+      h('span', { class: 'qs-summary' }, String(rejected.length))),
     rejected.map((entry) =>
       h('div', {},
         h('strong', { class: 'qs-mono qs-small' }, entry.name),
@@ -79,7 +105,7 @@ function rejectedPanel(overview) {
  * One editor, used for both kinds. The two differ only in their endpoints and
  * in what identifies a pack, so writing it twice would only invite drift.
  */
-function packEditor(container, { kind, title, files, loaded }) {
+function packEditor(container, { kind, title, folder, reference, files, loaded, rejected }) {
   const isLocale = kind === 'locale';
   const base = isLocale ? '/api/dev/locales' : '/api/dev/themes';
 
@@ -151,75 +177,90 @@ function packEditor(container, { kind, title, files, loaded }) {
     await reroute();
   };
 
-  return h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-    h('h2', {}, title),
+  const remove = async (file) => {
+    const id = file.replace(/\.json$/, '');
+    const ok = await confirmDialog({
+      title: t('developer.remove'),
+      message: t('developer.remove_confirm'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+    });
+    if (!ok) return;
+    const done = await guard(() => api.del(`${base}/${encodeURIComponent(id)}`));
+    if (done === undefined) return;
+    await loadLocales().catch(() => {});
+    await reroute();
+  };
 
-    h('div', { class: 'qs-row', style: { flexWrap: 'wrap' } },
-      files.map((file) =>
-        h('span', { class: 'qs-badge qs-mono' },
-          file,
-          h('button', {
-            class: 'qs-icon-btn',
-            title: t('developer.remove'),
-            onClick: async () => {
-              const id = file.replace(/\.json$/, '');
-              const ok = await confirmDialog({
+  /** One field of the new pack, on the same line as its label. */
+  const field = (label, control) => h('div', { class: 'qs-row-item' },
+    h('div', {}, h('div', { class: 'qs-row-label' }, label)),
+    h('div', { class: 'qs-row-control' }, control));
+
+  // The tab above already names this section; a heading repeating it would be
+  // the same three words twice, eight pixels apart.
+  return h('section', { class: 'qs-panel', 'aria-label': title },
+    h('div', { class: 'qs-panel-head' },
+      h('p', {}, t('developer.strict_note')),
+      h('p', { class: 'qs-mono qs-xs qs-muted' },
+        folder,
+        reference === null ? '' : ` · ${t('developer.reference')} ${reference}`)),
+
+    h('div', { class: 'qs-card qs-narrow' },
+      // What shipped, one per line: the file, and the one thing you can do to
+      // it. A grid of pills with an × in each was a row of small targets.
+      h('div', { class: 'qs-rows' },
+        files.map((file) =>
+          h('div', { class: 'qs-row-item' },
+            h('div', {}, h('div', { class: 'qs-row-label qs-mono qs-small' }, file)),
+            h('div', { class: 'qs-row-control' },
+              h('button', {
+                class: 'qs-btn qs-btn-ghost qs-btn-sm',
                 title: t('developer.remove'),
-                message: t('developer.remove_confirm'),
-                confirmLabel: t('common.delete'),
-                cancelLabel: t('common.cancel'),
-              });
-              if (!ok) return;
-              const done = await guard(() => api.del(`${base}/${encodeURIComponent(id)}`));
-              if (done === undefined) return;
-              await loadLocales().catch(() => {});
-              await reroute();
-            },
-          }, '×')))),
+                onClick: () => void remove(file),
+              }, t('common.delete')))))),
 
-    h('div', { class: 'qs-grid qs-grid-2', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
-      h('label', { class: 'qs-field' },
-        h('span', {}, isLocale ? t('languages.code') : t('themes.id')), idInput),
-      h('label', { class: 'qs-field' },
-        h('span', {}, isLocale ? t('languages.name') : t('themes.name')), nameInput),
-      englishInput
-        ? h('label', { class: 'qs-field' },
-            h('span', {}, t('languages.english_name')), englishInput)
-        : null,
-      directionSelect
-        ? h('label', { class: 'qs-field' },
-            h('span', {}, t('languages.direction')), directionSelect)
-        : null),
+      rejectedPanel(rejected),
 
-    h('div', { class: 'qs-row', style: { flexWrap: 'wrap' } },
-      isLocale
-        ? h('button', { class: 'qs-btn qs-btn-sm', onClick: () => fetchTemplate(true) },
-            t('languages.copy_blank'))
-        : null,
-      h('label', { class: 'qs-row qs-small' },
-        h('span', { class: 'qs-muted' },
-          isLocale ? t('languages.source') : t('themes.scheme')),
-        fromSelect),
-      h('button', { class: 'qs-btn qs-btn-sm', onClick: () => fetchTemplate(false) },
-        isLocale ? t('languages.copy_source') : t('themes.copy'))),
+      h('details', { class: 'qs-details' },
+        h('summary', {}, isLocale ? t('languages.add') : t('themes.add')),
+        h('div', { class: 'qs-form' },
+          h('div', { class: 'qs-rows' },
+            field(isLocale ? t('languages.code') : t('themes.id'), idInput),
+            field(isLocale ? t('languages.name') : t('themes.name'), nameInput),
+            englishInput ? field(t('languages.english_name'), englishInput) : null,
+            directionSelect ? field(t('languages.direction'), directionSelect) : null,
+            field(isLocale ? t('languages.source') : t('themes.scheme'),
+              h('div', { class: 'qs-row' },
+                fromSelect,
+                h('button', { class: 'qs-btn qs-btn-sm', onClick: () => fetchTemplate(false) },
+                  t('common.copy'))))),
 
-    h('label', { class: 'qs-field', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
-      h('span', {}, isLocale ? t('languages.paste') : t('themes.paste')), paste),
+          isLocale
+            ? h('p', { class: 'qs-row-hint' },
+                h('button', {
+                  class: 'qs-btn qs-btn-ghost qs-btn-sm',
+                  onClick: () => fetchTemplate(true),
+                }, t('languages.copy_blank')))
+            : null,
 
-    report,
+          h('label', { class: 'qs-field' },
+            h('span', {}, isLocale ? t('languages.paste') : t('themes.paste')), paste),
 
-    h('div', { class: 'qs-row' },
-      h('button', { class: 'qs-btn', onClick: check }, t('developer.check')),
-      h('button', {
-        class: 'qs-btn qs-btn-primary',
-        onClick: async () => {
-          // Check first so a refusal is explained in the report rather than
-          // arriving as one line in a toast.
-          const result = await check();
-          if (result && (result.errors ?? 0) > 0) return;
-          await install();
-        },
-      }, t('developer.install'))));
+          report,
+
+          h('div', { class: 'qs-row' },
+            h('button', { class: 'qs-btn', onClick: check }, t('developer.check')),
+            h('button', {
+              class: 'qs-btn qs-btn-primary',
+              onClick: async () => {
+                // Check first so a refusal is explained in the report rather
+                // than arriving as one line in a toast.
+                const result = await check();
+                if (result && (result.errors ?? 0) > 0) return;
+                await install();
+              },
+            }, t('developer.install')))))));
 }
 
 /* ------------------------------------------------------------ vendor info */
@@ -245,23 +286,23 @@ function vendorEditor(container, vendor) {
     await renderDeveloper(container);
   };
 
-  return h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-    h('h2', {}, t('developer.vendor')),
-    h('p', { class: 'qs-muted qs-small' }, t('developer.vendor_intro')),
-    h('p', { class: 'qs-mono qs-xs' }, vendor.file),
-    vendor.info
-      ? null
-      : h('p', { class: 'qs-badge qs-badge-text' }, t('developer.vendor_none')),
+  return h('section', { class: 'qs-panel', 'aria-label': t('developer.vendor') },
+    h('div', { class: 'qs-panel-head' },
+      h('h2', {}, t('developer.vendor')),
+      h('p', {}, t('developer.vendor_intro'))),
 
-    h('div', { class: 'qs-row' },
-      h('button', {
-        class: 'qs-btn qs-btn-sm',
-        onClick: () => { paste.value = pretty(vendor.template); },
-      }, t('developer.vendor_copy'))),
+    h('div', { class: 'qs-card qs-form' },
+      h('p', { class: 'qs-mono qs-xs qs-muted' },
+        vendor.file,
+        vendor.info ? '' : ` · ${t('developer.vendor_none')}`),
 
-    h('label', { class: 'qs-field', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
-      h('span', {}, t('developer.vendor_paste')), paste),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('developer.vendor_paste')), paste),
 
-    h('div', { class: 'qs-row' },
-      h('button', { class: 'qs-btn qs-btn-primary', onClick: save }, t('common.save'))));
+      h('div', { class: 'qs-row' },
+        h('button', { class: 'qs-btn qs-btn-primary', onClick: save }, t('common.save')),
+        h('button', {
+          class: 'qs-btn qs-btn-ghost qs-btn-sm',
+          onClick: () => { paste.value = pretty(vendor.template); },
+        }, t('developer.vendor_copy')))));
 }

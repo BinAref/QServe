@@ -287,8 +287,14 @@
 @media print {
   .shell-side, .shell-topbar, .qs-toasts, .no-print { display: none !important; }
   .shell { grid-template-columns: 1fr; }
-  .qr-print-sheet { display: grid !important; grid-template-columns: repeat(2, 1fr); gap: 12mm; }
-  .qr-print-sheet .qs-card { break-inside: avoid; border: 1px solid #000; }
+  /* The station list prints two to a page, each one whole. */
+  .qr-print-sheet { max-inline-size: none !important; border: none !important; padding: 0 !important; }
+  .qr-print-sheet .qs-rows { display: grid !important; grid-template-columns: repeat(2, 1fr); gap: 12mm; }
+  .qr-print-sheet .qs-row-item {
+    break-inside: avoid;
+    border: 1px solid #000;
+    padding: 6mm;
+  }
 }
 
 /* --------------------------------------------------------------- licence */
@@ -340,7 +346,6 @@
 
 /* ------------------------------------------------- languages and themes */
 
-.pack-card { display: grid; gap: var(--qs-spacing-md); }
 .pack-editor { display: grid; gap: var(--qs-spacing-lg); }
 .pack-editor textarea {
   font-family: var(--qs-typography-font-family-mono);
@@ -355,6 +360,9 @@
 .pack-step h3 { margin: 0 0 var(--qs-spacing-sm); font-size: var(--qs-typography-size-md); }
 
 .coverage { display: grid; gap: 4px; }
+/* In a list row the bar sits under the name, at reading width — a progress bar
+   drawn the full width of a desk monitor reads as a divider, not a measure. */
+.qs-row-item .coverage { max-inline-size: 420px; margin-block-start: var(--qs-spacing-sm); }
 .coverage-bar {
   block-size: 6px;
   border-radius: var(--qs-radius-pill);
@@ -369,32 +377,24 @@
 
 /* ---------------------------------------------------------- vendor info */
 
-.price-list {
-  display: grid;
-  gap: var(--qs-spacing-sm);
-  margin-block: var(--qs-spacing-md);
+/* A price is a number to be read at a glance, and lined up with the one under
+   it: tabular figures so 1,500 and 150 share a decimal column. */
+.qs-row-control strong {
+  font-size: var(--qs-typography-size-lg);
+  font-variant-numeric: tabular-nums;
 }
-.price-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--qs-spacing-sm);
-  flex-wrap: wrap;
-  padding: var(--qs-spacing-sm);
-  border-radius: var(--qs-radius-sm);
-  background: var(--qs-color-surface-alt);
-}
-.price-row strong { font-size: var(--qs-typography-size-lg); }
 
 /* -------------------------------------------------------- activity log */
 
-.filter-bar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--qs-spacing-md);
-  align-items: end;
-  margin-block-end: var(--qs-spacing-lg);
-}
-.filter-bar .qs-field { margin-block-end: 0; }
+/*
+ * The one thing looked for in a log is a word, so the search box is the only
+ * control standing open; the five ways of narrowing sit under one line saying
+ * how many are in force.
+ */
+.log-page { max-inline-size: 880px; }
+.log-search { display: flex; gap: var(--qs-spacing-sm); align-items: center; }
+.log-search input { flex: 1 1 auto; min-inline-size: 0; max-inline-size: 340px; }
+.log-search .qs-btn { flex: 0 0 auto; }
 .qs-row-detail td { background: var(--qs-color-surface-alt); }
 .qs-row-detail pre {
   margin: 0;

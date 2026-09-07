@@ -306,7 +306,15 @@
   max-inline-size: 760px;
   margin-inline: auto;
 }
-.menu-service .qs-btn { white-space: normal; }
+/* "Call a waiter" belongs on one line: a two-word button broken across two
+   lines is the phone telling the diner it did not plan for this sentence. The
+   text steps down before the button does. */
+.menu-service .qs-btn {
+  white-space: nowrap;
+  font-size: var(--qs-typography-size-sm);
+  padding-inline: var(--qs-spacing-sm);
+  min-inline-size: 0;
+}
 /* Asked and answered: it stays visibly spent for a minute rather than
  * inviting a second tap that calls the waiter twice. */
 .menu-service .qs-btn:disabled { opacity: 0.75; }

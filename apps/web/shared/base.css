@@ -77,9 +77,20 @@ h1, h2, h3, h4 {
   line-height: var(--qs-typography-line-height-tight);
   margin: 0 0 var(--qs-spacing-sm);
 }
-h1 { font-size: var(--qs-typography-size-xxl); }
-h2 { font-size: var(--qs-typography-size-xl); }
-h3 { font-size: var(--qs-typography-size-lg); }
+/*
+ * Four sizes, and no screen uses more.
+ *
+ *   xl (24)  the page — one per screen, and it is the only thing that big
+ *   lg (18)  a section within it
+ *   md (15)  everything a person actually reads
+ *   sm (13)  the line under a thing: a hint, a date, a count
+ *
+ * xxl (34) is for one number on a dashboard tile and nothing else: at that size
+ * a heading is decoration, and it pushes the first useful line off a laptop.
+ */
+h1 { font-size: var(--qs-typography-size-xl); }
+h2 { font-size: var(--qs-typography-size-lg); }
+h3 { font-size: var(--qs-typography-size-md); font-weight: var(--qs-typography-weight-medium); }
 
 p { margin: 0 0 var(--qs-spacing-sm); }
 a { color: var(--qs-color-primary); }
@@ -149,6 +160,171 @@ a { color: var(--qs-color-primary); }
   margin-block-end: var(--qs-spacing-md);
 }
 
+/* =========================================================================
+ * Sections
+ *
+ * A screen does one job. When a screen has more than one job — settings is
+ * five: the restaurant, its money, how it looks, how it runs, who may open it —
+ * the jobs are separated rather than stacked, and one is shown at a time.
+ * Everything below is the vocabulary for that: a strip of section tabs, a panel
+ * with a heading and one line saying what it is for, and rows that put a label
+ * and its control on the same line at a readable width.
+ * ========================================================================= */
+
+.qs-tabs {
+  display: flex;
+  gap: var(--qs-spacing-xs);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-block-end: 1px solid var(--qs-color-border);
+  margin-block-end: var(--qs-spacing-lg);
+}
+.qs-tabs::-webkit-scrollbar { display: none; }
+
+.qs-tab {
+  border: none;
+  background: none;
+  color: var(--qs-color-text-muted);
+  font: inherit;
+  font-weight: var(--qs-typography-weight-medium);
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+  /* The line under the current tab is the only mark: a filled pill here would
+     compete with the primary action, and there is one of those per screen. */
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-block-size: var(--qs-touch);
+  transition: color var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+.qs-tab:hover { color: var(--qs-color-text); }
+.qs-tab[aria-selected="true"] {
+  color: var(--qs-color-text);
+  border-block-end-color: var(--qs-color-primary);
+}
+
+/*
+ * A form is as wide as its content, not as wide as the window. A telephone
+ * number in a box a metre across is the clearest sign nobody looked at the
+ * screen after building it; and a label whose control is at the far end of a
+ * wide row makes the eye travel for no reason.
+ */
+form.qs-card, .qs-form { max-inline-size: 880px; }
+/*
+ * Two columns inside a form, not "as many as fit". Auto-fit made the same four
+ * fields sit three-across on a desk screen and two-across on a laptop — the
+ * form changed shape between two machines in the same restaurant.
+ */
+form.qs-card > .qs-grid-2, .qs-form > .qs-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  form.qs-card > .qs-grid-2, .qs-form > .qs-grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/** A panel: one heading, one line about it, then the thing itself. */
+.qs-panel + .qs-panel { margin-block-start: var(--qs-spacing-lg); }
+.qs-panel-head { margin-block-end: var(--qs-spacing-md); }
+.qs-panel-head h2 { margin: 0; }
+.qs-panel-head p {
+  margin: 4px 0 0;
+  color: var(--qs-color-text-muted);
+  font-size: var(--qs-typography-size-sm);
+  max-inline-size: 68ch;
+}
+
+/**
+ * A row: what it is on one side, the control on the other, and the sentence
+ * explaining it directly under the label rather than floating between rows.
+ */
+.qs-rows { display: grid; }
+/*
+ * Reading width, the same 880px a form gets. Left to fill a desk monitor, a
+ * list put the name at one edge and its buttons at the other, a hand's width
+ * apart, and the eye had to cross the screen to join them — and two cards on
+ * one screen, one capped and one not, do not line up down the right.
+ */
+.qs-narrow { max-inline-size: 880px; }
+.qs-rows > * + * { border-block-start: 1px solid var(--qs-color-border); }
+
+.qs-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qs-spacing-lg);
+  padding-block: var(--qs-spacing-md);
+}
+.qs-row-item > div:first-child { min-inline-size: 0; }
+.qs-row-label { font-weight: var(--qs-typography-weight-medium); }
+/* A row may carry one mark — "default", "in use" — beside its name, never a
+   row of them: the second pill on a line is decoration. */
+.qs-row-label .qs-badge { margin-inline-start: var(--qs-spacing-sm); }
+.qs-row-hint {
+  margin: 2px 0 0;
+  color: var(--qs-color-text-muted);
+  font-size: var(--qs-typography-size-sm);
+  max-inline-size: 62ch;
+}
+.qs-row-control { flex: 0 0 auto; display: flex; align-items: center; gap: var(--qs-spacing-sm); }
+.qs-row-control input[type="text"],
+.qs-row-control input[type="number"],
+.qs-row-control select { inline-size: 140px; }
+
+@media (max-width: 640px) {
+  /* A row that would wrap its control under a 62-character sentence reads
+     better as two lines with the control on its own. */
+  .qs-row-item { flex-direction: column; align-items: stretch; gap: var(--qs-spacing-sm); }
+  .qs-row-control { justify-content: flex-start; }
+}
+
+/** One line that stands in for a list: "Runs the till · 10 permissions". */
+.qs-summary {
+  color: var(--qs-color-text-muted);
+  font-size: var(--qs-typography-size-sm);
+}
+
+/*
+ * Detail somebody may want and nobody needs: nine areas of settings, thirteen
+ * capabilities, the grants behind a role. Closed, with a line saying what is
+ * inside, so the one being looked for can be opened without reading the rest.
+ *
+ * The chevron carries the affordance. Colouring the whole row instead would
+ * make nine coloured lines and say "these are links", which they are not.
+ */
+.qs-details > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-sm);
+  cursor: pointer;
+  padding: var(--qs-spacing-sm) 0;
+  min-block-size: var(--qs-touch);
+  list-style: none;
+  transition: color var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+.qs-details > summary::-webkit-details-marker { display: none; }
+.qs-details > summary::marker { content: ''; }
+.qs-details > summary::before {
+  content: '';
+  inline-size: 8px;
+  block-size: 8px;
+  flex: 0 0 auto;
+  border-inline-end: 2px solid var(--qs-color-text-muted);
+  border-block-end: 2px solid var(--qs-color-text-muted);
+  /* Points along the reading direction when closed, down when open. */
+  transform: rotate(-45deg);
+  transition: transform var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+[dir="rtl"] .qs-details > summary::before { transform: rotate(135deg); }
+.qs-details[open] > summary::before,
+[dir="rtl"] .qs-details[open] > summary::before { transform: rotate(45deg); }
+.qs-details > summary:hover { color: var(--qs-color-primary); }
+.qs-details + .qs-details { border-block-start: 1px solid var(--qs-color-border); }
+.qs-details[open] > summary { border-block-end: 1px solid var(--qs-color-border); }
+.qs-details[open] > *:not(summary) {
+  padding-block-end: var(--qs-spacing-md);
+  animation: qs-fade var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+
 .qs-section-title {
   font-size: var(--qs-typography-size-xs);
   text-transform: uppercase;
@@ -209,6 +385,14 @@ a { color: var(--qs-color-primary); }
   color: var(--qs-color-error);
 }
 .qs-btn-ghost { background: transparent; border-color: transparent; color: var(--qs-color-text-muted); }
+/* An anchor dressed as a button is a button: no underline, no link colour. */
+a.qs-btn { text-decoration: none; color: var(--qs-color-text); }
+a.qs-btn-primary { color: var(--qs-color-primary-contrast); }
+.qs-btn-sm {
+  min-block-size: 36px;
+  padding: 4px var(--qs-spacing-sm);
+  font-size: var(--qs-typography-size-sm);
+}
 .qs-btn-lg { min-height: 56px; font-size: var(--qs-typography-size-lg); padding-inline: var(--qs-spacing-lg); }
 .qs-btn-block { width: 100%; }
 
@@ -260,6 +444,26 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--qs-color-primary);
 }
 textarea { min-height: 84px; resize: vertical; }
+
+/*
+ * The file picker is the one control a browser draws itself, and on the restore
+ * screen it sat among the restaurant's own boxes looking like it belonged to a
+ * different program. Its button gets the same treatment as a ghost button.
+ */
+input[type="file"] { padding: 8px 12px; cursor: pointer; }
+input[type="file"]::file-selector-button {
+  margin-inline-end: var(--qs-spacing-md);
+  padding: 6px 12px;
+  border: 1px solid var(--qs-component-input-border-color);
+  border-radius: var(--qs-radius-sm);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text);
+  font: inherit;
+  font-weight: var(--qs-typography-weight-medium);
+  cursor: pointer;
+  transition: border-color var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+input[type="file"]::file-selector-button:hover { border-color: var(--qs-color-primary); }
 input:focus, select:focus, textarea:focus {
   border-color: var(--qs-color-primary);
   outline: 2px solid var(--qs-color-focus-ring);
@@ -268,23 +472,53 @@ input:focus, select:focus, textarea:focus {
 
 .qs-field { display: block; margin-block-end: var(--qs-spacing-md); }
 .qs-field > span {
-  display: block;
+  /* Fixed height, so a label carrying the language mark still puts its box on
+     the same line as the plain label beside it. */
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-sm);
+  min-block-size: 22px;
   margin-block-end: 5px;
   font-size: var(--qs-typography-size-sm);
   color: var(--qs-color-text-muted);
 }
+
+/* The one action of a form, set apart from the last field it applies to. */
+form.qs-card > .qs-btn,
+form.qs-card > .qs-row:last-child,
+.qs-form > .qs-btn { margin-block-start: var(--qs-spacing-md); }
 .qs-check { display: flex; align-items: center; gap: var(--qs-spacing-sm); }
 .qs-check input { width: auto; min-height: auto; }
 
+/*
+ * Ticks and radios wear the restaurant's own colour and are big enough to hit.
+ * The browser default is a small blue box, which on a warm theme is the one
+ * thing on the screen that came from somewhere else.
+ */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--qs-color-primary);
+  inline-size: 20px;
+  block-size: 20px;
+  cursor: pointer;
+}
+
 /* ------------------------------------------------------------------ badges */
 
+/*
+ * A badge says what state a thing is in — enabled, built-in, offline. It is not
+ * a decoration and it is not a label: an outlined pill around every noun turns
+ * a page into a word cloud, which is what the console had become. So the plain
+ * one is quiet, and colour appears only when the state is worth the colour.
+ */
 .qs-badge {
   display: inline-block;
-  padding: 3px 10px;
+  padding: 3px 9px;
   border-radius: var(--qs-radius-pill);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text-muted);
   font-size: var(--qs-typography-size-xs);
   font-weight: var(--qs-typography-weight-medium);
-  border: 1px solid var(--qs-color-border);
+  border: 1px solid transparent;
   white-space: nowrap;
 }
 /*
@@ -293,10 +527,10 @@ input:focus, select:focus, textarea:focus {
  * a phone is the difference between a readable line and a sideways scroll.
  */
 .qs-badge-text { white-space: normal; max-inline-size: 100%; }
-.qs-badge-success { color: var(--qs-color-success); border-color: var(--qs-color-success); }
-.qs-badge-warning { color: var(--qs-color-warning); border-color: var(--qs-color-warning); }
-.qs-badge-error   { color: var(--qs-color-error);   border-color: var(--qs-color-error); }
-.qs-badge-info    { color: var(--qs-color-info);    border-color: var(--qs-color-info); }
+.qs-badge-success { color: var(--qs-color-success); border-color: currentColor; }
+.qs-badge-warning { color: var(--qs-color-warning); border-color: currentColor; }
+.qs-badge-error   { color: var(--qs-color-error);   border-color: currentColor; }
+.qs-badge-info    { color: var(--qs-color-info);    border-color: currentColor; }
 /* The restaurant's own things — a role it added, a permission it granted. */
 .qs-badge-accent { color: var(--qs-color-primary); border-color: var(--qs-color-primary); }
 .qs-badge-solid {
@@ -399,6 +633,9 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   border-block-start: 1px solid var(--qs-color-border);
   background: var(--qs-color-surface-alt);
 }
+/* Delete goes to the far end, away from Save. Two buttons a thumb apart, one
+   of which destroys a dish, is a mistake the layout can prevent. */
+.qs-modal-foot .qs-btn-danger:first-child { margin-inline-end: auto; }
 
 /* ------------------------------------------------------------------ toasts */
 
@@ -784,7 +1021,7 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   border-radius: var(--qs-radius-pill);
   background: var(--qs-color-primary);
   color: var(--qs-color-primary-contrast);
-  font-size: 11px;
+  font-size: var(--qs-typography-size-xs);
   font-weight: var(--qs-typography-weight-bold);
   line-height: 18px;
   text-align: center;

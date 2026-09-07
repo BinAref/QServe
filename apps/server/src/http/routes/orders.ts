@@ -255,10 +255,9 @@ export function createOrderRoutes(services: Services): Router<AppState> {
   /* ------------------------------------------------------- station views */
 
   /** Kitchen display feed (spec §17). */
-  router.get('/kitchen/queue', (ctx) => {
-    const locale = ctx.query.get('locale') ?? services.settings.profile()?.defaultLocale ?? 'en';
+  router.get('/kitchen/queue', () => {
     return {
-      queue: services.orders.kitchenQueue(KITCHEN_QUEUE_STATUSES, locale),
+      queue: services.orders.kitchenQueue(KITCHEN_QUEUE_STATUSES),
       settings: {
         groupByStation: services.settings.get<boolean>('kitchen.groupByStation'),
         showSourceBadge: services.settings.get<boolean>('kitchen.showSourceBadge'),
