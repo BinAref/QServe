@@ -2,5 +2,5 @@ v1.0.0
 
 Writing a version here and pushing it is how a release is cut: the workflow in
 .github/workflows/release.yml builds the Windows bundle and the Android
-terminal, tags this commit, and publishes both. Anything below the first line
-is a note to whoever reads this file next; only the first line is read.
+terminal, tags this commit, and publishes both. Only the first line is read;
+everything after it is for whoever opens this file next.

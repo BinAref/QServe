@@ -134,7 +134,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          tag='${{ inputs.tag }}'
+          tag='${{ github.event.inputs.tag }}'
           if [ -z "$tag" ] && [ -f packaging/release.txt ]; then
             tag=$(grep -m1 -E '^v[0-9]' packaging/release.txt || true)
           fi
