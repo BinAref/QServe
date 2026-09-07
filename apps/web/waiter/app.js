@@ -108,7 +108,9 @@ function floor() {
     return h('div', { class: 'qs-empty' }, t('common.empty'));
   }
 
-  return h('div', { class: 'floor-grid' }, state.tables.map((table) => {
+  // The tables arrive as one thing rather than twenty, which is what makes a
+  // board glanced at from across a room readable rather than busy.
+  return h('div', { class: 'floor-grid qs-stagger' }, state.tables.map((table) => {
     const ready = table.openOrders.filter((order) => order.status === OrderStatus.READY).length;
 
     return h('button', {

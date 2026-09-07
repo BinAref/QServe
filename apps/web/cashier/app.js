@@ -117,7 +117,7 @@ function openSignIn() {
 }
 
 function orderList() {
-  return h('aside', { class: 'till-list' },
+  return h('aside', { class: 'till-list qs-stagger' },
     state.orders.length === 0
       ? h('div', { class: 'qs-empty' }, t('orders.no_orders'))
       : state.orders.map(({ order, bill }) =>

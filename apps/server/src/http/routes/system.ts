@@ -242,6 +242,13 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
       // because the word appears on the floor tablet's heading and on the
       // diner's "call" button, not only in the console.
       roleNames: services.access.roleNames(),
+      // What it has switched off. Sent the same way and for the same reason:
+      // a restaurant that turned sound off means every screen, not the console.
+      preferences: {
+        notifications: services.settings.get<boolean>('notifications.enabled') !== false,
+        sounds: services.settings.get<boolean>('notifications.sounds') !== false,
+        animations: services.settings.get<boolean>('ui.animations') !== false,
+      },
     };
   });
 

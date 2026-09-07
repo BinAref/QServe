@@ -207,7 +207,9 @@ function productPanel() {
   }
 
   const rows = products.filter((product) => product.categoryId === category.id);
-  const list = h('div', {});
+  // The dishes rise into place in order rather than appearing all at once,
+  // which is what makes a re-ordered list read as movement rather than a jump.
+  const list = h('div', { class: 'qs-stagger' });
 
   mount(list, rows.map((product) =>
     h('div', {

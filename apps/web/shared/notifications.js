@@ -30,9 +30,10 @@ export class NotificationCentre {
    * @param realtime  the socket to listen on
    * @param onArrive  optional: a terminal that wants to react itself
    */
-  constructor(realtime, { onArrive = null } = {}) {
+  constructor(realtime, { onArrive = null, enabled = true } = {}) {
     this.realtime = realtime;
     this.onArrive = onArrive;
+    this.enabled = enabled;
 
     // The handler is called with the payload first, the envelope second.
     realtime.on('notification', (notification) => this.#receive(notification));
@@ -61,6 +62,8 @@ export class NotificationCentre {
    * request was in flight. In a restaurant that is a call that vanishes.
    */
   async refresh() {
+    if (!this.enabled) return;
+
     let fetched;
     try {
       ({ notifications: fetched } = await api.get('/api/notifications?limit=50'));
@@ -87,7 +90,9 @@ export class NotificationCentre {
   }
 
   #receive(notification) {
-    if (!notification?.id) return;
+    // Switched off means switched off: the server still records who called and
+    // when — the activity log is evidence — but this screen does not react.
+    if (!this.enabled || !notification?.id) return;
 
     const index = this.#items.findIndex((item) => item.id === notification.id);
     const isNew = index === -1;
@@ -149,6 +154,8 @@ export class NotificationCentre {
    * between a badge somebody notices and one they scroll past.
    */
   bell() {
+    if (!this.enabled) return null;
+
     const count = h('span', { class: 'qs-bell-count' });
     const button = h('button', {
       class: 'qs-bell',
@@ -229,6 +236,8 @@ export class NotificationCentre {
    * a corner is not enough — a kitchen pass is looked at from two metres away.
    */
   banner() {
+    if (!this.enabled) return null;
+
     // Lit while it stands: a call nobody has answered is the definition of
     // something waiting on a person.
     const node = h('div', { class: 'qs-notify-banner qs-hidden qs-lit qs-lit-urgent' });

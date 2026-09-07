@@ -64,6 +64,15 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, unknown>> = {
   /** Set by the owner; used for automatic backups only. See docs/SECURITY.md. */
   'backup.passphrase': null,
 
+  /*
+   * What a restaurant may switch off. A kitchen that has its own bell, a dining
+   * room that wants a silent tablet on each table, a till on a machine that
+   * paints animation badly — all of them are the restaurant's call, not ours.
+   */
+  'notifications.enabled': true,
+  'notifications.sounds': true,
+  'ui.animations': true,
+
   'menu.showImages': true,
   'menu.showPrices': true,
   'menu.showUnavailableProducts': true,

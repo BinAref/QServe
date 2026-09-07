@@ -52,6 +52,19 @@ export async function boot({
   // heading of this very screen may be one of them.
   setRoleNames(session.roleNames);
 
+  /*
+   * What this restaurant has switched off, applied before the first paint.
+   *
+   * These are one decision taken once in the console and obeyed by every
+   * screen: a dining room that wants silence gets silence on the tablet at
+   * table nine as well as at the pass, and a till on an old machine that
+   * paints animation badly stops animating everywhere rather than in the one
+   * place somebody remembered to check.
+   */
+  const preferences = session.preferences ?? {};
+  sound.setMuted(preferences.sounds === false);
+  document.documentElement.dataset.motion = preferences.animations === false ? 'off' : 'on';
+
   const restaurantLocale = session.locale ?? 'en';
   await loadLocales().catch(() => {});
   await setLocale(preferredLocale(restaurantLocale), { remember: false }).catch(async () => {
@@ -80,18 +93,27 @@ export async function boot({
 
   // Every station carries the same notification centre. What each one is told
   // is decided on the server, so a diner's phone simply receives nothing.
-  const notifications = new NotificationCentre(realtime,
-    onNotification ? { onArrive: onNotification } : {});
+  const notifications = new NotificationCentre(realtime, {
+    enabled: preferences.notifications !== false,
+    ...(onNotification ? { onArrive: onNotification } : {}),
+  });
   if (signedIn) void notifications.refresh();
 
   // A role renamed in the console is a word on this screen's heading. Rather
   // than make every station wait for its next reload, take the new names as
   // they are published and re-render.
   realtime.on(EventName.SYSTEM_SETTINGS_CHANGED, (payload) => {
-    if (!payload?.keys?.includes('roles')) return;
     void api.get('/api/auth/me').then((fresh) => {
       setRoleNames(fresh.roleNames);
-      onResync?.();
+      const now = fresh.preferences ?? {};
+      sound.setMuted(now.sounds === false);
+      document.documentElement.dataset.motion = now.animations === false ? 'off' : 'on';
+      // Turning notifications off cannot un-draw a bell already on screen, so
+      // the screen is redrawn; the centre itself has already gone quiet.
+      const changed = notifications.enabled !== (now.notifications !== false);
+      notifications.enabled = now.notifications !== false;
+      if (changed) location.reload();
+      else onResync?.();
     }).catch(() => {});
   });
 

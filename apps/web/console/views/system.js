@@ -434,7 +434,7 @@ export async function renderUsers(container) {
       // The point worth making to an owner, in a sentence rather than a word:
       // these are real grants, checked on every request.
       h('p', { class: 'qs-muted qs-small' }, t('users.roles_intro')),
-      h('div', { class: 'qs-role-grid' }, roles.map((role) =>
+      h('div', { class: 'qs-role-grid qs-stagger' }, roles.map((role) =>
         h('div', { class: 'qs-card qs-card-tight qs-role-card' },
           h('div', { class: 'qs-row qs-row-between' },
             h('strong', {}, roleLabel(role)),

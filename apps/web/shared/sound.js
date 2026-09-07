@@ -79,10 +79,23 @@ export class SoundEngine {
   #profile = { enabled: false, masterVolume: 0.8, bindings: {} };
   #repeating = new Map();
   #unlocked = false;
+  #muted = false;
 
   setProfile(profile) {
     if (profile) this.#profile = { bindings: {}, ...profile };
   }
+
+  /**
+   * The restaurant's own switch, above every station's profile: a dining room
+   * that wants silence gets silence, whatever each tablet was configured with.
+   * Anything already repeating stops now rather than at its next interval.
+   */
+  setMuted(muted) {
+    this.#muted = Boolean(muted);
+    if (this.#muted) this.stopAll();
+  }
+
+  get muted() { return this.#muted; }
 
   get profile() {
     return this.#profile;
@@ -112,7 +125,7 @@ export class SoundEngine {
   /** Play the sound bound to a logical event, honouring its repeat settings. */
   playFor(soundEvent) {
     const binding = this.#profile.bindings?.[soundEvent];
-    if (!this.#profile.enabled || !binding) return null;
+    if (this.#muted || !this.#profile.enabled || !binding) return null;
 
     this.stop(soundEvent);
 

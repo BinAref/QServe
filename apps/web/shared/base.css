@@ -34,8 +34,10 @@
 }
 
 /*
- * Somebody who has told their operating system they get motion sick means it.
- * Everything still happens — it simply happens at once.
+ * Somebody who has told their operating system they get motion sick means it,
+ * and so does a restaurant that switched animation off in its settings — often
+ * because the till is an old machine that paints it badly. Either way
+ * everything still happens; it simply happens at once.
  */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -44,6 +46,15 @@
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+:root[data-motion="off"] *,
+:root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
 }
 
 html, body {
