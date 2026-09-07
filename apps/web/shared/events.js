@@ -17,6 +17,10 @@ export const SoundEvent = {
   PAYMENT_FAILED: 'payment_failed',
   NOTIFICATION: 'notification',
   ERROR: 'error',
+  WAITER_CALLED: 'waiter_called',
+  BILL_REQUESTED: 'bill_requested',
+  HELP_NEEDED: 'help_needed',
+  PRINT_FAILED: 'print_failed',
 };
 
 export const EventName = {
@@ -83,6 +87,45 @@ export const TableStatus = {
   READY: 'READY',
   WAITING_PAYMENT: 'WAITING_PAYMENT',
   CLOSED: 'CLOSED',
+};
+
+/** What one station tells another. Mirrors NotificationKind in @qserve/shared. */
+export const NotificationKind = {
+  WAITER_CALLED: 'WAITER_CALLED',
+  BILL_REQUESTED: 'BILL_REQUESTED',
+  ORDER_READY: 'ORDER_READY',
+  ORDER_ACCEPTED: 'ORDER_ACCEPTED',
+  ORDER_REJECTED: 'ORDER_REJECTED',
+  ORDER_RUSHED: 'ORDER_RUSHED',
+  ORDER_PLACED: 'ORDER_PLACED',
+  ITEM_UNAVAILABLE: 'ITEM_UNAVAILABLE',
+  PAYMENT_TAKEN: 'PAYMENT_TAKEN',
+  PRINT_FAILED: 'PRINT_FAILED',
+  BROADCAST: 'BROADCAST',
+  HELP_NEEDED: 'HELP_NEEDED',
+};
+
+export const NotificationUrgency = {
+  INFO: 'INFO',
+  ACTION: 'ACTION',
+  URGENT: 'URGENT',
+};
+
+/**
+ * Which sound answers which notice. A notice with no entry here is shown but
+ * not heard, which is the right default: most of them are information.
+ */
+export const NOTIFICATION_SOUND = {
+  WAITER_CALLED: 'waiter_called',
+  BILL_REQUESTED: 'bill_requested',
+  ORDER_READY: 'order_ready',
+  ORDER_PLACED: 'new_order',
+  ORDER_REJECTED: 'order_cancelled',
+  ORDER_RUSHED: 'order_urgent',
+  PRINT_FAILED: 'print_failed',
+  HELP_NEEDED: 'help_needed',
+  BROADCAST: 'notification',
+  ITEM_UNAVAILABLE: 'notification',
 };
 
 export const TerminalType = {

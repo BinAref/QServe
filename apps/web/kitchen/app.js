@@ -28,6 +28,7 @@ const state = {
 
 const root = document.getElementById('app');
 let realtime;
+let notifications;
 
 /* ----------------------------------------------------------------- data */
 
@@ -97,6 +98,7 @@ function header() {
         }, t('kitchen.acknowledge'))
       : null,
 
+    notifications.bell(),
     connectionIndicator(realtime));
 }
 
@@ -202,6 +204,7 @@ function render() {
 
   mount(root,
     offlineBanner(realtime),
+    notifications.banner(),
     h('div', { class: 'kds' },
       header(),
       queue.length === 0
@@ -226,6 +229,10 @@ async function main() {
   });
   state.session = started.session;
   realtime = started.realtime;
+  notifications = started.notifications;
+  notifications.onChange(() => {
+    document.querySelector('.qs-notify-banner')?.replaceWith(notifications.banner());
+  });
 
   await reload();
 

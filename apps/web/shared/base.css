@@ -10,9 +10,41 @@
  *  2. **Logical properties only** — `margin-inline`, `inset-inline-start`,
  *     `text-align: start`. Setting `dir="rtl"` on <html> is then the entire
  *     cost of Arabic support; there is no mirrored stylesheet to maintain.
+ *
+ *  3. **Motion serves comprehension, never decoration.** Things that appear
+ *     rise a little; things that leave get out of the way quickly; a press has
+ *     something to push back against. Durations come from the theme, so a busy
+ *     till can move quicker than a quiet dining room — and every one of them
+ *     collapses to zero under `prefers-reduced-motion`.
+ *
+ *  4. **A touch target is at least 44px.** These screens are used with wet
+ *     hands, in a hurry, by someone carrying three plates.
  */
 
 *, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  /* The smallest comfortable target for a finger in a hurry. */
+  --qs-touch: 44px;
+  /* Room for the notch and the home indicator on a phone, zero elsewhere. */
+  --qs-safe-top: env(safe-area-inset-top, 0px);
+  --qs-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --qs-safe-start: env(safe-area-inset-left, 0px);
+  --qs-safe-end: env(safe-area-inset-right, 0px);
+}
+
+/*
+ * Somebody who has told their operating system they get motion sick means it.
+ * Everything still happens — it simply happens at once.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 html, body {
   margin: 0;
@@ -117,18 +149,30 @@ a { color: var(--qs-color-primary); }
   font-weight: var(--qs-typography-weight-medium);
   cursor: pointer;
   /* Restaurant staff tap these with wet hands on a moving tablet. */
-  min-height: 44px;
-  transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
+  min-block-size: var(--qs-touch);
+  position: relative;
+  overflow: hidden;
+  /* Never let a label break mid-word across two lines on a narrow phone. */
+  white-space: nowrap;
+  transition:
+    background var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    border-color var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    box-shadow var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    transform var(--qs-motion-fast) var(--qs-motion-ease-spring);
 }
 .qs-btn:hover { border-color: var(--qs-color-border-strong); }
-.qs-btn:active { transform: translateY(1px); }
-.qs-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* A press that gives is a press that registered — it is the only confirmation
+ * a busy waiter gets before the screen changes. */
+.qs-btn:active { transform: scale(0.97); }
+.qs-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 .qs-btn-primary {
   background: var(--qs-color-primary);
   border-color: var(--qs-color-primary);
   color: var(--qs-color-primary-contrast);
+  box-shadow: var(--qs-shadow-sm);
 }
+.qs-btn-primary:hover { box-shadow: var(--qs-shadow-md); }
 .qs-btn-secondary {
   background: var(--qs-color-secondary);
   border-color: var(--qs-color-secondary);
@@ -154,16 +198,41 @@ a { color: var(--qs-color-primary); }
   border-radius: var(--qs-radius-sm);
 }
 .qs-icon-btn:hover { color: var(--qs-color-text); background: var(--qs-color-surface-alt); }
+.qs-icon-btn { transition: color var(--qs-motion-fast) var(--qs-motion-ease-standard),
+                           background var(--qs-motion-fast) var(--qs-motion-ease-standard); }
+
+/** A button that is working. The label stays, so nobody wonders what it was. */
+.qs-btn[data-busy="true"] { pointer-events: none; color: transparent; }
+.qs-btn[data-busy="true"]::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 18px;
+  block-size: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid currentColor;
+  border-block-start-color: transparent;
+  border-radius: 50%;
+  color: var(--qs-color-primary-contrast);
+  animation: qs-spin 700ms linear infinite;
+}
 
 input, select, textarea {
-  width: 100%;
+  inline-size: 100%;
   background: var(--qs-component-input-background);
   border: 1px solid var(--qs-component-input-border-color);
   border-radius: var(--qs-component-input-radius);
   color: var(--qs-color-text);
   padding: 10px 12px;
   font: inherit;
-  min-height: 44px;
+  min-block-size: var(--qs-touch);
+  transition:
+    border-color var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    box-shadow var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--qs-color-primary);
 }
 textarea { min-height: 84px; resize: vertical; }
 input:focus, select:focus, textarea:focus {
@@ -231,13 +300,47 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   max-width: min(560px, 94vw);
   width: 100%;
 }
-.qs-modal::backdrop { background: var(--qs-color-overlay); }
+.qs-modal::backdrop {
+  background: var(--qs-color-overlay);
+  animation: qs-fade var(--qs-motion-normal) var(--qs-motion-ease-standard);
+}
+.qs-modal[open] { animation: qs-pop var(--qs-motion-normal) var(--qs-motion-ease-entrance); }
 .qs-modal-inner {
   background: var(--qs-color-surface);
   border: 1px solid var(--qs-color-border);
   border-radius: var(--qs-radius-lg);
   box-shadow: var(--qs-shadow-lg);
   overflow: hidden;
+}
+
+/*
+ * On a phone a dialog floating in the middle is out of thumb reach and the
+ * keyboard covers it. A sheet rising from the bottom edge is neither.
+ */
+@media (max-width: 640px) {
+  .qs-modal {
+    max-inline-size: 100vw;
+    margin: 0;
+    margin-block-start: auto;
+    inset-block-end: 0;
+    inset-block-start: auto;
+  }
+  .qs-modal[open] { animation: qs-slide-up var(--qs-motion-normal) var(--qs-motion-ease-entrance); }
+  .qs-modal-inner {
+    border-start-start-radius: var(--qs-radius-lg);
+    border-start-end-radius: var(--qs-radius-lg);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    border-block-end: none;
+  }
+  .qs-modal-body { max-block-size: 68vh; }
+  .qs-modal-foot {
+    padding-block-end: calc(var(--qs-spacing-md) + var(--qs-safe-bottom));
+  }
+  /* Stacked and full width: two half-width buttons side by side are a misfire
+   * waiting to happen when one of them is "Delete". */
+  .qs-modal-foot { flex-direction: column-reverse; }
+  .qs-modal-foot .qs-btn { inline-size: 100%; }
 }
 .qs-modal-head {
   display: flex;
@@ -248,7 +351,13 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   border-block-end: 1px solid var(--qs-color-border);
 }
 .qs-modal-head h2 { margin: 0; font-size: var(--qs-typography-size-lg); }
-.qs-modal-body { padding: var(--qs-spacing-lg); max-height: 70vh; overflow-y: auto; }
+.qs-modal-body {
+  padding: var(--qs-spacing-lg);
+  max-block-size: 70vh;
+  overflow-y: auto;
+  /* A dialog's own scroll should not drag the page behind it. */
+  overscroll-behavior: contain;
+}
 .qs-modal-foot {
   display: flex;
   justify-content: flex-end;
@@ -276,8 +385,19 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   border-radius: var(--qs-radius-md);
   box-shadow: var(--qs-shadow-md);
   padding: 11px 16px;
-  max-width: 360px;
-  transition: opacity 300ms ease;
+  max-inline-size: 360px;
+  pointer-events: auto;
+  animation: qs-rise var(--qs-motion-normal) var(--qs-motion-ease-entrance);
+  transition: opacity var(--qs-motion-slow) var(--qs-motion-ease-exit),
+              transform var(--qs-motion-slow) var(--qs-motion-ease-exit);
+}
+/* On a phone a toast belongs above the thumb bar, not under it. */
+@media (max-width: 640px) {
+  .qs-toasts {
+    inset-inline: var(--qs-spacing-sm);
+    inset-block-end: calc(var(--qs-spacing-sm) + var(--qs-safe-bottom));
+  }
+  .qs-toast { max-inline-size: none; }
 }
 .qs-toast-error   { border-inline-start-color: var(--qs-color-error); }
 .qs-toast-success { border-inline-start-color: var(--qs-color-success); }
@@ -308,7 +428,13 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   color: var(--qs-color-text-inverse);
   text-align: center;
   padding: var(--qs-spacing-sm);
+  padding-block-start: calc(var(--qs-spacing-sm) + var(--qs-safe-top));
   font-weight: var(--qs-typography-weight-medium);
+  animation: qs-slide-down var(--qs-motion-normal) var(--qs-motion-ease-entrance);
+}
+@keyframes qs-slide-down {
+  from { transform: translateY(-100%); }
+  to   { transform: none; }
 }
 
 /* ------------------------------------------------------------------- misc */
@@ -317,6 +443,27 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   padding: var(--qs-spacing-xxl) var(--qs-spacing-lg);
   text-align: center;
   color: var(--qs-color-text-muted);
+  animation: qs-fade var(--qs-motion-slow) var(--qs-motion-ease-standard);
+}
+
+/*
+ * A shape where the content will be, rather than a spinner where it will not.
+ * A screen that keeps its layout while it loads does not jump when it arrives.
+ */
+.qs-skeleton {
+  border-radius: var(--qs-radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--qs-color-surface-alt) 25%,
+    var(--qs-color-border) 37%,
+    var(--qs-color-surface-alt) 63%);
+  background-size: 400% 100%;
+  animation: qs-shimmer 1.4s ease infinite;
+  min-block-size: 1em;
+}
+@keyframes qs-shimmer {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0 50%; }
 }
 
 .qs-locked {
@@ -390,6 +537,224 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   from { transform: translateX(-3px); }
   to   { transform: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .qs-amount[data-invalid="true"] .qs-amount-input { animation: none; }
+
+/* =========================================================================
+ * Motion
+ *
+ * Four movements, and no more. Every screen in the product is built from
+ * these, so the whole system moves the same way and nothing draws attention to
+ * itself for its own sake.
+ * ========================================================================= */
+
+@keyframes qs-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes qs-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes qs-pop {
+  0%   { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes qs-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@keyframes qs-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 var(--qs-color-primary); opacity: 0.55; }
+  100% { box-shadow: 0 0 0 14px transparent; opacity: 0; }
+}
+
+/** New arrivals rise into place, so the eye finds them without hunting. */
+.qs-enter { animation: qs-rise var(--qs-motion-normal) var(--qs-motion-ease-entrance) both; }
+.qs-enter-fade { animation: qs-fade var(--qs-motion-normal) var(--qs-motion-ease-standard) both; }
+
+/**
+ * A list that stagger-reveals reads as one thing arriving rather than twenty.
+ * Capped at ten, because past that the last row waits noticeably.
+ */
+.qs-stagger > * { animation: qs-rise var(--qs-motion-normal) var(--qs-motion-ease-entrance) both; }
+.qs-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.qs-stagger > *:nth-child(2) { animation-delay: 20ms; }
+.qs-stagger > *:nth-child(3) { animation-delay: 40ms; }
+.qs-stagger > *:nth-child(4) { animation-delay: 60ms; }
+.qs-stagger > *:nth-child(5) { animation-delay: 80ms; }
+.qs-stagger > *:nth-child(6) { animation-delay: 100ms; }
+.qs-stagger > *:nth-child(7) { animation-delay: 120ms; }
+.qs-stagger > *:nth-child(8) { animation-delay: 140ms; }
+.qs-stagger > *:nth-child(9) { animation-delay: 160ms; }
+.qs-stagger > *:nth-child(n+10) { animation-delay: 180ms; }
+
+/** Something that needs an answer, breathing rather than flashing. */
+.qs-attention { position: relative; }
+.qs-attention::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: qs-pulse-ring 1.8s var(--qs-motion-ease-standard) infinite;
+}
+
+/* =========================================================================
+ * Responsive
+ *
+ * Two shapes, not one stretched. A phone is held in one hand by someone
+ * standing up; a counter screen is a metre away and touched with a knuckle.
+ * ========================================================================= */
+
+/** Hidden on phones, shown from tablet up — and the reverse. */
+@media (max-width: 767px) {
+  .qs-desk-only { display: none !important; }
+}
+@media (min-width: 768px) {
+  .qs-phone-only { display: none !important; }
+}
+
+/** Every interactive thing meets the finger minimum on a touch screen. */
+@media (pointer: coarse) {
+  .qs-btn, .qs-icon-btn, button, select, input:not([type="checkbox"]):not([type="radio"]) {
+    min-block-size: var(--qs-touch);
+  }
+  .qs-check input { inline-size: 22px; block-size: 22px; }
+}
+
+/**
+ * A bar of primary actions pinned to the bottom of a phone screen — where the
+ * thumb already is. It clears the home indicator on its own.
+ */
+.qs-action-bar {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 20;
+  display: flex;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-sm);
+  padding-block-end: calc(var(--qs-spacing-sm) + var(--qs-safe-bottom));
+  background: var(--qs-color-surface);
+  border-block-start: 1px solid var(--qs-color-border);
+  box-shadow: var(--qs-shadow-lg);
+}
+.qs-action-bar > * { flex: 1 1 0; }
+
+/* =========================================================================
+ * Notifications
+ * ========================================================================= */
+
+.qs-bell {
+  position: relative;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: var(--qs-spacing-xs) var(--qs-spacing-sm);
+  border-radius: var(--qs-radius-md);
+  font-size: var(--qs-typography-size-lg);
+  line-height: 1;
+  color: var(--qs-color-text-muted);
+  transition: background var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+.qs-bell:hover { background: var(--qs-color-surface-alt); }
+
+.qs-bell-count {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  min-inline-size: 18px;
+  padding: 0 5px;
+  border-radius: var(--qs-radius-pill);
+  background: var(--qs-color-primary);
+  color: var(--qs-color-primary-contrast);
+  font-size: 11px;
+  font-weight: var(--qs-typography-weight-bold);
+  line-height: 18px;
+  text-align: center;
+}
+/* Nothing waiting, nothing shown: a permanent "0" is noise. */
+.qs-bell[data-count="0"] .qs-bell-count { display: none; }
+.qs-bell[data-urgent="true"] .qs-bell-count { background: var(--qs-color-error); }
+/* Urgent breathes rather than flashes — visible from across a kitchen, and
+ * still bearable for the person standing next to it. */
+.qs-bell[data-urgent="true"] .qs-bell-mark {
+  display: inline-block;
+  animation: qs-swing 1.6s var(--qs-motion-ease-standard) infinite;
+  transform-origin: 50% 10%;
+}
+@keyframes qs-swing {
+  0%, 60%, 100% { transform: rotate(0); }
+  70% { transform: rotate(-11deg); }
+  80% { transform: rotate(9deg); }
+  90% { transform: rotate(-5deg); }
+}
+
+.qs-notify-panel {
+  position: fixed;
+  inset-block-start: calc(56px + var(--qs-safe-top));
+  inset-inline-end: var(--qs-spacing-md);
+  z-index: 900;
+  inline-size: min(380px, calc(100vw - 2 * var(--qs-spacing-md)));
+  max-block-size: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--qs-color-surface);
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-radius-lg);
+  box-shadow: var(--qs-shadow-lg);
+  overflow: hidden;
+  animation: qs-rise var(--qs-motion-normal) var(--qs-motion-ease-entrance);
+}
+/* On a phone it is a sheet, like every other overlay in the product. */
+@media (max-width: 640px) {
+  .qs-notify-panel {
+    inset: auto 0 0 0;
+    inline-size: 100%;
+    max-block-size: 78vh;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    padding-block-end: var(--qs-safe-bottom);
+    animation: qs-slide-up var(--qs-motion-normal) var(--qs-motion-ease-entrance);
+  }
+}
+
+.qs-notify-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+  border-block-end: 1px solid var(--qs-color-border);
+}
+.qs-notify-list { overflow-y: auto; overscroll-behavior: contain; padding: var(--qs-spacing-sm); }
+
+.qs-notify-item {
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+  border-radius: var(--qs-radius-md);
+  border-inline-start: 3px solid var(--qs-color-info);
+  background: var(--qs-color-surface-alt);
+  margin-block-end: 6px;
+}
+.qs-notify-item[data-urgency="URGENT"] { border-inline-start-color: var(--qs-color-error); }
+.qs-notify-item[data-urgency="ACTION"] { border-inline-start-color: var(--qs-color-warning); }
+.qs-notify-body { flex: 1 1 auto; min-inline-size: 0; }
+.qs-notify-body p { margin: 2px 0 0; color: var(--qs-color-text-muted); }
+
+/* The one that cannot be missed, for a screen looked at from two metres. */
+.qs-notify-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-md);
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+  background: var(--qs-color-error);
+  color: var(--qs-color-text-inverse);
+  font-weight: var(--qs-typography-weight-medium);
+  animation: qs-slide-down var(--qs-motion-normal) var(--qs-motion-ease-entrance);
+}
+.qs-notify-banner .qs-btn {
+  background: var(--qs-color-surface);
+  border-color: transparent;
+  color: var(--qs-color-text);
 }

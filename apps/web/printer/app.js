@@ -27,6 +27,7 @@ const state = {
 const root = document.getElementById('app');
 const printArea = h('pre', { id: 'print-area' });
 let realtime;
+let notifications;
 
 function note(message) {
   state.log.unshift(`${new Date().toLocaleTimeString()}  ${message}`);
@@ -80,7 +81,9 @@ function render() {
       h('div', { class: 'qs-card' },
         h('div', { class: 'qs-card-head' },
           h('h1', {}, t('printing.title')),
-          connectionIndicator(realtime)),
+          h('div', { class: 'qs-row' },
+            notifications.bell(),
+            connectionIndicator(realtime))),
 
         h('p', { class: 'bridge-status' },
           state.session?.terminal
@@ -124,6 +127,10 @@ async function main() {
   });
   state.session = started.session;
   realtime = started.realtime;
+  notifications = started.notifications;
+  notifications.onChange(() => {
+    document.querySelector('.qs-notify-banner')?.replaceWith(notifications.banner());
+  });
 
   render();
   note(t('app.name'));

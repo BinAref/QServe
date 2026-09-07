@@ -1,4 +1,10 @@
-/* Waiter terminal: a floor plan first, because a waiter thinks in tables. */
+/*
+ * Waiter terminal: a floor plan first, because a waiter thinks in tables.
+ *
+ * This is the most phone-shaped screen in the product — it is carried, in an
+ * apron, and used one-handed while holding something. So the phone layout is
+ * the design and the tablet is the variation, not the other way round.
+ */
 
 .floor-head {
   display: flex;
@@ -8,8 +14,9 @@
   background: var(--qs-color-surface);
   border-block-end: 1px solid var(--qs-color-border);
   position: sticky;
-  top: 0;
+  inset-block-start: 0;
   z-index: 10;
+  padding-block-start: calc(var(--qs-spacing-md) + var(--qs-safe-top));
 }
 .floor-head h1 { margin: 0; font-size: var(--qs-typography-size-lg); }
 
@@ -30,12 +37,17 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
-  min-height: 108px;
+  min-block-size: 108px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  transition:
+    border-color var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    box-shadow var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    transform var(--qs-motion-fast) var(--qs-motion-ease-spring);
 }
-.floor-table:hover { border-color: var(--qs-color-border-strong); }
+.floor-table:hover { border-color: var(--qs-color-border-strong); box-shadow: var(--qs-shadow-sm); }
+.floor-table:active { transform: scale(0.98); }
 .floor-table[data-status="AVAILABLE"]       { border-block-start-color: var(--qs-color-success); }
 .floor-table[data-status="ORDERING"]        { border-block-start-color: var(--qs-color-info); }
 .floor-table[data-status="PREPARING"]       { border-block-start-color: var(--qs-color-primary); }
@@ -53,4 +65,50 @@
   border: 1px solid var(--qs-color-border);
   border-radius: var(--qs-radius-md);
   padding: var(--qs-spacing-md);
+}
+
+/*
+ * A table with food waiting is the one thing on this screen that must not be
+ * scrolled past. It keeps a soft ring until somebody goes.
+ */
+.floor-table[data-ready="true"] {
+  box-shadow: 0 0 0 2px var(--qs-color-warning);
+  animation: qs-ready-breathe 2.4s var(--qs-motion-ease-standard) infinite;
+}
+@keyframes qs-ready-breathe {
+  0%, 100% { box-shadow: 0 0 0 2px var(--qs-color-warning); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--qs-color-warning) 35%, transparent); }
+}
+
+.floor-grid { animation: qs-fade var(--qs-motion-normal) var(--qs-motion-ease-standard); }
+
+/* ------------------------------------------------------------ on a phone */
+
+@media (max-width: 640px) {
+  .floor-head {
+    padding-inline: var(--qs-spacing-md);
+    gap: var(--qs-spacing-sm);
+  }
+  .floor-head h1 { font-size: var(--qs-typography-size-md); }
+  /* The station badge and the signed-in name compete for a 360px row; the
+   * name wins, because knowing who is taking the order matters more. */
+  .floor-head > .qs-badge:first-of-type { display: none; }
+
+  .floor-grid {
+    /* Two across on the narrowest phone: a table card any smaller stops
+     * being tappable with a thumb. */
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--qs-spacing-sm);
+    padding: var(--qs-spacing-sm);
+    padding-block-end: calc(var(--qs-spacing-xl) + var(--qs-safe-bottom));
+  }
+  .floor-table { min-block-size: 96px; padding: var(--qs-spacing-sm); }
+}
+
+/* ----------------------------------------------------------- on a tablet */
+
+@media (min-width: 1024px) {
+  .floor-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .floor-table { min-block-size: 124px; }
+  .floor-label { font-size: var(--qs-typography-size-xl); }
 }

@@ -23,6 +23,7 @@ const state = {
 
 const root = document.getElementById('app');
 let realtime;
+let notifications;
 
 const selected = () => state.orders.find((entry) => entry.order.id === state.selectedId) ?? null;
 const currency = () => selected()?.order.currency ?? state.orders[0]?.order.currency;
@@ -50,6 +51,13 @@ async function refreshSession() {
 
 function header() {
   return h('header', { class: 'till-head' },
+    // Only visible on a phone, where the bill covers the list.
+    h('button', {
+      class: 'qs-icon-btn till-back',
+      'aria-label': t('common.back'),
+      onClick: () => { state.selectedId = null; render(); },
+    }, '‹'),
+
     h('h1', {}, t('cashier.title')),
     state.session.terminal
       ? h('span', { class: 'qs-badge' }, pick(state.session.terminal.name))
@@ -69,6 +77,7 @@ function header() {
           }, t('common.signout')))
       : h('button', { class: 'qs-btn qs-btn-primary', onClick: openSignIn }, t('common.signin')),
 
+    notifications.bell(),
     connectionIndicator(realtime));
 }
 
@@ -135,11 +144,14 @@ function orderList() {
 
 function detail() {
   const entry = selected();
-  if (!entry) return h('div', { class: 'till-detail' }, h('div', { class: 'qs-empty' }, t('orders.no_orders')));
+  if (!entry) {
+    return h('div', { class: 'till-detail till-bill' },
+      h('div', { class: 'qs-empty' }, t('orders.no_orders')));
+  }
 
   const { order, bill } = entry;
 
-  return h('section', { class: 'till-detail' },
+  return h('section', { class: 'till-detail till-bill' },
     h('div', { class: 'qs-card-head' },
       h('div', {},
         h('h2', {}, t('orders.order_number', { number: order.number })),
@@ -356,7 +368,12 @@ function orderActions(order, bill) {
 function render() {
   mount(root,
     offlineBanner(realtime),
-    h('div', { class: 'till' }, header(), orderList(), detail()));
+    notifications.banner(),
+    h('div', {
+      class: 'till',
+      // Ignored on a wide screen, where both panes are on show anyway.
+      'data-pane': state.selectedId ? 'bill' : 'list',
+    }, header(), orderList(), detail()));
 }
 
 /* ------------------------------------------------------------------ boot */
@@ -369,6 +386,10 @@ async function main() {
   });
   state.session = started.session;
   realtime = started.realtime;
+  notifications = started.notifications;
+  notifications.onChange(() => {
+    document.querySelector('.qs-notify-banner')?.replaceWith(notifications.banner());
+  });
 
   await reload();
 

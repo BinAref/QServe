@@ -22,6 +22,7 @@ const state = {
 
 const root = document.getElementById('app');
 let realtime;
+let notifications;
 
 const signedIn = () => state.session.user !== null;
 const currency = () => state.menu?.restaurant?.currency;
@@ -61,6 +62,7 @@ function header() {
           }, t('common.signout')))
       : h('button', { class: 'qs-btn qs-btn-primary', onClick: openSignIn }, t('common.signin')),
 
+    notifications.bell(),
     connectionIndicator(realtime));
 }
 
@@ -111,6 +113,9 @@ function floor() {
     return h('button', {
       class: 'floor-table',
       'data-status': table.status,
+      // Food waiting is the one thing on this screen that must not be scrolled
+      // past, so the card itself keeps asking rather than a badge inside it.
+      'data-ready': String(ready > 0),
       onClick: () => openTable(table),
     },
       h('span', { class: 'floor-label' }, table.label),
@@ -310,7 +315,13 @@ function addLine(product) {
 /* ---------------------------------------------------------------- render */
 
 function render() {
-  mount(root, offlineBanner(realtime), header(), floor());
+  mount(root,
+    offlineBanner(realtime),
+    // A waiter carrying plates looks at the top of the screen, not at a bell in
+    // a corner, so the urgent one gets a band of its own.
+    notifications.banner(),
+    header(),
+    floor());
 }
 
 async function main() {
@@ -321,6 +332,11 @@ async function main() {
   });
   state.session = started.session;
   realtime = started.realtime;
+  notifications = started.notifications;
+  // Anything arriving redraws the header count and the banner in place.
+  notifications.onChange(() => {
+    document.querySelector('.qs-notify-banner')?.replaceWith(notifications.banner());
+  });
 
   await reload();
 

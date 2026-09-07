@@ -12,11 +12,19 @@ import { loadLocales, setLocale, preferredLocale, t, describeError } from './i18
 import { applyTheme } from './theme.js';
 import { sound } from './sound.js';
 import { Realtime } from './realtime.js';
+import { NotificationCentre } from './notifications.js';
 import { h, mount, toast } from './dom.js';
 
 export { api, ApiError, t, describeError, sound, toast };
+export { NotificationCentre };
 
-export async function boot({ topics = null, onResync = null, requireTerminal = false } = {}) {
+export async function boot({
+  topics = null,
+  onResync = null,
+  requireTerminal = false,
+  /** A terminal that wants to react to a notice itself, beyond the centre. */
+  onNotification = null,
+} = {}) {
   const session = await api.get('/api/auth/me').catch(() => null);
 
   if (!session) {
@@ -60,9 +68,16 @@ export async function boot({ topics = null, onResync = null, requireTerminal = f
   // The console boots signed-out during first-run setup, and the server rightly
   // refuses an unauthenticated upgrade. Connecting anyway would just fill the
   // log with handshake failures, so wait until there is a session to present.
-  if (session.user || session.terminal) realtime.connect();
+  const signedIn = Boolean(session.user || session.terminal);
+  if (signedIn) realtime.connect();
 
-  return { session, realtime, sound };
+  // Every station carries the same notification centre. What each one is told
+  // is decided on the server, so a diner's phone simply receives nothing.
+  const notifications = new NotificationCentre(realtime,
+    onNotification ? { onArrive: onNotification } : {});
+  if (signedIn) void notifications.refresh();
+
+  return { session, realtime, sound, notifications };
 }
 
 /** Connection indicator every staff screen puts in its header. */

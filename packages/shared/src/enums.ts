@@ -127,6 +127,52 @@ export const ActorKind = {
 } as const;
 export type ActorKind = (typeof ActorKind)[keyof typeof ActorKind];
 
+/**
+ * What one station tells another (spec §21).
+ *
+ * A restaurant runs on shouted sentences: "table nine is ready", "table four
+ * wants the bill", "we are out of sea bass". Each of these is one of them,
+ * routed to whoever needs to hear it rather than broadcast at everybody.
+ */
+export const NotificationKind = {
+  /** A diner pressed the button on their table. */
+  WAITER_CALLED: 'WAITER_CALLED',
+  /** A diner asked to pay. */
+  BILL_REQUESTED: 'BILL_REQUESTED',
+  /** The kitchen finished a ticket; somebody has to carry it. */
+  ORDER_READY: 'ORDER_READY',
+  /** The kitchen took the ticket, so the floor can stop wondering. */
+  ORDER_ACCEPTED: 'ORDER_ACCEPTED',
+  /** The kitchen cannot make it — a waiter has to go back to the table. */
+  ORDER_REJECTED: 'ORDER_REJECTED',
+  /** The floor is asking the kitchen to hurry a specific ticket. */
+  ORDER_RUSHED: 'ORDER_RUSHED',
+  /** A new ticket landed on a station's board. */
+  ORDER_PLACED: 'ORDER_PLACED',
+  /** A dish came off the menu mid-service. */
+  ITEM_UNAVAILABLE: 'ITEM_UNAVAILABLE',
+  /** A bill was settled. */
+  PAYMENT_TAKEN: 'PAYMENT_TAKEN',
+  /** A printer did not print. Silence here loses tickets. */
+  PRINT_FAILED: 'PRINT_FAILED',
+  /** A manager talking to the floor. */
+  BROADCAST: 'BROADCAST',
+  /** A station asking for a person. */
+  HELP_NEEDED: 'HELP_NEEDED',
+} as const;
+export type NotificationKind = (typeof NotificationKind)[keyof typeof NotificationKind];
+
+/** How loudly a notification asks. */
+export const NotificationUrgency = {
+  /** Worth knowing. Appears in the list, no sound. */
+  INFO: 'INFO',
+  /** Somebody should act. Sounds once. */
+  ACTION: 'ACTION',
+  /** Food is going cold, or money is at risk. Repeats until acknowledged. */
+  URGENT: 'URGENT',
+} as const;
+export type NotificationUrgency = (typeof NotificationUrgency)[keyof typeof NotificationUrgency];
+
 export const TextDirection = { LTR: 'ltr', RTL: 'rtl' } as const;
 export type TextDirection = (typeof TextDirection)[keyof typeof TextDirection];
 

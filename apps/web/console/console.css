@@ -1,8 +1,19 @@
-/* Management console. Runs on the restaurant's own PC, on loopback only, so it
-   is designed for a keyboard and a real screen rather than for a phone. */
+/*
+ * Management console. Runs on the restaurant's own PC, on loopback only — so
+ * the desk is its home ground and it is laid out for a keyboard and a real
+ * screen.
+ *
+ * It is not only used there, though. An owner checks the takings from the car
+ * park through a tunnel to their own machine, and does it one-handed. So the
+ * console has two shapes: a sidebar on a desk, and on a phone a bottom bar
+ * where the thumb already is, with the rest of the sections behind one "More".
+ */
 
-.shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
-@media (max-width: 900px) { .shell { grid-template-columns: 1fr; } }
+.shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-block-size: 100vh;
+}
 
 .shell-side {
   background: var(--qs-component-nav-background);
@@ -51,26 +62,138 @@
   font: inherit;
   cursor: pointer;
 }
+.shell-nav-item {
+  transition:
+    background var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    border-color var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
 .shell-nav-item:hover { background: var(--qs-component-nav-active-background); }
 .shell-nav-item[aria-current="page"] {
   background: var(--qs-component-nav-active-background);
   border-color: var(--qs-color-border);
   font-weight: var(--qs-typography-weight-medium);
+  position: relative;
+}
+/* A bar on the leading edge says which section you are in at a glance, without
+ * relying on a background tint that some themes barely shift. */
+.shell-nav-item[aria-current="page"]::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 6px;
+  inline-size: 3px;
+  border-radius: var(--qs-radius-pill);
+  background: var(--qs-color-primary);
 }
 .shell-nav-item[data-locked="true"] { opacity: 0.55; }
 .shell-lock { margin-inline-start: auto; font-size: var(--qs-typography-size-xs); }
 
-.shell-main { min-width: 0; }
+.shell-main { min-inline-size: 0; display: flex; flex-direction: column; }
 .shell-topbar {
   display: flex;
   align-items: center;
   gap: var(--qs-spacing-md);
   padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  padding-block-start: calc(var(--qs-spacing-md) + var(--qs-safe-top));
   background: var(--qs-color-surface);
   border-block-end: 1px solid var(--qs-color-border);
   position: sticky;
-  top: 0;
+  inset-block-start: 0;
   z-index: 10;
+}
+
+/* Each route change fades its content in, so a click always looks answered. */
+.shell-main > .qs-page { animation: qs-fade var(--qs-motion-normal) var(--qs-motion-ease-standard); }
+
+/* ------------------------------------------------------------ on a phone */
+
+.shell-tabs { display: none; }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+
+  /* The sidebar becomes a drawer, opened from the topbar. */
+  .shell-side {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 60;
+    inline-size: min(80vw, 300px);
+    block-size: 100dvh;
+    padding-block-start: calc(var(--qs-spacing-md) + var(--qs-safe-top));
+    box-shadow: var(--qs-shadow-lg);
+    transform: translateX(-100%);
+    transition: transform var(--qs-motion-normal) var(--qs-motion-ease-entrance);
+  }
+  /* Logical, so the drawer slides in from the right in Arabic. */
+  [dir="rtl"] .shell-side { transform: translateX(100%); }
+  .shell[data-drawer="open"] .shell-side { transform: none; }
+
+  .shell-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: var(--qs-color-overlay);
+    animation: qs-fade var(--qs-motion-fast) var(--qs-motion-ease-standard);
+  }
+
+  .shell-topbar { gap: var(--qs-spacing-sm); padding-inline: var(--qs-spacing-md); }
+  /*
+   * A 390px row cannot hold a mode badge, a LAN address, two pickers, a name
+   * and a sign-out button. What stays is what a phone is used for: the title,
+   * the notification bell, and a way out. The language and theme pickers move
+   * into the drawer, where there is room for them.
+   */
+  .shell-topbar .mode-badge,
+  .shell-topbar .qs-badge,
+  .shell-topbar select { display: none; }
+  .shell-topbar .qs-muted { display: none; }
+
+  /* The drawer picks them up. */
+  .shell-side .shell-side-controls { display: grid; gap: var(--qs-spacing-sm); }
+
+  .shell-main { padding-block-end: calc(64px + var(--qs-safe-bottom)); }
+
+  /*
+   * Five sections under the thumb. Which five is decided in JavaScript from
+   * what this person may actually do, so a cashier's phone does not offer a
+   * tab that answers 403.
+   */
+  .shell-tabs {
+    position: fixed;
+    inset-block-end: 0;
+    inset-inline: 0;
+    z-index: 50;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    background: var(--qs-color-surface);
+    border-block-start: 1px solid var(--qs-color-border);
+    padding-block-end: var(--qs-safe-bottom);
+    box-shadow: var(--qs-shadow-lg);
+  }
+  .shell-tab {
+    display: grid;
+    place-items: center;
+    gap: 2px;
+    padding: 8px 4px;
+    min-block-size: 56px;
+    border: none;
+    background: none;
+    color: var(--qs-color-text-muted);
+    font: inherit;
+    font-size: var(--qs-typography-size-xs);
+    cursor: pointer;
+    transition: color var(--qs-motion-fast) var(--qs-motion-ease-standard);
+  }
+  .shell-tab[aria-current="page"] { color: var(--qs-color-primary); }
+  .shell-tab-mark { font-size: var(--qs-typography-size-lg); line-height: 1; }
+}
+
+@media (min-width: 901px) {
+  .shell-scrim { display: none; }
+  /* On a desk the pickers live in the topbar, so the drawer copy is redundant. */
+  .shell-side-controls { display: none; }
 }
 
 .mode-badge {
@@ -89,7 +212,13 @@
   color: var(--qs-color-success);
 }
 
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--qs-spacing-md); }
+/* Two across on the narrowest phone, so four figures are one glance rather
+ * than a scroll. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--qs-spacing-md);
+}
 .stat { background: var(--qs-color-surface); border: 1px solid var(--qs-color-border); border-radius: var(--qs-radius-lg); padding: var(--qs-spacing-md); }
 .stat-value { font-size: var(--qs-typography-size-xxl); font-weight: var(--qs-typography-weight-bold); line-height: 1.1; }
 .stat-label { color: var(--qs-color-text-muted); font-size: var(--qs-typography-size-sm); }

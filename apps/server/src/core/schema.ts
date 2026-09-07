@@ -19,7 +19,7 @@
 import type { Migration } from '@qserve/db';
 import { DEFAULT_ROLE_PERMISSIONS, SystemRole } from '@qserve/shared';
 
-export const RESTAURANT_SCHEMA_VERSION = 3;
+export const RESTAURANT_SCHEMA_VERSION = 4;
 
 export const migrations: readonly Migration[] = [
   {
@@ -548,6 +548,56 @@ export const migrations: readonly Migration[] = [
           currency.symbolPosition, at, at,
         );
       }
+    },
+  },
+  {
+    version: 4,
+    name: 'notifications',
+    up: (db) => {
+      db.exec(`
+        -- What one station tells another. A restaurant runs on shouted
+        -- sentences; these are the same sentences, routed to whoever needs to
+        -- hear them and kept until somebody says they heard.
+        CREATE TABLE notifications (
+          id             TEXT PRIMARY KEY,
+          kind           TEXT NOT NULL,
+          urgency        TEXT NOT NULL DEFAULT 'ACTION',
+
+          -- Who is speaking. Either may be null: the system speaks too.
+          from_terminal_id   TEXT,
+          from_terminal_name TEXT,
+          from_user_id       TEXT,
+          from_user_name     TEXT,
+
+          -- Who should hear it. A list of terminal types, and/or one terminal
+          -- by id. Empty audience means everybody who may see notifications.
+          to_terminal_types  TEXT NOT NULL DEFAULT '[]',
+          to_terminal_id     TEXT,
+          -- Only stations whose holder has this permission are told.
+          to_permission      TEXT,
+
+          -- What it is about, so a tap can open the thing itself.
+          order_id       TEXT,
+          table_id       TEXT,
+          table_label    TEXT,
+
+          -- A key and its parameters, never a sentence: the kitchen screen is
+          -- in Turkish and the floor's phone is in Arabic, from one row.
+          message_key    TEXT NOT NULL,
+          params_json    TEXT NOT NULL DEFAULT '{}',
+          -- Free text a person typed, when there is any.
+          body           TEXT,
+
+          created_at         TEXT NOT NULL,
+          acknowledged_at    TEXT,
+          acknowledged_by    TEXT,
+          acknowledged_name  TEXT
+        );
+        -- The question every terminal asks on connect: what is still open?
+        CREATE INDEX idx_notifications_open
+          ON notifications(created_at DESC) WHERE acknowledged_at IS NULL;
+        CREATE INDEX idx_notifications_order ON notifications(order_id);
+      `);
     },
   },
 ];

@@ -10,13 +10,15 @@
 import type { Db } from '@qserve/db';
 import { nowIso } from '@qserve/db';
 import {
-  canTransition, conflict, EventName, newEntityId, notFound, OrderStatus, PaymentMethod,
-  PaymentStatus, validationError, type Actor, type Payment, type PaymentMethod as Method,
+  canTransition, conflict, EventName, newEntityId, NotificationKind, notFound, OrderStatus,
+  PaymentMethod, PaymentStatus, validationError,
+  type Actor, type Payment, type PaymentMethod as Method,
 } from '@qserve/shared';
 import type { EventBus } from '../../core/event-bus.js';
 import type { AuditRepository } from '../../core/repositories/audit.js';
 import type { OrderService } from '../orders/service.js';
 import type { OrderRepository } from '../orders/repository.js';
+import type { NotifyInput } from '../orders/service.js';
 
 interface PaymentRow {
   id: string; order_id: string; method: Method; status: string;
@@ -164,6 +166,13 @@ export class PaymentService {
     private readonly bus: EventBus,
   ) {}
 
+  /** Told about a settled bill, without this module knowing what a notice is. */
+  private notify: ((input: NotifyInput) => void) | null = null;
+
+  setNotifier(notify: (input: NotifyInput) => void): void {
+    this.notify = notify;
+  }
+
   /**
    * Capture a payment. Partial payments are allowed (split bills); the order
    * only reaches PAID once the captured total covers it.
@@ -260,6 +269,18 @@ export class PaymentService {
       payload: { payment, orderId: input.orderId, fullyPaid },
       originTerminalId: input.actor.terminalId,
     });
+
+    if (fullyPaid) {
+      this.notify?.({
+        kind: NotificationKind.PAYMENT_TAKEN,
+        messageKey: 'notify.payment_taken',
+        params: { order: order.number, table: order.tableLabel ?? '' },
+        actor: input.actor,
+        orderId: order.id,
+        tableId: order.tableId,
+        tableLabel: order.tableLabel,
+      });
+    }
 
     return { payment, orderPaid: fullyPaid };
   }

@@ -51,6 +51,11 @@ export const REQUIRED_TOKENS: readonly string[] = [
 
   'shadow.sm', 'shadow.md', 'shadow.lg',
 
+  // Motion is a design decision, not a constant in a stylesheet: a busy till
+  // wants it quicker than a quiet dining room, and a theme can say so.
+  'motion.fast', 'motion.normal', 'motion.slow',
+  'motion.easeStandard', 'motion.easeEntrance', 'motion.easeExit', 'motion.easeSpring',
+
   'component.button.radius', 'component.button.paddingX', 'component.button.paddingY',
   'component.card.radius', 'component.card.padding', 'component.card.shadow',
   'component.input.radius', 'component.input.borderColor', 'component.input.background',

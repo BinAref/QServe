@@ -223,6 +223,7 @@ before/after values:
 | system | settings changed, backup created and restored, assets uploaded and deleted, printers edited |
 | licence | activated, deactivated |
 | the lock | enabled, disabled, locked, unlocked, failed unlock |
+| currencies | added, edited, base moved, removed |
 | languages and themes | restaurant packs created, updated, deleted; shipped packs installed and removed |
 
 **Console → Activity log** reads it back filtered by person, station, action,

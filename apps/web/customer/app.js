@@ -93,6 +93,14 @@ function categoryStrip() {
       }, pick(category.name))));
 }
 
+/** The currency a price is in: the dish's own, or the restaurant's base. */
+function currencyOf(code) {
+  const list = state.menu?.currencies ?? [];
+  return list.find((entry) => entry.code === code)
+    ?? state.menu?.baseCurrency
+    ?? currency();
+}
+
 function productCard(product) {
   const soldOut = !product.available;
   const showPrices = state.menu.display.showPrices;
@@ -109,10 +117,16 @@ function productCard(product) {
         : null,
       soldOut ? h('div', { class: 'menu-sold-out' }, t('menu.sold_out')) : null,
       showPrices
-        ? h('div', { class: 'menu-item-price' }, formatMoney(product.priceMinor, currency()))
+        ? h('div', { class: 'menu-item-price' },
+            formatMoney(product.priceMinor, currencyOf(product.currencyCode)))
         : null),
     state.menu.display.showImages && product.imageAssetId
       ? h('img', { class: 'menu-item-img', src: `/assets/${product.imageAssetId}`, alt: '', loading: 'lazy' })
+      : null,
+    // A dish with options costs "from" this price, not this price. Saying so on
+    // the card avoids the small surprise of the sheet showing a bigger number.
+    product.options.some((option) => option.choices.some((c) => c.priceDeltaMinor > 0))
+      ? h('span', { class: 'menu-item-from' }, t('menu.from'))
       : null);
 }
 
@@ -130,7 +144,8 @@ function productSection() {
       : null,
     products.length === 0
       ? h('div', { class: 'qs-empty' }, t('menu.empty_products'))
-      : h('div', { class: 'menu-items' }, products.map(productCard)));
+      // Staggered: the section reads as one thing arriving rather than twenty.
+      : h('div', { class: 'menu-items qs-stagger' }, products.map(productCard)));
 }
 
 /* ------------------------------------------------------- product sheet */
@@ -297,6 +312,45 @@ function addToCart(draft) {
   render();
 }
 
+/* ------------------------------------------------- asking for a person */
+
+/**
+ * The two things a diner asks for that are not food.
+ *
+ * They sit under the menu rather than in the header because that is where a
+ * thumb is while scrolling, and they confirm in place — a diner who taps twice
+ * because nothing visibly happened is a waiter called twice.
+ */
+function serviceButtons() {
+  if (!state.session.terminal) return null;
+
+  const ask = async (kind, node, doneKey) => {
+    node.dataset.busy = 'true';
+    const sent = await guard(() => notifications.raise(kind));
+    node.dataset.busy = 'false';
+    if (!sent) return;
+
+    node.disabled = true;
+    node.classList.add('qs-attention');
+    toast(t(doneKey), 'success');
+    sound.playFor('new_order');
+    // Long enough that nobody taps again, short enough to ask twice if the
+    // waiter genuinely has not come.
+    setTimeout(() => {
+      node.disabled = false;
+      node.classList.remove('qs-attention');
+    }, 60_000);
+  };
+
+  const call = h('button', { class: 'qs-btn qs-btn-lg' }, '🔔 ', t('notify.call_waiter'));
+  call.addEventListener('click', () => void ask('WAITER_CALLED', call, 'notify.called'));
+
+  const bill = h('button', { class: 'qs-btn qs-btn-lg' }, '🧾 ', t('notify.ask_for_bill'));
+  bill.addEventListener('click', () => void ask('BILL_REQUESTED', bill, 'notify.called'));
+
+  return h('div', { class: 'menu-service' }, call, bill);
+}
+
 /* ------------------------------------------------------------------ cart */
 
 function cartBar() {
@@ -460,17 +514,20 @@ function render() {
     header(),
     categoryStrip(),
     productSection(),
+    serviceButtons(),
     cartBar());
 }
 
 /* ------------------------------------------------------------------ boot */
 
 let realtime;
+let notifications;
 
 async function main() {
   const started = await boot({ topics: ['menu', 'orders', 'system'], onResync: () => void reload() });
   state.session = started.session;
   realtime = started.realtime;
+  notifications = started.notifications;
 
   await reload();
   render();

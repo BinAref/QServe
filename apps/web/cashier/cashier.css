@@ -1,8 +1,18 @@
-/* Cashier terminal. A till is used standing up, quickly, often one-handed:
-   two panes, a big keypad, and the outstanding balance always in view. */
+/*
+ * Cashier terminal. A till is used standing up, quickly, often one-handed:
+ * two panes, a big keypad, and the outstanding balance always in view.
+ *
+ * On a phone the two panes cannot both be there, and splitting the screen would
+ * give neither enough room. So it becomes one pane at a time — the list, then
+ * the bill — with a way back. That is how a card machine works, and a cashier
+ * already knows it.
+ */
 
-.till { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; min-height: 100vh; }
-@media (max-width: 860px) { .till { grid-template-columns: 1fr; } }
+.till {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  min-block-size: 100dvh;
+}
 
 .till-head {
   grid-column: 1 / -1;
@@ -10,17 +20,24 @@
   align-items: center;
   gap: var(--qs-spacing-md);
   padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  padding-block-start: calc(var(--qs-spacing-md) + var(--qs-safe-top));
   background: var(--qs-color-surface);
   border-block-end: 1px solid var(--qs-color-border);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 10;
 }
 .till-head h1 { margin: 0; font-size: var(--qs-typography-size-lg); }
+.till-back { display: none; }
 
 .till-list {
   border-inline-end: 1px solid var(--qs-color-border);
   background: var(--qs-color-surface);
   overflow-y: auto;
-  max-height: calc(100vh - 69px);
+  max-block-size: calc(100dvh - 69px);
 }
+.till-order { transition: background var(--qs-motion-fast) var(--qs-motion-ease-standard); }
+.till-order[aria-current="true"] { background: var(--qs-color-surface-alt); }
 .till-order {
   display: block;
   width: 100%;
@@ -74,3 +91,40 @@
   margin-block-end: var(--qs-spacing-md);
 }
 .till-methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--qs-spacing-sm); }
+
+/* ------------------------------------------------------------ on a phone */
+
+@media (max-width: 860px) {
+  .till { grid-template-columns: 1fr; }
+
+  /*
+   * One pane at a time. Which one is `data-pane` on the container, set when a
+   * bill is opened and cleared by the back button — the same gesture a card
+   * machine uses, so nobody has to be taught it.
+   */
+  .till[data-pane="bill"] .till-list,
+  .till[data-pane="list"] .till-bill { display: none; }
+
+  .till-list {
+    border-inline-end: none;
+    max-block-size: none;
+    padding-block-end: var(--qs-safe-bottom);
+  }
+  .till[data-pane="bill"] .till-back { display: inline-flex; }
+  .till-bill { animation: qs-rise var(--qs-motion-normal) var(--qs-motion-ease-entrance); }
+
+  .till-head { padding-inline: var(--qs-spacing-md); }
+  .till-head h1 { font-size: var(--qs-typography-size-md); }
+
+  /* The keypad is the reason this screen exists on a phone at all: full
+   * width, tall keys, nothing else competing for the thumb. */
+  .till-keypad button { min-block-size: 56px; font-size: var(--qs-typography-size-xl); }
+  .till-methods { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ------------------------------------------------ on a real till screen */
+
+@media (min-width: 1280px) {
+  .till { grid-template-columns: minmax(320px, 420px) 1fr; }
+  .till-keypad button { min-block-size: 64px; font-size: var(--qs-typography-size-xl); }
+}

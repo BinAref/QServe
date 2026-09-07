@@ -29,7 +29,19 @@ import type { SettingsRepository } from '../../core/repositories/settings.js';
 import type { MenuRepository } from '../menu/repository.js';
 import type { TableRepository } from '../tables/repository.js';
 import { deriveTableStatus } from '../tables/repository.js';
+import { NotificationKind } from '@qserve/shared';
 import type { CurrencyRepository } from '../../core/repositories/currencies.js';
+
+/** The subset of the notification service this module needs, and no more. */
+export interface NotifyInput {
+  readonly kind: string;
+  readonly messageKey: string;
+  readonly params?: Record<string, unknown>;
+  readonly actor?: Actor;
+  readonly orderId?: string | null;
+  readonly tableId?: string | null;
+  readonly tableLabel?: string | null;
+}
 import type { OrderRepository, PersistItemInput } from './repository.js';
 
 export interface RequestedItem {
@@ -61,6 +73,17 @@ export class OrderService {
     private readonly bus: EventBus,
     private readonly currencies: CurrencyRepository,
   ) {}
+
+  /**
+   * Telling other stations what happened. Set after construction because the
+   * notification service publishes onto the same bus this service writes to,
+   * and neither should own the other.
+   */
+  private notify: ((input: NotifyInput) => void) | null = null;
+
+  setNotifier(notify: (input: NotifyInput) => void): void {
+    this.notify = notify;
+  }
 
   /**
    * How much has been captured against an order. Supplied by the payments
@@ -302,6 +325,18 @@ export class OrderService {
       originTerminalId: input.actor.terminalId,
     });
 
+    // The kitchen is told a ticket landed. A board that lights up is the point
+    // of a kitchen screen; a board that has to be watched is not.
+    this.notify?.({
+      kind: NotificationKind.ORDER_PLACED,
+      messageKey: 'notify.order_placed',
+      params: { order: order.number, table: order.tableLabel ?? '' },
+      actor: input.actor,
+      orderId: order.id,
+      tableId: order.tableId,
+      tableLabel: order.tableLabel,
+    });
+
     this.refreshTableStatus(input.tableId, input.actor.terminalId);
     return order;
   }
@@ -356,6 +391,25 @@ export class OrderService {
       payload: { order: updated, previousStatus: current.status },
       originTerminalId: input.actor.terminalId,
     });
+
+    // Three of the transitions are somebody else's cue to move.
+    const CUES: Readonly<Record<string, string>> = {
+      [OrderStatus.ACCEPTED]: NotificationKind.ORDER_ACCEPTED,
+      [OrderStatus.READY]: NotificationKind.ORDER_READY,
+      [OrderStatus.REJECTED]: NotificationKind.ORDER_REJECTED,
+    };
+    const cue = CUES[input.next];
+    if (cue) {
+      this.notify?.({
+        kind: cue,
+        messageKey: `notify.${cue.toLowerCase()}`,
+        params: { order: updated.number, table: updated.tableLabel ?? '' },
+        actor: input.actor,
+        orderId: updated.id,
+        tableId: updated.tableId,
+        tableLabel: updated.tableLabel,
+      });
+    }
 
     this.refreshTableStatus(current.tableId, input.actor.terminalId);
 

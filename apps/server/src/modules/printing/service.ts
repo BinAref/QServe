@@ -26,6 +26,7 @@ import {
 } from '@qserve/shared';
 import type { EventBus } from '../../core/event-bus.js';
 import type { LicenseGate } from '../../core/license-gate.js';
+import type { NotifyInput } from '../orders/service.js';
 import type { SettingsRepository } from '../../core/repositories/settings.js';
 
 interface PrinterRow {
@@ -351,6 +352,13 @@ export class PrintingService {
     private readonly spoolDir: string,
   ) {}
 
+  /** Told when a printer refuses, so somebody hears about it. */
+  private notify: ((input: NotifyInput) => void) | null = null;
+
+  setNotifier(notify: (input: NotifyInput) => void): void {
+    this.notify = notify;
+  }
+
   /** Printers that accept this document type, and this item's station if given. */
   private route(documentType: DocType, stations: readonly string[]): Printer[] {
     return this.repository.listPrinters().filter((printer) => {
@@ -429,6 +437,14 @@ export class PrintingService {
       this.bus.publish({
         name: EventName.PRINT_JOB_RESULT,
         payload: { jobId: job.id, ok: false, error: message },
+      });
+      // Nobody watches a print queue. Somebody has to be told, or the ticket
+      // that never printed is discovered when the diner asks where the food is.
+      this.notify?.({
+        kind: 'PRINT_FAILED',
+        messageKey: 'notify.print_failed',
+        params: { printer: printer.name, error: message },
+        ...(orderId ? { orderId } : {}),
       });
       return this.repository.getJob(job.id)!;
     }

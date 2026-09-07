@@ -18,6 +18,7 @@ and tested alone.
 | `network.ts` | LAN addresses, a small mDNS responder, the QR base URL |
 | `paths.ts` | on-disk layout — encodes what is and is not backed up |
 | `app-lock.ts` | the optional console password: a middleware, not a screen |
+| `repositories/currencies.ts` | the currencies the restaurant accepts; exactly one base |
 | `repositories/` | access (users, roles, sessions), terminals, settings, audit, licence, packs |
 
 ---
@@ -57,6 +58,17 @@ separate tracks.
 Modular routing by document type and kitchen station, so "kitchen orders →
 kitchen printer, receipts → cashier printer" is configuration. Three transports:
 raw ESC/POS over TCP, a browser bridge for USB printers, and a spool directory.
+
+### notifications
+What one station tells another (spec §21). A restaurant already runs on
+shouted sentences — "table nine is ready", "table four wants the bill"; on a
+busy Friday the shout does not carry. These are the same sentences, **addressed
+rather than broadcast**: a routing table decides who hears each kind, so a
+kitchen screen is never interrupted by a bill request and a diner's phone is
+never in an audience at all. Each notice is a translation key and its
+parameters, never a sentence, so the Turkish pass and the Arabic floor render
+one row. Urgent ones repeat until acknowledged, and acknowledging clears them
+everywhere at once — two waiters do not both walk over.
 
 ### backup
 AES-256-GCM containers with an authenticated header. Restore is one transaction.

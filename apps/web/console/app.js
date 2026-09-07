@@ -32,7 +32,16 @@ export const state = {
   session: null,
   route: 'dashboard',
   realtime: null,
+  notifications: null,
+  /** Phone only: whether the navigation drawer is showing. */
+  drawer: false,
 };
+
+/**
+ * The five sections that earn a place under the thumb on a phone, in the order
+ * an owner reaches for them. The rest stay one tap away behind the drawer.
+ */
+const PHONE_TABS = ['dashboard', 'orders', 'tables', 'menu', 'reports'];
 
 const root = document.getElementById('app');
 
@@ -119,22 +128,70 @@ const VIEWS = {
 
 export function navigate(route) {
   state.route = VIEWS[route] ? route : 'dashboard';
+  // Following a link closes the drawer; leaving it open over the page the
+  // person just asked for would be the wrong answer to their tap.
+  state.drawer = false;
   location.hash = `#/${state.route}`;
   renderShell();
 }
 
+/**
+ * The phone's bottom bar: the five most-reached sections this person is
+ * allowed, so a cashier never gets a tab that answers 403.
+ */
+function bottomTabs() {
+  const allowed = visibleNav();
+  const tabs = PHONE_TABS
+    .map((route) => allowed.find((entry) => entry.route === route))
+    .filter(Boolean);
+
+  // Whatever the five leave out is reachable from here.
+  const more = { route: '__more', label: 'common.more', mark: '☰' };
+
+  return h('nav', { class: 'shell-tabs' },
+    [...tabs, more].map((entry) => h('button', {
+      class: 'shell-tab',
+      'aria-current': state.route === entry.route ? 'page' : 'false',
+      onClick: () => {
+        if (entry.route === '__more') {
+          state.drawer = true;
+          renderShell();
+          return;
+        }
+        navigate(entry.route);
+      },
+    },
+      h('span', { class: 'shell-tab-mark' }, entry.mark ?? NAV_MARKS[entry.route] ?? '•'),
+      h('span', {}, t(entry.label)))));
+}
+
+/**
+ * One glyph per section. Text alone in a 64px-wide tab truncates to nonsense in
+ * every language, so the glyph carries the meaning and the label confirms it.
+ */
+const NAV_MARKS = {
+  dashboard: '◎', menu: '☰', tables: '▦', terminals: '▢', orders: '🧾',
+  reports: '📈', printing: '🖨', users: '👤', settings: '⚙', currencies: '¤',
+  languages: '文', themes: '◐', backup: '💾', activity: '🕘', license: '🔑',
+  developer: '⚒',
+};
+
+/** The sections this person may actually open, in navigation order. */
+function visibleNav() {
+  return NAV
+    .filter((entry) => !entry.developerOnly || state.status?.developerMode)
+    .filter((entry) => !entry.permission || has(entry.permission));
+}
+
 function sidebar() {
-  return h('nav', { class: 'shell-side' },
+  return h('nav', { class: 'shell-side', id: 'shell-side' },
     h('div', { class: 'shell-brand' },
       h('span', { class: 'shell-mark' }, 'QS'),
       h('div', {},
         h('strong', {}, pick(state.status?.restaurantName) || t('app.name')),
         h('small', {}, state.status?.restaurantId ?? ''))),
 
-    NAV
-      .filter((entry) => !entry.developerOnly || state.status?.developerMode)
-      .filter((entry) => !entry.permission || has(entry.permission))
-      .map((entry) => {
+    visibleNav().map((entry) => {
       const locked = entry.capability !== undefined && !can(entry.capability);
       return h('button', {
         class: 'shell-nav-item',
@@ -147,14 +204,51 @@ function sidebar() {
     }),
 
     h('div', { class: 'qs-grow' }),
+
+    // On a phone the topbar has no room for these, so the drawer holds them.
+    h('div', { class: 'shell-side-controls', style: { padding: 'var(--qs-spacing-sm)' } },
+      localePicker(),
+      themePicker()),
+
     h('div', { class: 'qs-xs qs-muted', style: { padding: 'var(--qs-spacing-sm)' } },
       `${t('app.name')} ${state.status?.appVersion ?? ''}`));
 }
 
-function topbar() {
+/** The language picker, wherever it is being shown. */
+function localePicker() {
   const locales = availableLocales();
+  if (locales.length < 2) return null;
 
+  return h('select', {
+    'aria-label': t('common.language'),
+    style: { width: 'auto' },
+    onChange: async (event) => {
+      await setLocale(event.target.value);
+      renderShell();
+    },
+  }, locales.map((entry) =>
+    h('option', { value: entry.locale, selected: entry.locale === document.documentElement.lang },
+      entry.name)));
+}
+
+function themePicker() {
+  return h('select', {
+    'aria-label': t('common.theme'),
+    style: { width: 'auto' },
+    onChange: async (event) => { await applyTheme(event.target.value); },
+  }, (state.status.themes ?? []).map((theme) =>
+    h('option', { value: theme.id, selected: theme.active }, theme.name)));
+}
+
+function topbar() {
   return h('header', { class: 'shell-topbar' },
+    h('button', {
+      class: 'qs-icon-btn qs-phone-only',
+      'aria-label': t('common.menu'),
+      'aria-expanded': String(state.drawer),
+      onClick: () => { state.drawer = !state.drawer; renderShell(); },
+    }, '☰'),
+
     h('span', { class: 'mode-badge', 'data-mode': state.status.mode },
       state.status.mode === 'SETUP' ? t('setup.mode_badge') : t('license.state.active')),
 
@@ -164,25 +258,9 @@ function topbar() {
 
     h('span', { class: 'qs-grow' }),
 
-    locales.length > 1
-      ? h('select', {
-          'aria-label': t('common.language'),
-          style: { width: 'auto' },
-          onChange: async (event) => {
-            await setLocale(event.target.value);
-            renderShell();
-          },
-        }, locales.map((entry) =>
-          h('option', { value: entry.locale, selected: entry.locale === document.documentElement.lang },
-            entry.name)))
-      : null,
-
-    h('select', {
-      'aria-label': t('common.theme'),
-      style: { width: 'auto' },
-      onChange: async (event) => { await applyTheme(event.target.value); },
-    }, (state.status.themes ?? []).map((theme) =>
-      h('option', { value: theme.id, selected: theme.active }, theme.name))),
+    state.notifications ? state.notifications.bell() : null,
+    localePicker(),
+    themePicker(),
 
     state.session.user
       ? h('div', { class: 'qs-row' },
@@ -202,9 +280,16 @@ function renderShell() {
   const body = h('div', { class: 'qs-page' });
 
   mount(root,
-    h('div', { class: 'shell' },
+    h('div', { class: 'shell', 'data-drawer': state.drawer ? 'open' : 'closed' },
       sidebar(),
-      h('main', { class: 'shell-main' }, topbar(), body)));
+      state.drawer
+        ? h('div', {
+            class: 'shell-scrim',
+            onClick: () => { state.drawer = false; renderShell(); },
+          })
+        : null,
+      h('main', { class: 'shell-main' }, topbar(), body),
+      bottomTabs()));
 
   // Views render asynchronously; the page frame is already on screen so the
   // console never flashes empty between routes.
@@ -406,6 +491,7 @@ async function main() {
   const started = await boot({ topics: ['system', 'orders', 'tables', 'terminals', 'menu'] });
   state.session = started.session;
   state.realtime = started.realtime;
+  state.notifications = started.notifications;
   state.status = await api.get('/api/system');
 
   // Three distinct first-run states, in the order an owner meets them.

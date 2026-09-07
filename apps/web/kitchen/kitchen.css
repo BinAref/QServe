@@ -1,7 +1,16 @@
-/* Kitchen display. Read from two metres away, in a hurry, by someone holding a
-   pan: large type, high contrast, colour used only to mean something. */
+/*
+ * Kitchen display. Read from two metres away, in a hurry, by someone holding a
+ * pan: large type, high contrast, colour used only to mean something.
+ *
+ * It runs on three quite different screens, and the layout follows the one it
+ * is on rather than scaling a single design:
+ *
+ *   a phone in an apron    one ticket at a time, actions under the thumb
+ *   a 10" tablet at a pass two or three columns, tapped with a knuckle
+ *   a 43" screen overhead  as many columns as fit, and type that carries
+ */
 
-.kds { display: flex; flex-direction: column; min-height: 100vh; }
+.kds { display: flex; flex-direction: column; min-block-size: 100dvh; }
 
 .kds-head {
   display: flex;
@@ -39,6 +48,63 @@
   gap: var(--qs-spacing-md);
   padding: var(--qs-spacing-md) var(--qs-spacing-lg) var(--qs-spacing-xxl);
   align-content: start;
+}
+
+/*
+ * A ticket arriving is the one moment the board must not be missed. It rises
+ * in and holds a ring for a beat — long enough to catch an eye that was
+ * elsewhere, short enough not to become wallpaper.
+ */
+.kds-ticket { animation: qs-rise var(--qs-motion-normal) var(--qs-motion-ease-entrance); }
+.kds-ticket[data-fresh="true"] { animation: qs-ticket-land var(--qs-motion-slow) var(--qs-motion-ease-spring); }
+@keyframes qs-ticket-land {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.98); }
+  60%  { opacity: 1; transform: none; box-shadow: 0 0 0 4px var(--qs-color-primary); }
+  100% { transform: none; box-shadow: var(--qs-shadow-sm); }
+}
+
+/* ------------------------------------------------------- on a phone */
+
+@media (max-width: 700px) {
+  .kds-head {
+    flex-wrap: wrap;
+    padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+    padding-block-start: calc(var(--qs-spacing-sm) + var(--qs-safe-top));
+  }
+  .kds-head h1 { font-size: var(--qs-typography-size-md); }
+  /* The filters scroll sideways rather than wrapping into three rows that
+   * push the first ticket off the screen. */
+  .kds-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    inline-size: 100%;
+    padding-block-end: 2px;
+  }
+  .kds-filters::-webkit-scrollbar { display: none; }
+  .kds-filter { flex: 0 0 auto; }
+
+  .kds-board {
+    grid-template-columns: 1fr;
+    padding: var(--qs-spacing-sm);
+    padding-block-end: calc(var(--qs-spacing-xxl) + var(--qs-safe-bottom));
+  }
+}
+
+/* ------------------------------------------- on a screen across the room */
+
+/*
+ * Past about 1600px the screen is on a wall, not on a bench: nobody is close
+ * enough to read 15px, and the columns can afford to be wider.
+ */
+@media (min-width: 1600px) {
+  .kds-board {
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: var(--qs-spacing-lg);
+  }
+  .kds-ticket { font-size: var(--qs-typography-size-lg); }
+  .kds-ticket-head strong { font-size: var(--qs-typography-size-xl); }
+  .kds-item { font-size: var(--qs-typography-size-lg); }
 }
 
 .kds-ticket {

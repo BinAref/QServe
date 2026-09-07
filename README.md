@@ -188,8 +188,8 @@ boot, and is not recommended.
 The spec sets these as the bar for "complete". Each is enforced, and most are
 covered by a test:
 
-- [x] No hard-coded languages — 544 keys in `locales/*.json`, validated
-- [x] No hard-coded themes — 57 design tokens in `themes/*.json`, validated
+- [x] No hard-coded languages — 574 keys in `locales/*.json`, validated
+- [x] No hard-coded themes — 64 design tokens in `themes/*.json`, validated
 - [x] A restaurant adds its own language, theme or currency without a developer
       — and the language covers its own menu text, not only the interface
 - [x] Several currencies on one menu, each line settled at the rate it was
@@ -209,7 +209,10 @@ covered by a test:
 - [x] Every order carries a persisted, unspoofable source
 - [x] Waiter, cashier and manager identity recorded on every action
 - [x] Terminal IDs, and QR codes for tables and stations
-- [x] Configurable sound notifications per terminal
+- [x] Configurable sound notifications per terminal, and notices routed
+      between stations rather than broadcast
+- [x] A phone layout and a large-screen layout for every terminal
+- [x] Motion is a theme token, and stops entirely under `prefers-reduced-motion`
 - [x] Signing keys protected; only public keys ship in the app
 - [x] Licence server holds no restaurant operational data
 - [x] RTL and LTR

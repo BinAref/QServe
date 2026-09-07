@@ -33,11 +33,12 @@ import { TerminalRepository } from './core/repositories/terminals.js';
 import { MenuRepository } from './modules/menu/repository.js';
 import { TableRepository } from './modules/tables/repository.js';
 import { OrderRepository } from './modules/orders/repository.js';
-import { OrderService } from './modules/orders/service.js';
+import { OrderService, type NotifyInput } from './modules/orders/service.js';
 import { PaymentRepository, PaymentService } from './modules/payments/service.js';
 import { TerminalService } from './modules/terminals/service.js';
 import { PrintingRepository, PrintingService } from './modules/printing/service.js';
 import { BackupService } from './modules/backup/service.js';
+import { NotificationService } from './modules/notifications/service.js';
 import { ReportService } from './modules/reports/service.js';
 import { LicensingService } from './modules/licensing/service.js';
 import { TranslationService } from './modules/translations/service.js';
@@ -76,6 +77,7 @@ export interface Services {
   readonly terminals: TerminalService;
   readonly printing: PrintingService;
   readonly backup: BackupService;
+  readonly notifications: NotificationService;
   readonly reports: ReportService;
   readonly licensing: LicensingService;
   readonly translations: TranslationService;
@@ -136,6 +138,7 @@ export function buildServices(options: BuildOptions = {}): Services {
 
   const security = new SecurityService(access, terminalRepository, gate, defaultLocale);
   const appLock = new AppLockService(settings, audit);
+  const notifications = new NotificationService(db, bus);
   const realtime = new RealtimeGateway(bus, security);
   const discovery = new LocalDiscovery();
 
@@ -152,6 +155,8 @@ export function buildServices(options: BuildOptions = {}): Services {
   // Closes the loop between the two: orders can ask whether a bill is settled
   // without depending on the payments module at construction time.
   orders.setPaidTotalProvider((orderId) => paymentRepository.capturedTotal(orderId));
+  // And lets the kitchen and the floor hear about each other without the
+  // orders module having to know what a notification is.
 
   let lanBaseUrl: string | null = null;
 
@@ -164,6 +169,15 @@ export function buildServices(options: BuildOptions = {}): Services {
   const backup = new BackupService(db, settings, audit, paths);
   const reports = new ReportService(orderRepository, paymentRepository, audit, settings);
   const assets = new AssetService(db, audit, paths);
+
+  // One line of wiring rather than a dependency each way: the modules that
+  // raise a notice do not need to know what a notice is.
+  const raise = (notification: NotifyInput): void => {
+    notifications.raise(notification as never);
+  };
+  orders.setNotifier(raise);
+  payments.setNotifier(raise);
+  printing.setNotifier(raise);
 
   const licensing = new LicensingService(
     {
@@ -203,7 +217,7 @@ export function buildServices(options: BuildOptions = {}): Services {
     config, paths, db, bus, gate, security, realtime, discovery, fingerprint, appLock,
     access, audit, licenseRepository, settings, terminalRepository,
     currencies, packs, contentTranslations, menu, tables, orderRepository,
-    orders, payments, terminals, printing, backup, reports, licensing,
+    orders, payments, terminals, printing, backup, notifications, reports, licensing,
     translations, themes, packAuthoring, shippedPacks, assets,
     appVersion: APP_VERSION,
     lanBaseUrl: () => lanBaseUrl,

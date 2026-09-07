@@ -15,6 +15,14 @@ export const SoundEvent = {
   PAYMENT_FAILED: 'payment_failed',
   NOTIFICATION: 'notification',
   ERROR: 'error',
+  /** A diner pressed the button on their table. */
+  WAITER_CALLED: 'waiter_called',
+  /** A diner asked to pay. */
+  BILL_REQUESTED: 'bill_requested',
+  /** A station is asking for a person. */
+  HELP_NEEDED: 'help_needed',
+  /** A printer refused a ticket. Quiet, but it must not be silent. */
+  PRINT_FAILED: 'print_failed',
 } as const;
 export type SoundEvent = (typeof SoundEvent)[keyof typeof SoundEvent];
 
@@ -77,6 +85,7 @@ export function defaultSoundProfile(terminalType: string): SoundProfile {
           [SoundEvent.NEW_ORDER]: b({ asset: 'builtin:new-order' }),
           [SoundEvent.PAYMENT_SUCCESS]: b({ asset: 'builtin:success' }),
           [SoundEvent.PAYMENT_FAILED]: b({ asset: 'builtin:error', repeatCount: 2 }),
+          [SoundEvent.BILL_REQUESTED]: b({ asset: 'builtin:call', repeatCount: 2 }),
           [SoundEvent.ORDER_CANCELLED]: b({ asset: 'builtin:alert' }),
         },
       };
@@ -85,9 +94,37 @@ export function defaultSoundProfile(terminalType: string): SoundProfile {
         enabled: true,
         masterVolume: 0.8,
         bindings: {
-          [SoundEvent.ORDER_READY]: b({ asset: 'builtin:ready', repeatCount: 2 }),
+          // Food going cold is the most expensive silence in a restaurant, so
+          // this one keeps asking until somebody says they are going.
+          [SoundEvent.ORDER_READY]: b({ asset: 'builtin:ready', untilAcknowledged: true }),
+          [SoundEvent.WAITER_CALLED]: b({ asset: 'builtin:call', untilAcknowledged: true }),
+          [SoundEvent.BILL_REQUESTED]: b({ asset: 'builtin:call', repeatCount: 2 }),
           [SoundEvent.ORDER_CANCELLED]: b({ asset: 'builtin:alert' }),
-          [SoundEvent.NOTIFICATION]: b({ asset: 'builtin:chime' }),
+          [SoundEvent.NOTIFICATION]: b({ asset: 'builtin:chime', volume: 0.6 }),
+        },
+      };
+    case 'MANAGER':
+      // A manager hears about what nobody else can fix, and nothing else: a
+      // screen that chimes at every order is a screen that gets muted.
+      return {
+        enabled: true,
+        masterVolume: 0.7,
+        bindings: {
+          [SoundEvent.HELP_NEEDED]: b({ asset: 'builtin:urgent', untilAcknowledged: true }),
+          [SoundEvent.PRINT_FAILED]: b({ asset: 'builtin:alert', repeatCount: 2 }),
+          [SoundEvent.PAYMENT_FAILED]: b({ asset: 'builtin:error' }),
+          [SoundEvent.NOTIFICATION]: b({ asset: 'builtin:chime', volume: 0.5 }),
+        },
+      };
+    case 'TABLE':
+      // A diner's own phone. It confirms their taps and never alerts them —
+      // nobody wants a restaurant table that beeps at them mid-conversation.
+      return {
+        enabled: true,
+        masterVolume: 0.5,
+        bindings: {
+          [SoundEvent.NEW_ORDER]: b({ asset: 'builtin:success', volume: 0.5 }),
+          [SoundEvent.ERROR]: b({ asset: 'builtin:error', volume: 0.5 }),
         },
       };
     default:
