@@ -269,6 +269,12 @@
 .product-row:last-child { border-block-end: none; }
 .product-row.dragging { opacity: 0.4; }
 .product-thumb { width: 44px; height: 44px; border-radius: var(--qs-radius-sm); object-fit: cover; background: var(--qs-color-surface-alt); flex: 0 0 auto; }
+.product-thumb-empty {
+  display: grid;
+  place-items: center;
+  font-size: var(--qs-typography-size-lg);
+  opacity: 0.45;
+}
 .drag-handle { color: var(--qs-color-text-muted); cursor: grab; user-select: none; }
 
 /* ------------------------------------------------------------------- QR */

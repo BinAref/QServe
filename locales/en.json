@@ -692,6 +692,7 @@
     "setup.locked_feature": "This needs an active licence",
     "setup.mode_badge": "SETUP MODE",
     "setup.owner_account": "Owner account",
+    "setup.owner_password_hint": "At least 8 characters. This account can restore the whole database, so it is the one to make strong — staff sign in with a 4-digit PIN.",
     "setup.restaurant_name": "Restaurant name",
     "setup.step_license": "Licence",
     "setup.step_menu": "Menu",

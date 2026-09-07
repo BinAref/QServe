@@ -32,7 +32,10 @@ export async function start(config = loadServerConfig()): Promise<StartedApp> {
   console.log(`  Restaurant:  ${profile?.restaurantId ?? 'not created yet'}`);
   console.log(`  Device:      ${services.fingerprint.label}`);
   if (mode === RestaurantMode.SETUP) {
-    console.log(`  Licence:     ${services.gate.explain()}`);
+    // `explain()` returns a translation key, because every screen renders it in
+    // its own language. The person reading this terminal deserves the same.
+    const locale = profile?.defaultLocale ?? 'en';
+    console.log(`  Licence:     ${services.translations.translate(locale, services.gate.explain())}`);
   }
   // Worth stating out loud: it adds routes that write into locales/ and
   // themes/, and it should never be on in a restaurant.

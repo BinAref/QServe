@@ -496,7 +496,13 @@ async function renderWizard(status) {
             h('input', { name: 'username', required: true, pattern: '[a-zA-Z0-9._\\-]{3,40}', autocomplete: 'username' })),
           h('label', { class: 'qs-field' },
             h('span', {}, t('common.password')),
-            h('input', { name: 'password', type: 'password', required: true, minlength: '8', autocomplete: 'new-password' })),
+            // The rule is the server's; saying it here is what stops a person
+            // typing four digits and wondering why nothing happens.
+            h('span', { class: 'qs-xs qs-muted' }, t('setup.owner_password_hint')),
+            h('input', {
+              name: 'password', type: 'password', required: true, minlength: '8',
+              autocomplete: 'new-password', title: t('setup.owner_password_hint'),
+            })),
           h('button', { class: 'qs-btn qs-btn-primary qs-btn-block', type: 'submit' },
             t('setup.create_owner'))));
 

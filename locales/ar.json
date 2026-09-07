@@ -692,6 +692,7 @@
     "setup.locked_feature": "هذه الميزة تحتاج إلى ترخيص مفعّل",
     "setup.mode_badge": "وضع الإعداد",
     "setup.owner_account": "حساب المالك",
+    "setup.owner_password_hint": "ثمانية أحرف على الأقل. هذا الحساب يستطيع استعادة قاعدة البيانات كاملة، فاجعله قويًا — أما الموظفون فيدخلون برمز من أربعة أرقام.",
     "setup.restaurant_name": "اسم المطعم",
     "setup.step_license": "الترخيص",
     "setup.step_menu": "القائمة",

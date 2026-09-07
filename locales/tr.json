@@ -692,6 +692,7 @@
     "setup.locked_feature": "Bu, etkin bir lisans gerektirir",
     "setup.mode_badge": "KURULUM MODU",
     "setup.owner_account": "Sahip hesabı",
+    "setup.owner_password_hint": "En az 8 karakter. Bu hesap tüm veritabanını geri yükleyebilir, bu yüzden güçlü olmalı — personel 4 haneli PIN ile giriş yapar.",
     "setup.restaurant_name": "Restoran adı",
     "setup.step_license": "Lisans",
     "setup.step_menu": "Menü",

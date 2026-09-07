@@ -226,7 +226,9 @@ function productPanel() {
       canManage() ? h('span', { class: 'drag-handle' }, '⠿') : null,
       product.imageAssetId
         ? h('img', { class: 'product-thumb', src: `/assets/${product.imageAssetId}`, alt: '' })
-        : h('div', { class: 'product-thumb' }),
+        // A dish with no photograph gets a plate rather than an empty grey
+        // rectangle, which reads as a picture that failed to load.
+        : h('div', { class: 'product-thumb product-thumb-empty' }, '🍽'),
       h('div', { class: 'qs-grow' },
         h('div', {}, pick(product.name)),
         h('div', { class: 'qs-xs qs-muted' },
