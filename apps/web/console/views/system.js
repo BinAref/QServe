@@ -8,7 +8,7 @@
  */
 
 import { api, guard, t, toast, roleLabel, setRoleNames } from '../../shared/boot.js';
-import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
+import { h, mount, modal, confirmDialog, entered } from '../../shared/dom.js';
 import { pick, te, formatDateTime, formatMoney } from '../../shared/i18n.js';
 import { localisedField, mergeLocalised, languageNote } from '../../shared/fields.js';
 import { Capability, Permission, PrintDocumentType, PrinterTransport } from '../../shared/events.js';
@@ -58,6 +58,7 @@ export async function renderSettings(container) {
 
   const body = h('div', {});
   const paint = () => {
+    entered(body);
     if (settingsSection === 'restaurant') mount(body, restaurantPanel(restaurant, canEdit, savePatch));
     else if (settingsSection === 'money') mount(body, moneyPanel(restaurant, canEdit, savePatch));
     else if (settingsSection === 'appearance') {
@@ -879,8 +880,11 @@ export async function renderPrinting(container) {
       // Routing is configuration, which is the whole point of §36.
       `${t('printing.doc.kitchen_ticket')} → ${roleLabel('KITCHEN')} · ${t('printing.doc.receipt')} → ${roleLabel('CASHIER')}`),
 
+    // "Nothing here yet" in a card the height of a hand is a hole in the page.
+    // A restaurant with no printer is a supported restaurant, so this says so.
     config.printers.length === 0
-      ? h('div', { class: 'qs-card' }, h('div', { class: 'qs-empty' }, t('common.empty')))
+      ? h('div', { class: 'qs-card qs-narrow' },
+          h('p', { class: 'qs-muted qs-small', style: { margin: 0 } }, t('printing.no_printers')))
       : h('div', { class: 'qs-grid qs-grid-2' }, config.printers.map((printer) =>
           h('div', { class: 'qs-card' },
             h('div', { class: 'qs-card-head' },
@@ -897,8 +901,8 @@ export async function renderPrinting(container) {
               onClick: () => openPrinterForm(container, printer, config),
             }, t('common.edit'))))),
 
-    h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-      h('h3', {}, t('printing.jobs')),
+    h('div', { class: 'qs-card qs-narrow', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+      h('h2', {}, t('printing.jobs')),
       jobs.jobs.length === 0
         ? h('p', { class: 'qs-muted qs-small' }, t('common.empty'))
         : h('div', { class: 'qs-table-wrap' },

@@ -391,6 +391,17 @@
  * control standing open; the five ways of narrowing sit under one line saying
  * how many are in force.
  */
+/* Two dates and a button, on one line, at the width they actually need. */
+.date-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--qs-spacing-md);
+  max-inline-size: 560px;
+}
+.date-range .qs-field { margin-block-end: 0; }
+.date-range .qs-btn { margin-block-end: 1px; }
+
 .log-page { max-inline-size: 880px; }
 .log-search { display: flex; gap: var(--qs-spacing-sm); align-items: center; }
 .log-search input { flex: 1 1 auto; min-inline-size: 0; max-inline-size: 340px; }

@@ -13,8 +13,8 @@
  */
 
 import { boot, api, guard, t, toast } from '../shared/boot.js';
-import { h, mount, modal } from '../shared/dom.js';
-import { pick, availableLocales, setLocale } from '../shared/i18n.js';
+import { h, mount, modal, entered } from '../shared/dom.js';
+import { pick, availableLocales, setLocale, locale as currentLocale } from '../shared/i18n.js';
 import { applyTheme } from '../shared/theme.js';
 import { Capability, grants, Permission } from '../shared/events.js';
 
@@ -346,7 +346,7 @@ function renderShell() {
   // Views render asynchronously; the page frame is already on screen so the
   // console never flashes empty between routes.
   mount(body, h('div', { class: 'qs-empty' }, h('div', { class: 'qs-spinner', style: { margin: '0 auto' } })));
-  void Promise.resolve(view(body)).catch((error) => {
+  void Promise.resolve(view(body)).then(() => entered(body)).catch((error) => {
     console.error('[console]', error);
     mount(body, h('div', { class: 'qs-card' }, h('p', { class: 'qs-muted' }, String(error.message ?? error))));
   });
@@ -404,7 +404,10 @@ async function renderDashboard(container) {
         h('p', { class: 'qs-small qs-muted' },
           `${t('license.restaurant_id')}: ${status.restaurantId ?? '—'}`, h('br'),
           `${t('license.transfers')}: ${status.license.transferCount}`),
-        h('button', { class: 'qs-btn', onClick: () => navigate('license') }, t('nav.license'))),
+        // "Licence" under a heading that says Licence, beside a nav item that
+        // says Licence: the button says what pressing it does.
+        h('button', { class: 'qs-btn qs-btn-sm', onClick: () => navigate('license') },
+          t('common.open'))),
 
       h('div', { class: 'qs-card' },
         h('h3', {}, t('nav.terminals')),
@@ -426,9 +429,15 @@ async function renderDashboard(container) {
  * The install wizard. Runs only while the installation has no restaurant or no
  * owner account; after that this code never executes again.
  */
+/* Survives the redraw that follows changing the wizard's language. */
+let wizardTheme = null;
+
 async function renderWizard(status) {
   const needsRestaurant = !status.setupComplete;
   const step = needsRestaurant ? 0 : 1;
+
+  wizardTheme ??= status.themes?.[0]?.id ?? 'light';
+  await applyTheme(wizardTheme);
 
   const form = h('form', { class: 'qs-card' });
   const submit = async (event) => {
@@ -460,9 +469,30 @@ async function renderWizard(status) {
   form.addEventListener('submit', submit);
 
   const locales = (status.locales ?? []).map((entry) =>
-    h('option', { value: entry.locale }, `${entry.name} (${entry.englishName})`));
+    h('option', { value: entry.locale, selected: entry.locale === currentLocale() },
+      `${entry.name} (${entry.englishName})`));
   const themes = (status.themes ?? []).map((theme) =>
-    h('option', { value: theme.id }, theme.name));
+    h('option', { value: theme.id, selected: theme.id === wizardTheme }, theme.name));
+
+  // Picking a theme changes this screen while you pick it. A dropdown listing
+  // five words, on a page that stays the same colour whichever you choose, is
+  // a choice made blind — and this is the first screen anyone ever sees.
+  const themeSelect = h('select', {
+    name: 'themeId',
+    onChange: (event) => {
+      wizardTheme = event.target.value;
+      void applyTheme(wizardTheme);
+    },
+  }, themes);
+
+  const localeSelect = h('select', {
+    name: 'defaultLocale',
+    // The same for the language: the wizard is written in it from here on.
+    onChange: async (event) => {
+      await setLocale(event.target.value);
+      await renderWizard(status);
+    },
+  }, locales);
 
   mount(form,
     h('div', { class: 'wizard-steps' },
@@ -480,10 +510,10 @@ async function renderWizard(status) {
             h('input', { name: 'name', required: true, autofocus: true, maxlength: '200' })),
           h('label', { class: 'qs-field' },
             h('span', {}, t('settings.default_language')),
-            h('select', { name: 'defaultLocale' }, locales)),
+            localeSelect),
           h('label', { class: 'qs-field' },
             h('span', {}, t('common.theme')),
-            h('select', { name: 'themeId' }, themes)),
+            themeSelect),
           h('button', { class: 'qs-btn qs-btn-primary qs-btn-block', type: 'submit' },
             t('setup.create_restaurant')))
       : h('div', {},

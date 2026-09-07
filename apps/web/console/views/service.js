@@ -89,8 +89,11 @@ export async function renderTables(container) {
       canManage ? h('button', { class: 'qs-btn', onClick: () => openBulkForm(container) }, t('tables.add_range')) : null,
       canManage ? h('button', { class: 'qs-btn qs-btn-primary', onClick: () => openTableForm(container, null) }, t('tables.add')) : null),
 
+    // The first thing a new restaurant sees here. "Nothing here yet" tells them
+    // what they can already see; this tells them what to do about it.
     tables.length === 0
-      ? h('div', { class: 'qs-card' }, h('div', { class: 'qs-empty' }, t('common.empty')))
+      ? h('div', { class: 'qs-card qs-narrow' },
+          h('p', { class: 'qs-muted qs-small', style: { margin: 0 } }, t('tables.none')))
       : h('div', { class: 'qs-grid qs-grid-cards qr-print-sheet' }, tables.map((table) =>
           h('div', { class: 'qs-card' },
             h('div', { class: 'qs-card-head' },
@@ -248,7 +251,8 @@ export async function renderTerminals(container) {
     // Each card used to carry two pills — what it is and whether it is on —
     // where what it is never changes and only one of the two is news.
     terminals.length === 0
-      ? h('div', { class: 'qs-card' }, h('div', { class: 'qs-empty' }, t('common.empty')))
+      ? h('div', { class: 'qs-card qs-narrow' },
+          h('p', { class: 'qs-muted qs-small', style: { margin: 0 } }, t('terminals.none')))
       : h('div', { class: 'qs-card qs-narrow qr-print-sheet' },
           h('div', { class: 'qs-rows' }, terminals.map((terminal) =>
             h('div', { class: 'qs-row-item' },

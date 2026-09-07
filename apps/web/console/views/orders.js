@@ -224,28 +224,30 @@ export async function renderReports(container) {
         download: '',
       }, t('reports.export_csv'))),
 
-    h('div', { class: 'qs-card', style: { marginBlockEnd: 'var(--qs-spacing-lg)' } },
-      h('div', { class: 'qs-row' },
-        h('label', { class: 'qs-field', style: { marginBlockEnd: 0 } },
-          h('span', {}, t('reports.range')),
-          h('input', {
-            type: 'date', value: since,
-            onChange: (event) => { state.reportSince = event.target.value; void renderReports(container); },
-          })),
-        h('label', { class: 'qs-field', style: { marginBlockEnd: 0 } },
-          h('span', {}, '—'),
-          h('input', {
-            type: 'date', value: until,
-            onChange: (event) => { state.reportUntil = event.target.value; void renderReports(container); },
-          })),
-        h('button', {
-          class: 'qs-btn',
-          onClick: () => {
-            state.reportSince = undefined;
-            state.reportUntil = undefined;
-            void renderReports(container);
-          },
-        }, t('reports.today')))),
+    // Two dates and a way back to today, in the width two dates need. The
+    // second box used to be labelled "—", which is not a word in any language
+    // this ships in.
+    h('div', { class: 'qs-card date-range', style: { marginBlockEnd: 'var(--qs-spacing-lg)' } },
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('audit.filter_from')),
+        h('input', {
+          type: 'date', value: since,
+          onChange: (event) => { state.reportSince = event.target.value; void renderReports(container); },
+        })),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('audit.filter_to')),
+        h('input', {
+          type: 'date', value: until,
+          onChange: (event) => { state.reportUntil = event.target.value; void renderReports(container); },
+        })),
+      h('button', {
+        class: 'qs-btn',
+        onClick: () => {
+          state.reportSince = undefined;
+          state.reportUntil = undefined;
+          void renderReports(container);
+        },
+      }, t('reports.today'))),
 
     h('div', { class: 'stat-grid' },
       stat(String(report.totals.orders), t('reports.orders_count')),

@@ -19,7 +19,7 @@
  */
 
 import { api, guard, t, toast } from '../../shared/boot.js';
-import { h, mount, confirmDialog } from '../../shared/dom.js';
+import { h, mount, confirmDialog, entered } from '../../shared/dom.js';
 import { loadLocales } from '../../shared/i18n.js';
 import { pageHeader, reroute } from '../app.js';
 
@@ -43,6 +43,7 @@ export async function renderDeveloper(container) {
 
   const body = h('div', {});
   const paint = () => {
+    entered(body);
     if (developerSection === 'vendor') {
       mount(body, vendorEditor(container, vendor));
       return;

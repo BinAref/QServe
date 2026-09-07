@@ -52,6 +52,22 @@ export function mount(container, ...children) {
   return container;
 }
 
+/**
+ * Play the entrance animation on something that has just been filled.
+ *
+ * A repaint replaces children, which restarts nothing on the container itself,
+ * so the class is removed and re-added around a forced reflow. Used where a
+ * panel is swapped under a heading that stays put — a settings tab, the
+ * developer's sections — so the eye is told something changed without the whole
+ * screen moving.
+ */
+export function entered(element) {
+  element.classList.remove('qs-enter-fade');
+  void element.offsetWidth;
+  element.classList.add('qs-enter-fade');
+  return element;
+}
+
 export function debounce(fn, ms = 250) {
   let timer;
   return (...args) => {
