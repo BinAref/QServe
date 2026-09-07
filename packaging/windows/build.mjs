@@ -211,9 +211,11 @@ rmSync(zip, { force: true });
 
 if (!skipZip) {
   say(`packing ${basename(zip)}`);
+  // bsdtar on Windows, zip on everything else — the point being that both
+  // produce an archive with a single `QServe` folder inside it, so unzipping
+  // never scatters ninety files across somebody's Downloads.
   if (platform === 'win32') {
-    run('powershell', ['-NoProfile', '-Command',
-      `Compress-Archive -Path '${stage}' -DestinationPath '${zip}' -Force`]);
+    run('tar', ['-a', '-c', '-f', zip, '-C', build, 'QServe']);
   } else {
     run('zip', ['-qr', zip, 'QServe'], { cwd: build });
   }
