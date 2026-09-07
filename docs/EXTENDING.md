@@ -206,10 +206,16 @@ mechanism, the router.
 
 ## 5. Add a role
 
-Entirely at runtime, in **Users → Roles → Add role**. Pick a key, a name and the
-permissions. Roles are rows; the built-in defaults seed the table once at
-install and are never consulted again, so re-scoping `CASHIER` gives exactly
-what you configured.
+Entirely at runtime, in **Users → Roles → Add role**. Write a name in each
+language and tick what the role may do; the machine key is derived from the name
+so nobody is asked to invent an identifier. A role you add is yours completely —
+rename it, re-scope it, delete it.
+
+Renaming is separate from scoping, and works on the built-in roles too:
+**Users → Roles → Rename** writes what your restaurant calls its people, and
+every screen follows. The permissions behind a built-in role stay the system's;
+if you need a different set, add a role of your own rather than re-scoping
+`CASHIER` (the server refuses that, and restates the defaults at each boot).
 
 To add a new *permission*, add it to `Permission` in
 `packages/shared/src/permissions.ts`, mirror it in `apps/web/shared/events.js`,

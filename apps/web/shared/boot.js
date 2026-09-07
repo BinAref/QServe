@@ -13,10 +13,13 @@ import { applyTheme } from './theme.js';
 import { sound } from './sound.js';
 import { Realtime } from './realtime.js';
 import { NotificationCentre } from './notifications.js';
+import { setRoleNames } from './roles.js';
+import { EventName } from './events.js';
 import { h, mount, toast } from './dom.js';
 
 export { api, ApiError, t, describeError, sound, toast };
 export { NotificationCentre };
+export { roleLabel, stationLabel, isRenamed, setRoleNames } from './roles.js';
 
 export async function boot({
   topics = null,
@@ -44,6 +47,10 @@ export async function boot({
     );
     throw new Error('no terminal session');
   }
+
+  // The restaurant's own words for its people, before anything is drawn: the
+  // heading of this very screen may be one of them.
+  setRoleNames(session.roleNames);
 
   const restaurantLocale = session.locale ?? 'en';
   await loadLocales().catch(() => {});
@@ -76,6 +83,17 @@ export async function boot({
   const notifications = new NotificationCentre(realtime,
     onNotification ? { onArrive: onNotification } : {});
   if (signedIn) void notifications.refresh();
+
+  // A role renamed in the console is a word on this screen's heading. Rather
+  // than make every station wait for its next reload, take the new names as
+  // they are published and re-render.
+  realtime.on(EventName.SYSTEM_SETTINGS_CHANGED, (payload) => {
+    if (!payload?.keys?.includes('roles')) return;
+    void api.get('/api/auth/me').then((fresh) => {
+      setRoleNames(fresh.roleNames);
+      onResync?.();
+    }).catch(() => {});
+  });
 
   return { session, realtime, sound, notifications };
 }

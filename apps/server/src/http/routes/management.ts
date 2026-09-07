@@ -269,12 +269,44 @@ export function createManagementRoutes(services: Services): Router<AppState> {
     roles: services.access.listRoles().map(({ row, permissions }) => ({
       id: row.id,
       key: row.key,
+      // Empty when nobody has renamed it: the console then shows the shipped
+      // label, translated into whatever language the reader is using.
       name: services.access.roleName(row),
       system: row.is_system === 1,
       permissions,
     })),
     availablePermissions: ALL_PERMISSIONS,
   }), [loopbackOnly, security.requirePermission(Permission.ROLES_MANAGE)]);
+
+  /**
+   * Rename a role — including a built-in one. What a restaurant calls its
+   * people is the restaurant's business; what those people may do is not, so
+   * this route touches `name` and nothing else. Sending `null` gives the role
+   * its shipped label back.
+   */
+  router.patch('/roles/:id', (ctx) => {
+    const id = ctx.params['id']!;
+    const role = services.access.getRoleById(id);
+    if (!role) throw notFound('role', id);
+
+    const body = asObject(ctx.body);
+    const before = services.access.roleName(role);
+    const name = body['name'] === null ? {} : requireLocalised(body, 'name', { max: 80 });
+    services.access.renameRole(id, name);
+
+    services.audit.record({
+      action: 'role.renamed',
+      actor: ctx.state.auth!.actor,
+      entityType: 'role',
+      entityId: id,
+      before: { name: before },
+      after: { name },
+      clientIp: ctx.ip,
+    });
+    // Every screen reads the name from its session, so they all need telling.
+    services.bus.publish({ name: EventName.SYSTEM_SETTINGS_CHANGED, payload: { keys: ['roles'] } });
+    return { id, key: role.key, name };
+  }, [loopbackOnly, canManageRoles]);
 
   router.post('/roles', (ctx) => {
     const body = asObject(ctx.body);
@@ -306,6 +338,15 @@ export function createManagementRoutes(services: Services): Router<AppState> {
     const id = ctx.params['id']!;
     const role = services.access.getRoleById(id);
     if (!role) throw notFound('role', id);
+    // A built-in role's grants are the product's promise, not a setting: a
+    // "cashier" means the same thing in every restaurant that runs QServe, even
+    // where the word on the badge is different. A restaurant that needs another
+    // set of powers adds a role of its own, which it then owns outright.
+    if (role.is_system === 1) {
+      throw conflict('a built-in role keeps the permissions the system gives it', {
+        role: role.key, hint: 'rename it, or add a role of your own',
+      });
+    }
 
     const body = asObject(ctx.body);
     const permissions = requireStringArray(body, 'permissions', { max: 80 });

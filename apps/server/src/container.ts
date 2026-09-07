@@ -10,7 +10,9 @@
 
 import { openDatabase, runMigrations, type Db } from '@qserve/db';
 import { computeDeviceFingerprint, type FingerprintResult } from '@qserve/crypto';
-import { APP_VERSION, EventName, type DeviceFingerprint } from '@qserve/shared';
+import {
+  APP_VERSION, DEFAULT_ROLE_PERMISSIONS, EventName, type DeviceFingerprint,
+} from '@qserve/shared';
 
 import { loadServerConfig, type ServerConfig } from './config.js';
 import { ensureDirectories, readOrCreateInstallId, resolvePaths, type Paths } from './core/paths.js';
@@ -137,6 +139,13 @@ export function buildServices(options: BuildOptions = {}): Services {
   );
 
   const defaultLocale = (): string => settings.profile()?.defaultLocale ?? 'en';
+
+  // A built-in role's grants belong to the system: restated here so a database
+  // restored from an older backup runs with the powers this version defines.
+  const repaired = access.assertSystemGrants(DEFAULT_ROLE_PERMISSIONS);
+  if (repaired.length > 0) {
+    console.log(`[qserve] restored system grants for: ${repaired.join(', ')}`);
+  }
 
   const security = new SecurityService(access, terminalRepository, gate, defaultLocale);
   const appLock = new AppLockService(settings, audit);

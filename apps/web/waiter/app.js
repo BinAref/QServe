@@ -7,7 +7,7 @@
  * waiter's own name, which is the distinction the spec is most insistent about.
  */
 
-import { boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t } from '../shared/boot.js';
+import { boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t, roleLabel } from '../shared/boot.js';
 import { h, mount, modal } from '../shared/dom.js';
 import { formatMoney, pick, te } from '../shared/i18n.js';
 import { SoundEvent, OrderStatus, grants, Permission } from '../shared/events.js';
@@ -43,7 +43,8 @@ async function refreshSession() {
 
 function header() {
   return h('header', { class: 'floor-head' },
-    h('h1', {}, t('waiter.title')),
+    // Whatever this restaurant calls the people who work here.
+    h('h1', {}, roleLabel('WAITER')),
     state.session.terminal
       ? h('span', { class: 'qs-badge' }, pick(state.session.terminal.name))
       : null,

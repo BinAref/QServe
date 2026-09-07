@@ -9,11 +9,19 @@
  * what activation unlocks rather than an empty page.
  */
 
-import { api, guard, t, toast } from '../../shared/boot.js';
+import { api, guard, t, toast, stationLabel } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { pick, te, formatDateTime } from '../../shared/i18n.js';
+import { localisedField, collectLocalised } from '../../shared/fields.js';
 import { Capability, Permission, TerminalType } from '../../shared/events.js';
-import { state, has, can, pageHeader, lockedPanel } from '../app.js';
+import { state, has, can, pageHeader, lockedPanel, enabledLocales } from '../app.js';
+
+/**
+ * A station's type, in this restaurant's words. An owner who renamed their
+ * waiters sees that name here too — the terminal list is where they go looking
+ * for it, and one product using two words for one thing is a bug.
+ */
+const typeLabel = (type) => stationLabel(type, te('terminals.type', type));
 
 /* ------------------------------------------------------------- QR sheet */
 
@@ -246,7 +254,7 @@ export async function renderTerminals(container) {
                 class: `qs-badge ${terminal.online ? 'qs-badge-success' : ''}`,
               }, terminal.online ? t('common.online') : t('common.offline'))),
             h('p', { class: 'qs-small' },
-              h('span', { class: 'qs-badge' }, te('terminals.type', terminal.type)),
+              h('span', { class: 'qs-badge' }, typeLabel(terminal.type)),
               terminal.status !== 'ACTIVE'
                 ? h('span', { class: 'qs-badge qs-badge-warning' }, t('common.disabled'))
                 : null),
@@ -258,7 +266,7 @@ export async function renderTerminals(container) {
               h('button', {
                 class: 'qs-btn',
                 onClick: () => void openQr(`/api/terminals/${terminal.id}/qr`,
-                  pick(terminal.name), te('terminals.type', terminal.type)),
+                  pick(terminal.name), typeLabel(terminal.type)),
               }, t('terminals.qr')),
               canManage
                 ? h('button', {
@@ -270,25 +278,17 @@ export async function renderTerminals(container) {
 
 function openTerminalForm(container, terminal) {
   const types = Object.values(TerminalType).filter((type) => type !== TerminalType.TABLE);
-  const locales = state.status?.locales?.filter((entry) => entry.enabled) ?? [{ locale: 'en' }];
+  const locales = enabledLocales();
 
   const form = h('form', {},
-    h('div', { class: 'qs-field' },
-      h('span', {}, t('common.name')),
-      locales.map((entry) =>
-        h('div', { class: 'qs-row', style: { marginBlockEnd: '6px' } },
-          h('span', { class: 'qs-badge', style: { minWidth: '46px' } }, entry.locale),
-          h('input', {
-            name: `name.${entry.locale}`,
-            value: terminal?.name?.[entry.locale] ?? '',
-          })))),
+    localisedField(t('common.name'), 'name', terminal?.name ?? {}, { locales }),
 
     terminal
       ? null
       : h('label', { class: 'qs-field' },
           h('span', {}, t('common.type')),
           h('select', { name: 'type' }, types.map((type) =>
-            h('option', { value: type }, te('terminals.type', type))))),
+            h('option', { value: type }, typeLabel(type))))),
 
     terminal
       ? h('label', { class: 'qs-check' },
@@ -349,11 +349,7 @@ function openTerminalForm(container, terminal) {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
 
-          const name = {};
-          for (const entry of locales) {
-            const value = String(data[`name.${entry.locale}`] ?? '').trim();
-            if (value) name[entry.locale] = value;
-          }
+          const name = collectLocalised(data, 'name', locales);
           if (Object.keys(name).length === 0) {
             toast(t('error.validation'), 'error');
             return;

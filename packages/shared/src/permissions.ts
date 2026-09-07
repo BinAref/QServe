@@ -63,7 +63,11 @@ export const isPermission = (v: unknown): v is Permission =>
  */
 export const WILDCARD_PERMISSION = '*';
 
-/** Built-in role keys. Restaurants may add their own; these cannot be deleted. */
+/**
+ * Built-in role keys. A restaurant may add its own and may rename any of these,
+ * but cannot delete or re-scope them — the key is what the rest of the product
+ * is written against, and the name is what people read.
+ */
 export const SystemRole = {
   ADMIN: 'ADMIN',
   MANAGER: 'MANAGER',
@@ -77,8 +81,11 @@ export type SystemRole = (typeof SystemRole)[keyof typeof SystemRole];
 const P = Permission;
 
 /**
- * Default grants. A restaurant can edit any of these after install — they are
- * seeded into the `role_permissions` table, not consulted at runtime.
+ * What each built-in role may do. Seeded into `role_permissions` at install and
+ * restated at every boot, because these grants are the product's promise rather
+ * than a restaurant's setting: a cashier means the same thing everywhere QServe
+ * runs, whatever that restaurant calls the person. What a restaurant *does* own
+ * is the name, and any role it adds itself.
  */
 export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly string[]>> = {
   [SystemRole.ADMIN]: [WILDCARD_PERMISSION],

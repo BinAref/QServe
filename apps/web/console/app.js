@@ -50,6 +50,9 @@ const root = document.getElementById('app');
 export const has = (permission) => grants(state.session?.permissions ?? [], permission);
 export const can = (capability) => (state.status?.capabilities ?? []).includes(capability);
 export const isSetup = () => state.status?.mode === 'SETUP';
+/** The languages this restaurant offers; every owner-written name is per-language. */
+export const enabledLocales = () =>
+  state.status?.locales?.filter((entry) => entry.enabled).map((entry) => entry.locale) ?? ['en'];
 
 export async function refreshStatus() {
   state.status = await api.get('/api/system');
@@ -162,7 +165,7 @@ function bottomTabs() {
       },
     },
       h('span', { class: 'shell-tab-mark' }, entry.mark ?? NAV_MARKS[entry.route] ?? '•'),
-      h('span', {}, t(entry.label)))));
+      h('span', { class: 'shell-tab-label' }, t(entry.label)))));
 }
 
 /**
@@ -396,7 +399,7 @@ async function renderDashboard(container) {
       h('div', { class: 'qs-card' },
         h('h3', {}, t('license.title')),
         h('p', {},
-          h('span', { class: 'qs-badge' }, t(status.license.explanation)),
+          h('span', { class: 'qs-badge qs-badge-text' }, t(status.license.explanation)),
           status.license.licenseId ? h('span', { class: 'qs-mono' }, ` ${status.license.licenseId}`) : null),
         h('p', { class: 'qs-small qs-muted' },
           `${t('license.restaurant_id')}: ${status.restaurantId ?? '—'}`, h('br'),

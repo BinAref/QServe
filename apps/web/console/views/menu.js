@@ -13,7 +13,9 @@
 import { api, guard, t, toast } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { formatMoney, pick } from '../../shared/i18n.js';
-import { moneyField, integerField } from '../../shared/fields.js';
+import {
+  moneyField, integerField, localisedField as sharedLocalisedField, collectLocalised as sharedCollectLocalised,
+} from '../../shared/fields.js';
 import { displayed } from '../../shared/money.js';
 import { Permission } from '../../shared/events.js';
 import { state, has, pageHeader, reroute } from '../app.js';
@@ -57,31 +59,11 @@ async function load() {
 
 /* ------------------------------------------------------ localised inputs */
 
-/**
- * One input per enabled language. Storing a `{ locale: text }` object rather
- * than a single string is what lets a diner read the menu in Arabic while the
- * kitchen ticket prints in English.
- */
-function localisedField(label, name, current = {}, { textarea = false } = {}) {
-  return h('div', { class: 'qs-field' },
-    h('span', {}, label),
-    locales().map((locale) =>
-      h('div', { class: 'qs-row', style: { marginBlockEnd: '6px' } },
-        h('span', { class: 'qs-badge', style: { minWidth: '46px' } }, locale),
-        textarea
-          ? h('textarea', { name: `${name}.${locale}`, rows: '2' }, current[locale] ?? '')
-          : h('input', { name: `${name}.${locale}`, value: current[locale] ?? '' }))));
-}
+/** The shared control, bound to the languages this restaurant offers. */
+const localisedField = (label, name, current = {}, options = {}) =>
+  sharedLocalisedField(label, name, current, { ...options, locales: locales() });
 
-/** Collect `name.en`, `name.ar`, … back into one object. */
-function collectLocalised(data, name) {
-  const out = {};
-  for (const locale of locales()) {
-    const value = String(data[`${name}.${locale}`] ?? '').trim();
-    if (value) out[locale] = value;
-  }
-  return out;
-}
+const collectLocalised = (data, name) => sharedCollectLocalised(data, name, locales());
 
 /* ------------------------------------------------------------- drag sort */
 

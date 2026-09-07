@@ -361,3 +361,44 @@ export function currencySelect({ currencies, value = null, name = 'currencyCode'
   if (onChange) select.addEventListener('change', () => onChange(select.value));
   return select;
 }
+
+/* ------------------------------------------------------ localised inputs */
+
+/**
+ * One input per language the restaurant offers.
+ *
+ * Every name an owner types — a category, a dish, a station, what they call
+ * their waiters — is stored per language rather than as one string, because the
+ * diner reads the menu in Arabic while the kitchen ticket prints in English.
+ * Three screens needed this control, so it lives here rather than three times.
+ *
+ * `locales` is passed in rather than read from a global: the console knows
+ * which languages are enabled, this module has no business knowing.
+ */
+export function localisedField(label, name, current = {}, {
+  locales = ['en'], textarea = false, placeholder = '', hint = '',
+} = {}) {
+  return h('div', { class: 'qs-field' },
+    h('span', {}, label),
+    hint ? h('span', { class: 'qs-xs qs-muted' }, hint) : null,
+    locales.map((locale) =>
+      h('div', { class: 'qs-row', style: { marginBlockEnd: '6px' } },
+        h('span', { class: 'qs-badge', style: { minWidth: '46px' } }, locale),
+        textarea
+          ? h('textarea', { name: `${name}.${locale}`, rows: '2' }, current[locale] ?? '')
+          : h('input', {
+              name: `${name}.${locale}`,
+              value: current[locale] ?? '',
+              ...(placeholder ? { placeholder } : {}),
+            }))));
+}
+
+/** Collect `name.en`, `name.ar`, … back into one object, dropping blanks. */
+export function collectLocalised(data, name, locales = ['en']) {
+  const out = {};
+  for (const locale of locales) {
+    const value = String(data[`${name}.${locale}`] ?? '').trim();
+    if (value) out[locale] = value;
+  }
+  return out;
+}

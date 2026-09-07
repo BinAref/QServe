@@ -79,7 +79,13 @@ a { color: var(--qs-color-primary); }
 }
 
 .qs-muted { color: var(--qs-color-text-muted); }
-.qs-mono { font-family: var(--qs-typography-font-family-mono); font-size: var(--qs-typography-size-sm); }
+/* Fingerprints, ids and keys have no spaces to break at, so they are told they
+   may break anywhere rather than pushing a phone's whole page sideways. */
+.qs-mono {
+  font-family: var(--qs-typography-font-family-mono);
+  font-size: var(--qs-typography-size-sm);
+  overflow-wrap: anywhere;
+}
 .qs-small { font-size: var(--qs-typography-size-sm); }
 .qs-xs { font-size: var(--qs-typography-size-xs); }
 .qs-strong { font-weight: var(--qs-typography-weight-bold); }
@@ -101,7 +107,13 @@ a { color: var(--qs-color-primary); }
 .qs-grid-cards { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 
 .qs-page {
-  max-width: 1200px;
+  /*
+   * `min(…, 100%)` rather than a bare 1200px: the page centres itself with auto
+   * margins, and an auto margin opts a flex item out of stretching, leaving it
+   * sized to its widest content. On a phone that turned one wide table into a
+   * sideways scroll of the entire console.
+   */
+  max-inline-size: min(1200px, 100%);
   margin-inline: auto;
   padding: var(--qs-spacing-lg);
 }
@@ -262,10 +274,18 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--qs-color-border);
   white-space: nowrap;
 }
+/*
+ * A badge holding a whole sentence — the lock's state, a licence explanation —
+ * rather than one status word. It wraps instead of widening the page, which on
+ * a phone is the difference between a readable line and a sideways scroll.
+ */
+.qs-badge-text { white-space: normal; max-inline-size: 100%; }
 .qs-badge-success { color: var(--qs-color-success); border-color: var(--qs-color-success); }
 .qs-badge-warning { color: var(--qs-color-warning); border-color: var(--qs-color-warning); }
 .qs-badge-error   { color: var(--qs-color-error);   border-color: var(--qs-color-error); }
 .qs-badge-info    { color: var(--qs-color-info);    border-color: var(--qs-color-info); }
+/* The restaurant's own things — a role it added, a permission it granted. */
+.qs-badge-accent { color: var(--qs-color-primary); border-color: var(--qs-color-primary); }
 .qs-badge-solid {
   background: var(--qs-color-primary);
   border-color: var(--qs-color-primary);
@@ -834,4 +854,22 @@ button.qs-amount-currency {
   font-weight: var(--qs-typography-weight-medium);
   cursor: pointer;
   direction: ltr;
+}
+
+/* ------------------------------------------------------------------- chips */
+
+/*
+ * A small read-only fact in a row of them: the grants a role holds, the
+ * languages a pack covers. Not a badge — a badge states a status, a chip is one
+ * of many things being listed.
+ */
+.qs-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: var(--qs-radius-pill);
+  background: var(--qs-color-surface-alt);
+  color: var(--qs-color-text-muted);
+  font-size: var(--qs-typography-size-xs);
+  line-height: 1.7;
+  white-space: nowrap;
 }

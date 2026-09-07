@@ -238,6 +238,10 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
       capabilities: services.gate.current.capabilities,
       locale: profile?.defaultLocale ?? 'en',
       themeId: profile?.themeId ?? 'light',
+      // What this restaurant calls its people. Sent to every screen at boot,
+      // because the word appears on the floor tablet's heading and on the
+      // diner's "call" button, not only in the console.
+      roleNames: services.access.roleNames(),
     };
   });
 

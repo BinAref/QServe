@@ -1,9 +1,15 @@
 /**
  * Users, roles, grants and sessions.
  *
- * Permissions are rows, not constants: `DEFAULT_ROLE_PERMISSIONS` seeds the
- * table once at install and is never consulted again, so a restaurant that
- * re-scopes its CASHIER role gets exactly what it configured.
+ * A role has two halves, and they belong to different people. The **name** is
+ * the restaurant's: an owner who calls their floor staff "hosts" writes that
+ * word once and every screen follows. The **grants** of a built-in role are the
+ * system's: a host is still exactly a waiter, whatever the sign says. So
+ * `assertSystemGrants` re-states `DEFAULT_ROLE_PERMISSIONS` at every boot,
+ * while `renameRole` never touches a permission row.
+ *
+ * A restaurant that needs a different set of powers adds a role of its own,
+ * which it then owns entirely — name and grants both.
  */
 
 import type { Db } from '@qserve/db';
@@ -62,6 +68,46 @@ export class AccessRepository {
         .prepare('SELECT permission FROM role_permissions WHERE role_id = ?')
         .all(roleId) as { permission: string }[]
     ).map((r) => r.permission);
+  }
+
+  /**
+   * The restaurant's own word for each role, by key. Only roles the owner has
+   * actually named appear: the rest fall back to the shipped translation, so a
+   * fresh install reads correctly in every language without anyone typing
+   * anything.
+   */
+  roleNames(): Record<string, Localised> {
+    const out: Record<string, Localised> = {};
+    for (const row of this.db.prepare('SELECT * FROM roles').all() as RoleRow[]) {
+      const name = this.roleName(row);
+      if (Object.keys(name).length > 0) out[row.key] = name;
+    }
+    return out;
+  }
+
+  /** Rename a role. Never touches its grants — see the note at the top. */
+  renameRole(roleId: string, name: Localised): void {
+    this.db.prepare('UPDATE roles SET name_json = ? WHERE id = ?').run(toDbJson(name), roleId);
+  }
+
+  /**
+   * Put every built-in role back on its system grants, returning the keys that
+   * had drifted. Called at boot, so a database restored from an older backup —
+   * or from a version whose defaults differed — is corrected rather than
+   * quietly running with the wrong powers.
+   */
+  assertSystemGrants(defaults: Readonly<Record<string, readonly string[]>>): string[] {
+    const repaired: string[] = [];
+    for (const [key, permissions] of Object.entries(defaults)) {
+      const role = this.getRoleByKey(key);
+      if (!role || role.is_system !== 1) continue;
+      const current = [...this.permissionsForRole(role.id)].sort();
+      const wanted = [...permissions].sort();
+      if (current.length === wanted.length && current.every((p, i) => p === wanted[i])) continue;
+      this.setRolePermissions(role.id, permissions);
+      repaired.push(key);
+    }
+    return repaired;
   }
 
   createRole(key: string, name: Localised, permissions: readonly string[]): RoleRow {

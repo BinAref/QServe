@@ -19,7 +19,7 @@
 import type { Migration } from '@qserve/db';
 import { DEFAULT_ROLE_PERMISSIONS, SystemRole } from '@qserve/shared';
 
-export const RESTAURANT_SCHEMA_VERSION = 5;
+export const RESTAURANT_SCHEMA_VERSION = 6;
 
 export const migrations: readonly Migration[] = [
   {
@@ -84,7 +84,9 @@ export const migrations: readonly Migration[] = [
           id          TEXT PRIMARY KEY,
           key         TEXT NOT NULL UNIQUE,
           name_json   TEXT NOT NULL,
-          -- System roles cannot be deleted, but their permissions are editable.
+          -- Built-in roles cannot be deleted and their grants are the system's;
+          -- what a restaurant owns here is the name. Empty name_json means
+          -- "nobody has renamed this", so the shipped translation is used.
           is_system   INTEGER NOT NULL DEFAULT 0,
           created_at  TEXT NOT NULL
         );
@@ -426,8 +428,9 @@ export const migrations: readonly Migration[] = [
         VALUES (1, 'NONE', 'MISSING', 0, ?)
       `).run(new Date().toISOString());
 
-      // Seed the built-in roles with their default grants. These are ordinary
-      // rows: a restaurant can re-scope any of them without a code change.
+      // Seed the built-in roles with their system grants, and with no name:
+      // until an owner writes their own word for a role, every screen shows the
+      // shipped translation, in whichever language the reader is using.
       const insertRole = db.prepare(`
         INSERT INTO roles (id, key, name_json, is_system, created_at) VALUES (?, ?, ?, 1, ?)
       `);
@@ -438,7 +441,7 @@ export const migrations: readonly Migration[] = [
 
       for (const key of Object.values(SystemRole)) {
         const roleId = `ROLE-${key}`;
-        insertRole.run(roleId, key, JSON.stringify({ en: key, ar: key }), at);
+        insertRole.run(roleId, key, '{}', at);
         for (const permission of DEFAULT_ROLE_PERMISSIONS[key]) {
           insertGrant.run(roleId, permission);
         }
@@ -619,6 +622,30 @@ export const migrations: readonly Migration[] = [
         -- way it was written on the night.
         ALTER TABLE order_items ADD COLUMN currency_display TEXT;
       `);
+    },
+  },
+  {
+    version: 6,
+    name: 'role_names',
+    up: (db) => {
+      // Earlier installs seeded each built-in role with its own key as a name,
+      // which then showed as "WAITER" on screen and blocked the translated
+      // label. Clearing those placeholders hands the label back to the language
+      // pack; a name an owner actually typed is left alone.
+      const roles = db.prepare('SELECT id, key, name_json FROM roles WHERE is_system = 1')
+        .all() as { id: string; key: string; name_json: string }[];
+      const clear = db.prepare('UPDATE roles SET name_json = \'{}\' WHERE id = ?');
+      for (const role of roles) {
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(role.name_json) as Record<string, unknown>;
+        } catch {
+          clear.run(role.id);
+          continue;
+        }
+        const values = Object.values(parsed);
+        if (values.length > 0 && values.every((value) => value === role.key)) clear.run(role.id);
+      }
     },
   },
 ];

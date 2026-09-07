@@ -91,9 +91,22 @@ came from.
 
 ## 3. Authorisation
 
-Permissions are **rows in a table**, not constants. The defaults seed the table
-once at install and are never consulted again, so a restaurant that re-scopes
-its CASHIER role gets exactly what it configured.
+Permissions are **rows in a table**, not constants — but they are not a setting
+either. A role has two halves, and they belong to different people:
+
+- The **name** is the restaurant's. One owner's waiter is another's host, and
+  whichever word they type in the console is the word every screen uses: the
+  floor tablet's heading, the station list, the button a diner presses to call
+  someone. Names are localised like any other content, so a role renamed once is
+  renamed in every language the restaurant offers.
+- The **grants of a built-in role are the system's**. A cashier means the same
+  thing in every restaurant that runs QServe, whatever the badge says, so
+  `PUT /roles/:id/permissions` refuses a built-in role and `assertSystemGrants`
+  restates the defaults at every boot — which also repairs a database restored
+  from an older backup.
+
+A restaurant that needs a different set of powers adds a role of its own, and
+owns that one outright: name and grants both.
 
 Every mutating route is guarded server-side. Hiding a button is a convenience,
 never the control. The effective set is:

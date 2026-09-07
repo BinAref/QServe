@@ -7,11 +7,14 @@
  * unlocks, and never pretends the restaurant's data is at risk.
  */
 
-import { api, guard, t, toast } from '../../shared/boot.js';
+import { api, guard, t, toast, roleLabel, setRoleNames } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { pick, te, formatDateTime, formatMoney } from '../../shared/i18n.js';
+import { localisedField, collectLocalised } from '../../shared/fields.js';
 import { Capability, Permission, PrintDocumentType, PrinterTransport } from '../../shared/events.js';
-import { state, has, can, isSetup, pageHeader, lockedPanel, refreshStatus, navigate } from '../app.js';
+import {
+  state, has, can, isSetup, pageHeader, lockedPanel, refreshStatus, navigate, enabledLocales,
+} from '../app.js';
 
 /* -------------------------------------------------------------- settings */
 
@@ -186,7 +189,9 @@ function appLockPanel(lock, canEdit, container) {
     h('p', { class: 'qs-muted' }, t('lock.subtitle')),
 
     h('p', {},
-      h('span', { class: lock.enabled ? 'qs-badge qs-badge-success' : 'qs-badge' },
+      h('span', {
+        class: `qs-badge qs-badge-text${lock.enabled ? ' qs-badge-success' : ''}`,
+      },
         t(lock.enabled ? 'lock.enabled' : 'lock.disabled'))),
 
     h('label', { class: 'qs-check' }, enableCheck, h('span', {}, t('lock.enable'))),
@@ -321,13 +326,36 @@ function operationalSettings(settings, canEdit, container) {
 
 /* ------------------------------------------------------- users and roles */
 
+/**
+ * Roles have two halves and they belong to different people.
+ *
+ * The **name** is the restaurant's: one owner's waiter is another's host, and
+ * the word they choose here is the word every screen uses — the floor tablet's
+ * heading, the station list, the button a diner presses to call someone.
+ *
+ * The **permissions** of a built-in role are the system's. A cashier means the
+ * same thing in every restaurant that runs QServe, whatever the badge says, and
+ * an owner cannot accidentally hand the till's powers to the room. A restaurant
+ * that needs a different set of powers adds a role of its own, which it then
+ * owns outright — name and permissions both.
+ */
 export async function renderUsers(container) {
   const [{ users }, roleResult] = await Promise.all([
     api.get('/api/users'),
     api.get('/api/roles'),
   ]);
   const { roles, availablePermissions } = roleResult;
+  // This list is the truth about what the restaurant calls its people, and the
+  // console is where those names are changed — so every other screen in this
+  // tab takes them from here rather than from a session fetched at load.
+  setRoleNames(Object.fromEntries(
+    roles.filter((role) => Object.keys(role.name ?? {}).length > 0)
+      .map((role) => [role.key, role.name]),
+  ));
   const canManage = has(Permission.USERS_MANAGE);
+  const canManageRoles = has(Permission.ROLES_MANAGE);
+  const byKey = new Map(roles.map((role) => [role.key, role]));
+  const label = (key) => roleLabel(byKey.get(key) ?? key);
 
   mount(container,
     pageHeader(t('users.title'),
@@ -350,7 +378,7 @@ export async function renderUsers(container) {
               h('td', {}, user.displayName),
               h('td', { class: 'qs-mono qs-small' }, user.username),
               h('td', {}, user.roleKeys.map((key) =>
-                h('span', { class: 'qs-badge', style: { marginInlineEnd: '4px' } }, t(`users.role.${key.toLowerCase()}`)))),
+                h('span', { class: 'qs-badge', style: { marginInlineEnd: '4px' } }, label(key)))),
               h('td', {},
                 h('span', { class: `qs-badge ${user.active ? 'qs-badge-success' : ''}` },
                   user.active ? t('common.enabled') : t('common.disabled'))),
@@ -358,27 +386,38 @@ export async function renderUsers(container) {
                 user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '—'))))))),
 
     h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
-      h('h2', {}, t('users.roles')),
-      h('p', { class: 'qs-muted qs-small' },
-        // The point worth making to an owner: these are real grants, checked on
-        // every request, not just hidden buttons.
-        t('users.permissions')),
-      roles.map((role) =>
-        h('div', { class: 'qs-card qs-card-tight', style: { marginBlockEnd: 'var(--qs-spacing-sm)' } },
+      h('div', { class: 'qs-row qs-row-between' },
+        h('h2', {}, t('users.roles')),
+        canManageRoles
+          ? h('button', {
+              class: 'qs-btn qs-btn-ghost',
+              onClick: () => openRoleForm(container, null, availablePermissions, roles),
+            }, t('users.add_role'))
+          : null),
+      // The point worth making to an owner, in a sentence rather than a word:
+      // these are real grants, checked on every request.
+      h('p', { class: 'qs-muted qs-small' }, t('users.roles_intro')),
+      h('div', { class: 'qs-role-grid' }, roles.map((role) =>
+        h('div', { class: 'qs-card qs-card-tight qs-role-card' },
           h('div', { class: 'qs-row qs-row-between' },
-            h('strong', {}, t(`users.role.${role.key.toLowerCase()}`)),
+            h('strong', {}, roleLabel(role)),
             h('span', { class: 'qs-row' },
-              role.system ? h('span', { class: 'qs-badge' }, t('users.system_role')) : null,
-              has(Permission.ROLES_MANAGE)
+              h('span', { class: `qs-badge ${role.system ? '' : 'qs-badge-accent'}` },
+                role.system ? t('users.system_role') : t('users.own_role')),
+              canManageRoles
                 ? h('button', {
                     class: 'qs-btn qs-btn-ghost',
-                    onClick: () => openRoleForm(container, role, availablePermissions),
-                  }, t('common.edit'))
+                    onClick: () => openRoleForm(container, role, availablePermissions, roles),
+                  }, role.system ? t('users.rename') : t('common.edit'))
                 : null)),
-          h('div', { class: 'qs-xs qs-muted' },
+          // The key never changes and staff never see it, but an owner who has
+          // renamed three roles needs one fixed thing to recognise them by.
+          h('div', { class: 'qs-xs qs-muted qs-mono' }, role.key),
+          h('div', { class: 'qs-role-grants' },
             role.permissions.includes('*')
-              ? '★ ' + t('users.permissions')
-              : role.permissions.join(' · '))))));
+              ? h('span', { class: 'qs-badge qs-badge-accent' }, '★ ' + t('users.all_permissions'))
+              : role.permissions.map((permission) =>
+                  h('span', { class: 'qs-chip' }, permissionLabel(permission)))))))));
 }
 
 function openUserForm(container, user, roles) {
@@ -402,7 +441,7 @@ function openUserForm(container, user, roles) {
             type: 'checkbox', name: `role.${role.key}`,
             checked: user?.roleKeys.includes(role.key) ?? false,
           }),
-          h('span', {}, t(`users.role.${role.key.toLowerCase()}`))))),
+          h('span', {}, roleLabel(role))))),
     user
       ? h('label', { class: 'qs-check' },
           h('input', { type: 'checkbox', name: 'active', checked: user.active }),
@@ -469,43 +508,177 @@ function openUserForm(container, user, roles) {
   });
 }
 
-function openRoleForm(container, role, availablePermissions) {
-  const wildcard = role.permissions.includes('*');
+/* ----------------------------------------------------------- permissions */
+
+/** `orders.change_status` → "Move an order along", in the reader's language. */
+function permissionLabel(permission) {
+  if (permission === '*') return '★ ' + t('users.all_permissions');
+  const label = t(`permission.${permission}`);
+  // Scope wildcards ("orders.*") and anything a future version adds have no
+  // sentence of their own; the raw grant is honest and still readable.
+  return label.startsWith('permission.') ? permission : label;
+}
+
+/** The heading a group of permissions sits under, in the restaurant's words. */
+function permissionGroupLabel(group) {
+  const key = group.toUpperCase();
+  // "Kitchen", "Cashier" and "Waiter" are names this restaurant may have
+  // changed; the rest are the product's own words.
+  if (['KITCHEN', 'CASHIER', 'WAITER'].includes(key)) return roleLabel(key);
+  const label = t(`permission.group.${group}`);
+  return label.startsWith('permission.group.') ? group : label;
+}
+
+/** Permissions in the order they are granted in life, grouped by their area. */
+function groupPermissions(permissions) {
+  const groups = new Map();
+  for (const permission of permissions) {
+    const group = permission.split('.')[0];
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(permission);
+  }
+  return [...groups.entries()];
+}
+
+/* ----------------------------------------------------------------- roles */
+
+/**
+ * One dialog for both halves, because an owner opening a role wants to see the
+ * whole of it. On a built-in role the permissions are shown and locked, with
+ * the reason next to them rather than in a manual nobody reads.
+ */
+function openRoleForm(container, role, availablePermissions, roles) {
+  const locales = enabledLocales();
+  const creating = role === null;
+  const system = role?.system ?? false;
+  const wildcard = role?.permissions.includes('*') ?? false;
+  const locked = system || wildcard;
 
   const form = h('form', {},
+    localisedField(t('users.role_name'), 'name', role?.name ?? {}, {
+      locales,
+      ...(system ? { placeholder: shippedRoleLabel(role.key), hint: t('users.role_name_hint') } : {}),
+    }),
+
     h('p', { class: 'qs-muted qs-small' },
-      wildcard ? '★ ' + t('users.permissions') : t('users.permissions')),
-    h('div', { style: { columnCount: '2' } }, availablePermissions.map((permission) =>
-      h('label', { class: 'qs-check', style: { breakInside: 'avoid' } },
-        h('input', {
-          type: 'checkbox', name: permission,
-          checked: wildcard || role.permissions.includes(permission),
-          disabled: wildcard,
-        }),
-        h('span', { class: 'qs-xs qs-mono' }, permission)))));
+      locked ? t('users.permissions_fixed') : t('users.custom_permissions')),
+
+    h('div', { class: 'qs-permission-groups' },
+      groupPermissions(availablePermissions).map(([group, permissions]) =>
+        h('div', { class: 'qs-permission-group' },
+          h('div', { class: 'qs-section-title' }, permissionGroupLabel(group)),
+          permissions.map((permission) =>
+            h('label', { class: 'qs-check' },
+              h('input', {
+                type: 'checkbox', name: permission,
+                checked: wildcard || (role?.permissions.includes(permission) ?? false),
+                disabled: locked,
+              }),
+              h('span', {}, permissionLabel(permission))))))));
 
   const dialog = modal({
-    title: t(`users.role.${role.key.toLowerCase()}`),
+    title: creating ? t('users.add_role') : roleLabel(role),
     body: form,
     actions: [
-      h('button', { class: 'qs-btn', value: 'cancel' }, t('common.cancel')),
-      wildcard
-        ? null
-        : h('button', {
-            class: 'qs-btn qs-btn-primary', value: 'save',
-            onClick: async (event) => {
-              event.preventDefault();
-              const data = new FormData(form);
-              const permissions = availablePermissions.filter((permission) => data.get(permission) === 'on');
-              const saved = await guard(() =>
-                api.put(`/api/roles/${role.id}/permissions`, { permissions }));
-              if (!saved) return;
+      // Only a role the restaurant added is the restaurant's to remove; the
+      // built-in ones are what the rest of the product is written against.
+      !creating && !system
+        ? h('button', {
+            class: 'qs-btn qs-btn-danger', type: 'button',
+            onClick: async () => {
+              const ok = await confirmDialog({
+                title: t('common.delete'),
+                message: roleLabel(role),
+                confirmLabel: t('common.delete'),
+                cancelLabel: t('common.cancel'),
+              });
+              if (!ok) return;
+              const done = await guard(() => api.del(`/api/roles/${role.id}`));
+              if (!done) return;
               dialog.close();
               await renderUsers(container);
             },
-          }, t('common.save')),
+          }, t('common.delete'))
+        : null,
+      // Handing a renamed built-in role back its shipped label, which then
+      // follows the reader's language again instead of one owner's word.
+      !creating && system && Object.keys(role.name ?? {}).length > 0
+        ? h('button', {
+            class: 'qs-btn', type: 'button',
+            onClick: async () => {
+              const done = await guard(() => api.patch(`/api/roles/${role.id}`, { name: null }));
+              if (!done) return;
+              dialog.close();
+              await refreshStatus();
+              await renderUsers(container);
+            },
+          }, t('users.use_default_name'))
+        : null,
+      h('button', { class: 'qs-btn', value: 'cancel' }, t('common.cancel')),
+      h('button', {
+        class: 'qs-btn qs-btn-primary', value: 'save',
+        onClick: async (event) => {
+          event.preventDefault();
+          const data = Object.fromEntries(new FormData(form).entries());
+          const name = collectLocalised(data, 'name', locales);
+          const permissions = availablePermissions.filter((permission) => data[permission] === 'on');
+
+          if (creating) {
+            if (Object.keys(name).length === 0 || permissions.length === 0) {
+              toast(t(permissions.length === 0 ? 'users.no_permissions' : 'error.validation'), 'error');
+              return;
+            }
+            const created = await guard(() => api.post('/api/roles', {
+              key: newRoleKey(name, roles.map((entry) => entry.key)),
+              name,
+              permissions,
+            }));
+            if (!created) return;
+          } else {
+            // A built-in role's name is the only thing this form may change,
+            // so nothing else is sent for one.
+            const renamed = await guard(() => api.patch(`/api/roles/${role.id}`, {
+              name: Object.keys(name).length === 0 ? null : name,
+            }));
+            if (!renamed) return;
+            if (!locked) {
+              const saved = await guard(() =>
+                api.put(`/api/roles/${role.id}/permissions`, { permissions }));
+              if (!saved) return;
+            }
+          }
+
+          dialog.close();
+          toast(t('common.saved'), 'success');
+          // Role names appear on every screen, so the session behind this one
+          // has to hear about the change too.
+          await refreshStatus();
+          await renderUsers(container);
+        },
+      }, t('common.save')),
     ],
   });
+}
+
+/** The shipped label for a built-in role, ignoring any name the owner gave it. */
+function shippedRoleLabel(key) {
+  const label = t(`users.role.${key.toLowerCase()}`);
+  return label.startsWith('users.role.') ? key : label;
+}
+
+/**
+ * A role the restaurant invents still needs a stable machine key, and asking an
+ * owner to invent one is asking the wrong person. Derived from the name they
+ * typed, falling back to ROLE_2, ROLE_3… when the name is in a script that has
+ * no ASCII to derive from.
+ */
+function newRoleKey(name, taken) {
+  const source = name.en ?? Object.values(name)[0] ?? '';
+  const base = source.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
+  let candidate = /^[A-Z][A-Z0-9_]*$/.test(base) ? base : 'ROLE';
+  let suffix = 2;
+  while (taken.includes(candidate)) candidate = `${candidate.replace(/_\d+$/, '')}_${suffix++}`;
+  return candidate;
 }
 
 /* -------------------------------------------------------------- printing */
@@ -530,7 +703,7 @@ export async function renderPrinting(container) {
 
     h('p', { class: 'qs-muted' },
       // Routing is configuration, which is the whole point of §36.
-      `${t('printing.doc.kitchen_ticket')} → ${t('terminals.type.kitchen')} · ${t('printing.doc.receipt')} → ${t('terminals.type.cashier')}`),
+      `${t('printing.doc.kitchen_ticket')} → ${roleLabel('KITCHEN')} · ${t('printing.doc.receipt')} → ${roleLabel('CASHIER')}`),
 
     config.printers.length === 0
       ? h('div', { class: 'qs-card' }, h('div', { class: 'qs-empty' }, t('common.empty')))

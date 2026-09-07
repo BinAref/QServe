@@ -166,7 +166,9 @@
     z-index: 50;
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: 1fr;
+    /* minmax(0, …) so a long word in one tab cannot widen the whole bar and
+       push the page sideways; the label ellipsises instead. */
+    grid-auto-columns: minmax(0, 1fr);
     background: var(--qs-color-surface);
     border-block-start: 1px solid var(--qs-color-border);
     padding-block-end: var(--qs-safe-bottom);
@@ -176,6 +178,8 @@
     display: grid;
     place-items: center;
     gap: 2px;
+    min-inline-size: 0;
+    overflow: hidden;
     padding: 8px 4px;
     min-block-size: 56px;
     border: none;
@@ -188,6 +192,12 @@
   }
   .shell-tab[aria-current="page"] { color: var(--qs-color-primary); }
   .shell-tab-mark { font-size: var(--qs-typography-size-lg); line-height: 1; }
+  .shell-tab-label {
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 @media (min-width: 901px) {
@@ -407,3 +417,46 @@
   font-size: var(--qs-typography-size-lg);
   font-weight: var(--qs-typography-weight-bold);
 }
+
+/* ------------------------------------------------------------------- roles */
+
+/*
+ * A role is read at a glance — its name, whether it is one of ours or one the
+ * restaurant added, and what it may do — so the cards sit side by side on a
+ * desk screen and stack on a phone without either being cramped.
+ */
+.qs-role-grid {
+  display: grid;
+  gap: var(--qs-spacing-sm);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  margin-block-start: var(--qs-spacing-md);
+}
+
+.qs-role-card { display: flex; flex-direction: column; gap: 6px; }
+
+.qs-role-grants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/*
+ * The permission list in the role dialog. Grouped by the part of the product
+ * each grant belongs to, because "may this person refund?" is a question about
+ * payments, and hunting for it in one long alphabetical column is not reading.
+ */
+.qs-permission-groups {
+  display: grid;
+  gap: var(--qs-spacing-md);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.qs-permission-group {
+  break-inside: avoid;
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-radius-md);
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+}
+
+.qs-permission-group .qs-section-title { margin-block-end: 4px; }
+.qs-permission-group .qs-check { font-size: var(--qs-typography-size-sm); }

@@ -9,7 +9,9 @@
  * what is sent is product ids and quantities: prices are the server's business.
  */
 
-import { boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t } from '../shared/boot.js';
+import {
+  boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t, roleLabel, isRenamed,
+} from '../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../shared/dom.js';
 import { formatMoney, pick, formatTime, availableLocales, setLocale, te } from '../shared/i18n.js';
 import { SoundEvent } from '../shared/events.js';
@@ -326,7 +328,7 @@ function addToCart(draft) {
 function serviceButtons() {
   if (!state.session.terminal) return null;
 
-  const ask = async (kind, node, doneKey) => {
+  const ask = async (kind, node, done) => {
     node.dataset.busy = 'true';
     const sent = await guard(() => notifications.raise(kind));
     node.dataset.busy = 'false';
@@ -334,7 +336,7 @@ function serviceButtons() {
 
     node.disabled = true;
     node.classList.add('qs-attention');
-    toast(t(doneKey), 'success');
+    toast(done, 'success');
     sound.playFor('new_order');
     // Long enough that nobody taps again, short enough to ask twice if the
     // waiter genuinely has not come.
@@ -344,11 +346,19 @@ function serviceButtons() {
     }, 60_000);
   };
 
-  const call = h('button', { class: 'qs-btn qs-btn-lg' }, '🔔 ', t('notify.call_waiter'));
-  call.addEventListener('click', () => void ask('WAITER_CALLED', call, 'notify.called'));
+  // The button says what this restaurant calls the person it fetches. Until
+  // somebody renames the role, the shipped sentence is the better one — "Call a
+  // waiter" reads more naturally than "Call Waiter" — so it stays.
+  const role = roleLabel('WAITER');
+  const named = isRenamed('WAITER');
+  const callLabel = named ? t('notify.call_role', { role }) : t('notify.call_waiter');
+  const onTheWay = named ? t('notify.called_role', { role }) : t('notify.called');
+
+  const call = h('button', { class: 'qs-btn qs-btn-lg' }, '🔔 ', callLabel);
+  call.addEventListener('click', () => void ask('WAITER_CALLED', call, onTheWay));
 
   const bill = h('button', { class: 'qs-btn qs-btn-lg' }, '🧾 ', t('notify.ask_for_bill'));
-  bill.addEventListener('click', () => void ask('BILL_REQUESTED', bill, 'notify.called'));
+  bill.addEventListener('click', () => void ask('BILL_REQUESTED', bill, onTheWay));
 
   return h('div', { class: 'menu-service' }, call, bill);
 }
@@ -460,7 +470,13 @@ async function submitOrder(notes, dialog) {
    * plainly, rather than waiting for food nobody knows about.
    */
   const plan = state.plan ?? {};
-  toast(t(plan.afterOrderKey ?? 'menu.order_sent'), 'success');
+  const afterOrder = plan.afterOrderKey ?? 'menu.order_sent';
+  toast(t(
+    afterOrder === 'orders.placed_call_waiter' && isRenamed('WAITER')
+      ? 'orders.placed_call_role'
+      : afterOrder,
+    { role: roleLabel('WAITER') },
+  ), 'success');
   if (plan.callWaiterAfterOrder) {
     // And the ask is made for them, so "call a waiter" is a fact rather than
     // an instruction they have to carry out.
@@ -575,7 +591,12 @@ let realtime;
 let notifications;
 
 async function main() {
-  const started = await boot({ topics: ['menu', 'orders', 'system'], onResync: () => void reload() });
+  // Re-fetching without repainting would leave a diner reading a stale menu
+  // after every reconnection, so a resync ends in a render like everything else.
+  const started = await boot({
+    topics: ['menu', 'orders', 'system'],
+    onResync: () => void reload().then(render),
+  });
   state.session = started.session;
   realtime = started.realtime;
   notifications = started.notifications;

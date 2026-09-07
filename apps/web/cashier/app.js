@@ -8,7 +8,7 @@
  * server, which refuses the request without an identified user.
  */
 
-import { boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t } from '../shared/boot.js';
+import { boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t, roleLabel } from '../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../shared/dom.js';
 import { formatMoney, pick, te, formatTime } from '../shared/i18n.js';
 import { SoundEvent, OrderStatus, PaymentMethod, grants, Permission } from '../shared/events.js';
@@ -58,7 +58,8 @@ function header() {
       onClick: () => { state.selectedId = null; render(); },
     }, '‹'),
 
-    h('h1', {}, t('cashier.title')),
+    // Whatever this restaurant calls the people who work here.
+    h('h1', {}, roleLabel('CASHIER')),
     state.session.terminal
       ? h('span', { class: 'qs-badge' }, pick(state.session.terminal.name))
       : null,

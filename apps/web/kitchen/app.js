@@ -11,7 +11,7 @@
  *    so, and on reconnect the whole board is reloaded rather than patched.
  */
 
-import { boot, connectionIndicator, offlineBanner, guard, api, sound, t } from '../shared/boot.js';
+import { boot, connectionIndicator, offlineBanner, guard, api, sound, t, roleLabel } from '../shared/boot.js';
 import { h, mount, toast } from '../shared/dom.js';
 import { pick, te, formatTime } from '../shared/i18n.js';
 import { SoundEvent, OrderStatus, grants, Permission } from '../shared/events.js';
@@ -67,7 +67,8 @@ function header() {
   const list = stations();
 
   return h('header', { class: 'kds-head' },
-    h('h1', {}, t('kitchen.title')),
+    // Whatever this restaurant calls the people who work here.
+    h('h1', {}, roleLabel('KITCHEN')),
     state.session.terminal
       ? h('span', { class: 'qs-badge' }, pick(state.session.terminal.name))
       : null,
