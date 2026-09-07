@@ -7,3 +7,7 @@ everything after it is for whoever opens this file next.
 
 Pushing this file again re-runs the build and updates the release in place, so
 a fix to the packaging does not need a new version number.
+
+Before cutting a release anyone is meant to pay for: run `npm run keygen` and
+put the public half in the QSERVE_TRUSTED_KEYS repository secret, or the build
+ships unable to activate anything — and says so in its own README.

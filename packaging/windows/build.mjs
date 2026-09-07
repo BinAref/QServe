@@ -124,14 +124,19 @@ cpSync(join(repo, 'apps/server/dist'), join(app, 'server/dist'), {
  */
 mkdirSync(join(app, 'server/config'), { recursive: true });
 const trustStore = join(repo, 'apps/server/config/trusted-keys.json');
-if (existsSync(trustStore)) {
+let activatable = existsSync(trustStore);
+if (activatable) {
   cpSync(trustStore, join(app, 'server/config/trusted-keys.json'));
-} else {
+  // A file with no keys in it is not a trust store; it is a placeholder.
+  const keys = JSON.parse(readFileSync(trustStore, 'utf8')).keys ?? {};
+  activatable = Object.keys(keys).length > 0;
+}
+if (!activatable) {
   cpSync(join(repo, 'apps/server/config/trusted-keys.example.json'),
     join(app, 'server/config/trusted-keys.json'));
   process.stdout.write(
-    '\n  ! no apps/server/config/trusted-keys.json — shipping the example.\n'
-    + '    Nothing this build issues can be activated. Set QSERVE_TRUSTED_KEYS\n'
+    '\n  ! no vendor public keys — shipping the example trust store.\n'
+    + '    Nothing this build produces can be activated. Set QSERVE_TRUSTED_KEYS\n'
     + '    in the release workflow, or run `npm run keygen` before building.\n',
   );
 }
@@ -200,6 +205,13 @@ writeFileSync(join(stage, 'README.txt'), [
   '',
   'No part of QServe needs the internet to run a service.',
   '',
+  ...(activatable ? [] : [
+    'NOTE ON THIS BUILD',
+    'It carries no vendor keys, so it cannot activate a licence: it runs in',
+    'setup mode, where you can build your whole menu but not open to diners.',
+    'Ask whoever gave you this file for a build carrying their keys.',
+    '',
+  ]),
 ].join('\r\n'));
 
 /* ----------------------------------------------------------------- the zip */

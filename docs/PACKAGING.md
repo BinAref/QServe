@@ -66,8 +66,13 @@ restaurant's data must survive replacing the program folder.
 verifies activation certificates against, offline. It is not in the repository
 (each vendor generates their own with `npm run keygen`), so the release workflow
 writes it from the `QSERVE_TRUSTED_KEYS` repository secret. Without it the build
-still succeeds and still runs — but nothing it produces can be activated, and
-the build says so.
+still succeeds and still runs — but nothing it produces can be activated. The
+build says so on the console, and the README inside the bundle says so to
+whoever unzips it, because "why will my licence key not work" is a terrible
+thing for a restaurant to have to discover on a Friday night.
+
+So before cutting a release anyone is meant to pay for: `npm run keygen`, then
+put the public half in the `QSERVE_TRUSTED_KEYS` repository secret.
 
 The signing key itself never leaves the vendor's machine and is never packaged.
 See [SECURITY.md](SECURITY.md).
