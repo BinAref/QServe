@@ -45,9 +45,19 @@ const flag = (name, fallback) => {
 const nodeVersion = flag('node-version', process.version.replace(/^v/, ''));
 const skipZip = argv.includes('--no-zip');
 
+/*
+ * Run a tool. On Windows `npm` and `npx` are `.cmd` files, which cannot be
+ * spawned directly — hence the shell — and going through a shell means the
+ * arguments have to be quoted ourselves, because a restaurant's build machine
+ * may well have a space in its path.
+ */
 const run = (command, args, options = {}) => {
   process.stdout.write(`  $ ${command} ${args.join(' ')}\n`);
-  return execFileSync(command, args, { stdio: 'inherit', ...options });
+  const shell = platform === 'win32';
+  const quoted = shell
+    ? args.map((argument) => (/[\s&|<>^]/.test(argument) ? `"${argument}"` : argument))
+    : args;
+  return execFileSync(command, quoted, { stdio: 'inherit', shell, ...options });
 };
 const say = (message) => process.stdout.write(`\n▸ ${message}\n`);
 
@@ -155,7 +165,7 @@ writeFileSync(join(app, 'package.json'), `${JSON.stringify({
 }, null, 2)}\n`);
 
 say('installing runtime dependencies');
-run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'], { cwd: app, shell: platform === 'win32' });
+run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'], { cwd: app });
 
 // `better-sqlite3` is native. Built anywhere but Windows, the zip would look
 // perfect and fail on the first launch, so say so rather than ship it quietly.
