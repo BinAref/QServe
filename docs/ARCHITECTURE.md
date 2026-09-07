@@ -185,7 +185,47 @@ Three properties make it safe to run a kitchen on:
 
 ---
 
-## 7. Data ownership
+### Who receives an event
+
+Two gates, not one. Every event names a permission, and a socket receives it
+only if its session holds that permission — a kitchen screen physically cannot
+be sent a payment total. Some events narrow further: a notification names the
+stations it is addressed to, and the gateway asks the notification module
+whether this socket is one of them. Filtering in the browser instead would
+still mean the payload reached a screen it was not meant for.
+
+---
+
+## 7. How the screens are shaped
+
+Six front-ends, each written for the device it is actually used on rather than
+one design stretched to fit. The shape is not decoration — it is the difference
+between a screen somebody uses and one they work around.
+
+| | phone | large screen |
+|---|---|---|
+| **console** | bottom bar of five sections, the rest behind a drawer | sidebar, two-pane pages |
+| **menu** | one column, service buttons under the thumb | grid; past 1100px the photograph leads |
+| **kitchen** | one ticket wide, filters scroll sideways | columns to fit; larger type past 1600px, for a wall |
+| **cashier** | one pane at a time with a back button, like a card machine | list beside bill, tall keypad |
+| **waiter** | two table cards across, thumb-sized | more columns, larger labels |
+| **printer** | status list, unchanged — it is a bridge, not a workplace |
+
+Three rules hold across all of them:
+
+- **A touch target is at least 44px**, and inputs never sit under the keyboard:
+  dialogs become bottom sheets on a phone, and bars clear the home indicator
+  with `env(safe-area-inset-*)`.
+- **Motion is a theme token.** Four movements — rise, fade, pop, slide — with
+  durations and easings in the token contract, so a "modern" theme is snappier
+  than an "elegant" one without touching CSS. All of it collapses under
+  `prefers-reduced-motion`.
+- **Logical properties only.** `dir="rtl"` on `<html>` is still the entire cost
+  of Arabic, including the drawer that slides in from the other side.
+
+---
+
+## 8. Data ownership
 
 **The Restaurant ID owns the data. The device never does.**
 
@@ -220,7 +260,7 @@ clone. That is a property of the file layout, not of a policy check.
 
 ---
 
-## 8. Why these technology choices
+## 9. Why these technology choices
 
 **SQLite.** The operational store lives on one restaurant PC, must survive that
 PC losing power mid-service, and must never need a DBA. WAL mode gives
@@ -246,7 +286,7 @@ later through the same code path.
 
 ---
 
-## 9. Extending the system
+## 10. Extending the system
 
 See [EXTENDING.md](EXTENDING.md). In summary, each of these is additive:
 

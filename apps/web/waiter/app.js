@@ -146,7 +146,9 @@ function openTable(table) {
               h('div', {}, `${item.quantity}× ${pick(item.name)}`))),
             h('div', { class: 'qs-row qs-row-between', style: { marginBlockStart: 'var(--qs-spacing-sm)' } },
               h('span', {}, formatMoney(order.totals.totalMinor, order.currency)),
-              serveButton(order))))));
+              h('div', { class: 'qs-row' },
+                rushButton(order),
+                serveButton(order)))))));
 
   const dialog = modal({
     title: `${t('orders.table')} ${table.label}`,
@@ -167,6 +169,33 @@ function openTable(table) {
     ],
   });
   return dialog;
+}
+
+/**
+ * Ask the kitchen to hurry a specific ticket.
+ *
+ * Only offered while the food is still being made — asking for speed on a
+ * ticket that is already up would just be noise at the pass. It spends itself
+ * for a minute afterwards, because asking twice does not make it faster.
+ */
+function rushButton(order) {
+  if (order.status !== OrderStatus.ACCEPTED && order.status !== OrderStatus.PREPARING) {
+    return null;
+  }
+
+  const button = h('button', { class: 'qs-btn qs-btn-sm' }, t('notify.rush'));
+  button.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const sent = await guard(() => notifications.raise('ORDER_RUSHED', {
+      orderId: order.id,
+      params: { order: order.number },
+    }));
+    if (!sent) return;
+    button.disabled = true;
+    toast(t('notify.rush'), 'success');
+    setTimeout(() => { button.disabled = false; }, 60_000);
+  });
+  return button;
 }
 
 function serveButton(order) {

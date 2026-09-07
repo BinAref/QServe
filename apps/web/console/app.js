@@ -13,7 +13,7 @@
  */
 
 import { boot, api, guard, t, toast } from '../shared/boot.js';
-import { h, mount } from '../shared/dom.js';
+import { h, mount, modal } from '../shared/dom.js';
 import { pick, availableLocales, setLocale } from '../shared/i18n.js';
 import { applyTheme } from '../shared/theme.js';
 import { Capability, grants, Permission } from '../shared/events.js';
@@ -240,6 +240,54 @@ function themePicker() {
     h('option', { value: theme.id, selected: theme.active }, theme.name)));
 }
 
+/**
+ * A manager talking to the floor.
+ *
+ * It reaches every station that has a person at it — not the tables, which is
+ * the one audience a message like this must never reach.
+ */
+function broadcastButton() {
+  if (!has(Permission.ORDERS_VIEW)) return null;
+
+  return h('button', {
+    class: 'qs-icon-btn qs-desk-only',
+    'aria-label': t('notify.send'),
+    title: t('notify.send'),
+    onClick: () => {
+      const text = h('textarea', {
+        rows: '3',
+        maxlength: '400',
+        placeholder: t('notify.to_floor'),
+      });
+
+      const dialog = modal({
+        title: t('notify.send'),
+        body: h('div', {},
+          h('p', { class: 'qs-muted qs-small' }, t('notify.to_floor')),
+          text),
+        actions: [
+          h('button', { class: 'qs-btn', value: 'cancel' }, t('common.cancel')),
+          h('button', {
+            class: 'qs-btn qs-btn-primary',
+            value: 'send',
+            onClick: async (event) => {
+              event.preventDefault();
+              const body = text.value.trim();
+              if (body === '') return;
+              const sent = await guard(() =>
+                state.notifications.raise('BROADCAST', { body }));
+              if (!sent) return;
+              toast(t('common.saved'), 'success');
+              dialog.close('send');
+            },
+          }, t('notify.send')),
+        ],
+      });
+      setTimeout(() => text.focus(), 60);
+    },
+  }, '📣');
+}
+
 function topbar() {
   return h('header', { class: 'shell-topbar' },
     h('button', {
@@ -258,6 +306,7 @@ function topbar() {
 
     h('span', { class: 'qs-grow' }),
 
+    state.notifications ? broadcastButton() : null,
     state.notifications ? state.notifications.bell() : null,
     localePicker(),
     themePicker(),

@@ -259,7 +259,30 @@ apps/server/src/modules/<name>/
 
 ---
 
-## 8. The features the architecture is ready for
+## 8. Add a notification
+
+One entry in `NOTIFICATION_ROUTING` (`modules/notifications/service.ts`) and one
+call at the place that raises it:
+
+```ts
+[NotificationKind.STOCK_LOW]: {
+  urgency: NotificationUrgency.ACTION,
+  terminalTypes: [TerminalType.MANAGER],
+  permission: Permission.MENU_MANAGE,   // optional, narrows further
+},
+```
+
+The routing table is the whole answer to "does the kitchen hear about this?" —
+readable in one place rather than traced through five call sites. Add a
+`notify.stock_low` key to the locale packs and the message renders itself in
+each screen's own language; add an entry to `NOTIFICATION_SOUND` in
+`apps/web/shared/events.js` if it should also be heard.
+
+**You do not touch:** any front-end, the socket gateway, or any terminal.
+
+---
+
+## 9. The features the architecture is ready for
 
 The spec lists these as future work, explicitly not to be built now. Each is
 noted with where it would attach:
@@ -282,7 +305,7 @@ admits them, not the features themselves.**
 
 ---
 
-## 9. Before you ship a change
+## 10. Before you ship a change
 
 ```bash
 npm run check      # build + validate packs + 113 tests
