@@ -62,9 +62,10 @@ jobs:
       # public half; the signing key never leaves the vendor's own machine.
       # A secret cannot be tested in an `if:` — GitHub refuses the whole
       # workflow for it — so the emptiness is checked where it is readable.
-      - name: Write the trust store
+      - name: Write the trust store and the vendor's details
         env:
           TRUSTED_KEYS: ${{ secrets.QSERVE_TRUSTED_KEYS }}
+          VENDOR_INFO: ${{ secrets.QSERVE_VENDOR_INFO }}
         shell: bash
         run: |
           if [ -n "$TRUSTED_KEYS" ]; then
@@ -72,6 +73,12 @@ jobs:
             echo "trust store written from QSERVE_TRUSTED_KEYS"
           else
             echo "no QSERVE_TRUSTED_KEYS secret: this build cannot activate anything"
+          fi
+          if [ -n "$VENDOR_INFO" ]; then
+            printf '%s' "$VENDOR_INFO" > apps/server/config/vendor.json
+            echo "vendor details written from QSERVE_VENDOR_INFO"
+          else
+            echo "no QSERVE_VENDOR_INFO secret: the licence screen will say 'ask us'"
           fi
 
       - name: Build QServe.exe

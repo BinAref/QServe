@@ -1,0 +1,15 @@
+{
+  "_comment": "The vendor's own name, prices and contact channels, shipped inside the build. Copy this to vendor.json and fill it in — or write it from the console's Developer section, which is where it is meant to be edited. Nothing here is secret and nothing here is trusted: it is text a restaurant reads on its licence screen before it has ever been online. Whatever the installation later fetches from the licence server replaces it.",
+  "vendorName": "Your company",
+  "tagline": "Restaurant systems, installed and supported",
+  "contacts": [
+    { "kind": "WHATSAPP", "label": "Sales", "value": "+966 5X XXX XXXX" },
+    { "kind": "EMAIL", "label": "Support", "value": "hello@example.com" }
+  ],
+  "pricing": {
+    "activation": { "price": "1,500 SAR", "note": "One payment. The licence does not expire." },
+    "transfer": { "price": "150 SAR", "note": "Moving your licence to another computer." }
+  },
+  "instructions": "Message us with your Restaurant ID and we will send your key.",
+  "updatedAt": "1970-01-01T00:00:00.000Z"
+}

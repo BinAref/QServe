@@ -39,6 +39,12 @@ export class LicensingService {
     private readonly gate: LicenseGate,
     private readonly audit: AuditRepository,
     private readonly bus: EventBus,
+    /**
+     * What the vendor put in the build. Consulted only when this installation
+     * has never fetched anything: a price list in a file is a starting point,
+     * and the licence server is the truth the moment it can be reached.
+     */
+    private readonly shippedVendorInfo: () => VendorInfo | null = () => null,
   ) {}
 
   /* ----------------------------------------------------------- transport */
@@ -134,6 +140,7 @@ export class LicensingService {
   /** The cached copy, plus how to reach the vendor about *this* restaurant. */
   vendorInfo(): {
     info: VendorInfo;
+    source: 'fetched' | 'shipped' | 'none';
     fetchedAt: string | null;
     stale: boolean;
     contacts: { kind: string; label: string; value: string; url: string | null }[];
@@ -142,10 +149,14 @@ export class LicensingService {
     const cached = this.settings.get<{ info: VendorInfo; fetchedAt: string } | null>(
       'license.vendorInfoCache',
     );
-    const info = cached?.info ?? EMPTY_VENDOR_INFO;
+    const shipped = this.shippedVendorInfo();
+    const info = cached?.info ?? shipped ?? EMPTY_VENDOR_INFO;
 
     return {
       info,
+      // Where the words on the screen came from, so the console can say
+      // "as shipped" rather than implying it just checked.
+      source: cached ? 'fetched' : shipped ? 'shipped' : 'none',
       fetchedAt: cached?.fetchedAt ?? null,
       // A month-old price list is worth re-checking before quoting it to anyone.
       stale: cached

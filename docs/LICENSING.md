@@ -228,6 +228,15 @@ restaurant deciding to buy is often a restaurant whose internet is not working,
 which is why it bought an offline system; the cached prices stay readable, with
 the date they were fetched shown beside them.
 
+And before any of that has happened at all, the same details ship **inside the
+build**, in `apps/server/config/vendor.json`. A restaurant that has just unzipped
+QServe has never spoken to anything, and "ask us" naming nobody is not an answer
+to "who do I pay". The developer prepares that file in the console's **Developer**
+section, or the release workflow writes it from a repository secret; the licence
+screen says *as shipped with this copy* so nobody mistakes it for a live quote,
+and the first successful fetch replaces it. See
+[PACKAGING.md](PACKAGING.md).
+
 The licence screen then offers **"I have a licence key"** and a contact button
 per channel. WhatsApp and Telegram links carry a prefilled message, composed in
 the console from translation keys so it goes out in the owner's own language:

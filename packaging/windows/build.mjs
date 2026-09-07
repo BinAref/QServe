@@ -140,6 +140,22 @@ if (!activatable) {
     + '    in the release workflow, or run `npm run keygen` before building.\n',
   );
 }
+
+/*
+ * And the vendor's own name, prices and contacts. Not secret, and not required
+ * — but without it a restaurant that has never been online has no way to know
+ * who to ask for a licence, which is a strange thing to ship.
+ */
+const vendorFile = join(repo, 'apps/server/config/vendor.json');
+if (existsSync(vendorFile)) {
+  cpSync(vendorFile, join(app, 'server/config/vendor.json'));
+} else {
+  process.stdout.write(
+    '\n  ! no apps/server/config/vendor.json — this build shows "ask us" with\n'
+    + '    nobody to ask until it reaches a licence server. Prepare it in the\n'
+    + '    console\'s Developer section, or set QSERVE_VENDOR_INFO in the workflow.\n',
+  );
+}
 cpSync(join(repo, 'apps/web'), join(app, 'web'), { recursive: true });
 cpSync(join(repo, 'locales'), join(stage, 'locales'), { recursive: true });
 cpSync(join(repo, 'themes'), join(stage, 'themes'), { recursive: true });

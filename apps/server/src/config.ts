@@ -31,6 +31,12 @@ export interface ServerConfig {
   readonly localesDir: string;
   readonly themesDir: string;
   readonly trustedKeysFile: string;
+  /**
+   * The vendor's own name, prices and contact channels, shipped with the build.
+   * A restaurant that has never reached the licence server still has to be able
+   * to see who to ask for a licence.
+   */
+  readonly vendorInfoFile: string;
   /** Seconds a staff session stays valid without activity. */
   readonly userSessionTtlSeconds: number;
   /** Terminal sessions are long-lived: a kitchen screen is never signed out. */
@@ -62,6 +68,11 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
     themesDir: resolve(env.QSERVE_THEMES_DIR ?? resolve(appRoot, '../../themes')),
     trustedKeysFile: resolve(
       env.QSERVE_TRUSTED_KEYS_FILE ?? resolve(appRoot, 'config/trusted-keys.json'),
+    ),
+    // Who to ask for a licence, and what it costs — shipped with the build so
+    // that a restaurant that has never been online still has an answer.
+    vendorInfoFile: resolve(
+      env.QSERVE_VENDOR_INFO_FILE ?? resolve(appRoot, 'config/vendor.json'),
     ),
     userSessionTtlSeconds: Number(env.QSERVE_USER_SESSION_TTL ?? 12 * 60 * 60),
     terminalSessionTtlSeconds: Number(env.QSERVE_TERMINAL_SESSION_TTL ?? 365 * 24 * 60 * 60),

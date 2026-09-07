@@ -44,6 +44,7 @@ import { BackupService } from './modules/backup/service.js';
 import { NotificationService } from './modules/notifications/service.js';
 import { ReportService } from './modules/reports/service.js';
 import { LicensingService } from './modules/licensing/service.js';
+import { ShippedVendorInfo } from './modules/licensing/shipped-vendor.js';
 import { TranslationService } from './modules/translations/service.js';
 import { ContentTranslationRepository } from './modules/translations/content.js';
 import { PackAuthoringService } from './modules/translations/authoring.js';
@@ -84,6 +85,7 @@ export interface Services {
   readonly notifications: NotificationService;
   readonly reports: ReportService;
   readonly licensing: LicensingService;
+  readonly shippedVendor: ShippedVendorInfo;
   readonly translations: TranslationService;
   readonly themes: ThemeService;
   readonly packAuthoring: PackAuthoringService;
@@ -196,6 +198,11 @@ export function buildServices(options: BuildOptions = {}): Services {
   payments.setNotifier(raise);
   printing.setNotifier(raise);
 
+  // What the vendor put in the build: shown until this installation has ever
+  // reached the licence server, and replaced by what it fetches when it does.
+  const shippedVendor = new ShippedVendorInfo(config.vendorInfoFile, audit, warn);
+  shippedVendor.load();
+
   const licensing = new LicensingService(
     {
       licenseServerUrl: config.licenseServerUrl,
@@ -203,6 +210,7 @@ export function buildServices(options: BuildOptions = {}): Services {
       deviceLabel: fingerprint.label,
     },
     licenseRepository, settings, gate, audit, bus,
+    () => shippedVendor.current,
   );
 
   const translations = new TranslationService(config.localesDir, warn);
@@ -236,6 +244,7 @@ export function buildServices(options: BuildOptions = {}): Services {
     access, audit, licenseRepository, settings, terminalRepository,
     currencies, packs, contentTranslations, menu, tables, orderRepository,
     orders, payments, terminals, printing, backup, notifications, reports, licensing,
+    shippedVendor,
     translations, themes, packAuthoring, shippedPacks, assets,
     appVersion: APP_VERSION,
     lanBaseUrl: () => lanBaseUrl,

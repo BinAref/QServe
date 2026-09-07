@@ -20,7 +20,10 @@ import { pageHeader, reroute } from '../app.js';
 const pretty = (value) => JSON.stringify(value, null, 2);
 
 export async function renderDeveloper(container) {
-  const overview = await api.get('/api/dev/packs');
+  const [overview, vendor] = await Promise.all([
+    api.get('/api/dev/packs'),
+    api.get('/api/dev/vendor'),
+  ]);
 
   mount(container,
     pageHeader(t('developer.title')),
@@ -50,7 +53,8 @@ export async function renderDeveloper(container) {
       title: t('developer.shipped_themes'),
       files: overview.files.themes,
       loaded: overview.themes.loaded,
-    }));
+    }),
+    vendorEditor(container, vendor));
 }
 
 /** A file on disk that did not load, and the reason. Silence here would hurt. */
@@ -216,4 +220,48 @@ function packEditor(container, { kind, title, files, loaded }) {
           await install();
         },
       }, t('developer.install'))));
+}
+
+/* ------------------------------------------------------------ vendor info */
+
+/**
+ * The vendor's own name, prices and contact channels, written into the build.
+ *
+ * This is the answer to the first question a restaurant asks — *who do I pay,
+ * and how much* — and it has to survive having no internet, because a
+ * restaurant that has just unzipped QServe has never spoken to anything. What
+ * the licence server later hands over replaces it; until then this is what the
+ * licence screen shows.
+ */
+function vendorEditor(container, vendor) {
+  const paste = h('textarea', {
+    rows: '16', spellcheck: 'false', class: 'qs-mono qs-xs',
+  }, pretty(vendor.info ?? vendor.template));
+
+  const save = async () => {
+    const saved = await guard(() => api.put('/api/dev/vendor', { vendor: paste.value }));
+    if (!saved) return;
+    toast(t('common.saved'), 'success');
+    await renderDeveloper(container);
+  };
+
+  return h('div', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
+    h('h2', {}, t('developer.vendor')),
+    h('p', { class: 'qs-muted qs-small' }, t('developer.vendor_intro')),
+    h('p', { class: 'qs-mono qs-xs' }, vendor.file),
+    vendor.info
+      ? null
+      : h('p', { class: 'qs-badge qs-badge-text' }, t('developer.vendor_none')),
+
+    h('div', { class: 'qs-row' },
+      h('button', {
+        class: 'qs-btn qs-btn-sm',
+        onClick: () => { paste.value = pretty(vendor.template); },
+      }, t('developer.vendor_copy'))),
+
+    h('label', { class: 'qs-field', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
+      h('span', {}, t('themes.paste')), paste),
+
+    h('div', { class: 'qs-row' },
+      h('button', { class: 'qs-btn qs-btn-primary', onClick: save }, t('common.save'))));
 }

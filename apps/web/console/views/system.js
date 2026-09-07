@@ -1198,13 +1198,17 @@ function vendorPanel(vendor, container) {
         },
       }, t('license.refresh_vendor')),
 
-      // One line about how current these prices are, never two.
-      vendor?.fetchedAt
-        ? h('span', { class: 'qs-xs qs-muted' },
-            vendor.stale
+      // One line about where these prices came from, never two. "Shipped" is
+      // worth saying: it is why a restaurant with no internet still sees a
+      // phone number, and why that number may be older than the vendor's.
+      h('span', { class: 'qs-xs qs-muted' },
+        vendor?.fetchedAt
+          ? (vendor.stale
               ? t('license.vendor_stale', { when: formatDateTime(vendor.fetchedAt) })
               : formatDateTime(vendor.fetchedAt))
-        : h('span', { class: 'qs-xs qs-muted' }, t('license.vendor_never'))),
+          : vendor?.source === 'shipped'
+            ? t('license.source_shipped')
+            : t('license.vendor_never'))),
 
     message
       ? h('pre', {

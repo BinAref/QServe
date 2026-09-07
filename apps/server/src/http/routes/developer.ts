@@ -111,6 +111,27 @@ export function createDeveloperRoutes(services: Services): Router<AppState> {
     return HttpResponse.noContent();
   }, gate);
 
+  /* --------------------------------------------------------- vendor info */
+
+  /**
+   * The vendor's own details, as they will ship. A restaurant that has never
+   * been online sees exactly this on its licence screen, so it is prepared here
+   * once rather than explained on the phone every time.
+   */
+  router.get('/dev/vendor', () => ({
+    file: services.shippedVendor.path,
+    info: services.shippedVendor.current,
+    template: services.shippedVendor.template(),
+  }), gate);
+
+  router.put('/dev/vendor', (ctx) => ({
+    info: services.shippedVendor.save(
+      parseJsonField(ctx.body, 'vendor'),
+      ctx.state.auth!.actor,
+      ctx.ip,
+    ),
+  }), gate);
+
   return router;
 }
 

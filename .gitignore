@@ -13,6 +13,10 @@ secrets/
 # Vendor-specific build output. Public keys only, but generated per vendor by
 # `npm run keygen`; see trusted-keys.example.json.
 apps/server/config/trusted-keys.json
+
+# The vendor's own name, prices and contacts, shipped with their build. Not
+# secret, but theirs rather than the product's; see vendor.example.json.
+apps/server/config/vendor.json
 *.log
 .DS_Store
 

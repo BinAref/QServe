@@ -74,6 +74,20 @@ thing for a restaurant to have to discover on a Friday night.
 So before cutting a release anyone is meant to pay for: `npm run keygen`, then
 put the public half in the `QSERVE_TRUSTED_KEYS` repository secret.
 
+### The vendor's own details
+
+`apps/server/config/vendor.json` holds the name, prices and contact channels a
+restaurant sees on its licence screen — the answer to "who do I ask, and what
+does it cost". It ships inside the build because a restaurant that has just
+unzipped QServe has never been online and cannot fetch anything; whatever it
+later fetches from the licence server replaces it.
+
+Nothing in it is secret and nothing in it is trusted: it is text shown to a
+person. Prepare it in the console's **Developer** section, which writes the
+file, or set the `QSERVE_VENDOR_INFO` repository secret for the release
+workflow. Without it the licence screen says "ask us" and names nobody, and the
+build says so while it packs.
+
 The signing key itself never leaves the vendor's machine and is never packaged.
 See [SECURITY.md](SECURITY.md).
 
