@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Deliberately plain: the restaurant's own theme is served by the page
+      inside the WebView, so anything this shell paints would fight it. What is
+      left is a full-screen surface in the right colour while the page loads.
+    -->
+    <style name="Theme.QServe" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+    </style>
+</resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The only permission this app asks for. A terminal that cannot reach the
+      restaurant's computer is useless; a terminal that could read the contacts
+      on a waiter's own phone would be indefensible.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.QServe">
+
+        <!--
+          Cleartext is deliberate and is the point: the restaurant's server is
+          on the restaurant's own wire, identified by a name it chose, with no
+          certificate authority within reach of a building with no internet.
+          The traffic never leaves the premises.
+        -->
+
+        <activity
+            android:name=".TerminalActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

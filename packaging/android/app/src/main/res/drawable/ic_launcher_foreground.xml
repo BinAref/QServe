@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The same QR-square mark the console wears, drawn as a vector so it is one
+     file at every density. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,32h14v14h-14z M62,32h14v14h-14z M32,62h14v14h-14z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,62h6v6h-6z M72,62h4v4h-4z M62,72h4v4h-4z M70,70h6v6h-6z" />
+</vector>

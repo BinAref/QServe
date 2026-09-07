@@ -43,8 +43,15 @@ vendor console, paste it into the licence screen, and the LAN server starts
 immediately — with everything you just built intact.
 
 ```bash
-npm run check       # build + validate language/theme packs + 113 tests
+npm run check       # build + validate the packs, the audit labels and the settings + tests
 ```
+
+### Running it without a checkout
+
+A restaurant does not clone a repository. Each release carries two files: a
+Windows folder with `QServe.exe` in it, and an Android APK for the restaurant's
+own phones and tablets. See [PACKAGING.md](docs/PACKAGING.md) for how both are
+built, and the Releases page for the current ones.
 
 ---
 
@@ -180,6 +187,7 @@ boot, and is not recommended.
 | [SECURITY.md](docs/SECURITY.md) | what is protected, how, and what is **not** |
 | [MODULES.md](docs/MODULES.md) | module responsibilities and how to add one |
 | [EXTENDING.md](docs/EXTENDING.md) | languages, themes, terminal types, roles, printers, modules |
+| [PACKAGING.md](docs/PACKAGING.md) | the Windows bundle, the Android terminal, and how a release is cut |
 
 ---
 
@@ -188,7 +196,7 @@ boot, and is not recommended.
 The spec sets these as the bar for "complete". Each is enforced, and most are
 covered by a test:
 
-- [x] No hard-coded languages — 574 keys in `locales/*.json`, validated
+- [x] No hard-coded languages — every string in `locales/*.json`, validated
 - [x] No hard-coded themes — 64 design tokens in `themes/*.json`, validated
 - [x] A restaurant adds its own language, theme or currency without a developer
       — and the language covers its own menu text, not only the interface

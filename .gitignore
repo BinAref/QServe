@@ -15,3 +15,9 @@ secrets/
 apps/server/config/trusted-keys.json
 *.log
 .DS_Store
+
+# Packaging output: assembled bundles and the runtimes they are built from.
+packaging/windows/build/
+packaging/android/.gradle/
+packaging/android/build/
+packaging/android/app/build/

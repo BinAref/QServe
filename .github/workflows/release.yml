@@ -1,0 +1,139 @@
+# Build the two things a restaurant installs, and publish them.
+#
+# Neither can honestly be built on a developer's laptop alone: the Windows
+# bundle carries a native SQLite that has to be compiled on Windows, and the
+# Android package needs the Android SDK. Both runners here have what they need,
+# so a release is a tag rather than an afternoon.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# or run it by hand from the Actions tab, which is the same build without the
+# release step unless a tag is given.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish as, e.g. v1.0.0. Leave empty to build only.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: Build, test and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run validate
+      - run: npm test
+
+  windows:
+    name: Windows bundle
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # The vendor's public keys, so an activation certificate can be verified
+      # on a restaurant's computer with the internet unplugged. Only ever the
+      # public half; the signing key never leaves the vendor's own machine.
+      - name: Write the trust store
+        if: ${{ secrets.QSERVE_TRUSTED_KEYS != '' }}
+        env:
+          TRUSTED_KEYS: ${{ secrets.QSERVE_TRUSTED_KEYS }}
+        shell: bash
+        run: printf '%s' "$TRUSTED_KEYS" > apps/server/config/trusted-keys.json
+
+      - name: Build QServe.exe
+        run: node packaging/windows/build.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+          if-no-files-found: error
+
+  android:
+    name: Android terminal
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      # Pinned rather than whatever the runner happens to ship: the Android
+      # plugin is particular about which Gradle it will work with.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build the APK
+        working-directory: packaging/android
+        run: gradle --no-daemon assembleRelease
+
+      - name: Name it after the version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          mkdir -p dist
+          cp packaging/android/app/build/outputs/apk/release/app-release.apk \
+             "dist/QServe-Terminal-${version}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: Publish the release
+    needs: [windows, android]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.tag != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect what was built
+        shell: bash
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name '*.zip' -o -name '*.apk' \) -exec cp {} dist/ \;
+          ls -l dist
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: QServe ${{ inputs.tag || github.ref_name }}
+          files: dist/*
+          body_path: packaging/RELEASE_NOTES.md
+          fail_on_unmatched_files: true
