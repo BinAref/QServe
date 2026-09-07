@@ -6,7 +6,9 @@
  *
  *  - **Authorisation per event.** Each event names a permission; a socket
  *    receives it only if its session holds that permission. A kitchen screen
- *    physically cannot be sent a payment total.
+ *    physically cannot be sent a payment total. Some events narrow further —
+ *    a notice for the floor is not sent to the pass at all, rather than sent
+ *    and hidden there.
  *  - **Subscription.** A terminal asks for the topics it renders, so a table's
  *    phone is not woken by every kitchen state change in the building.
  *  - **Liveness.** Heartbeats reap sockets whose device went to sleep or left
@@ -27,6 +29,15 @@ const HEARTBEAT_MS = 30_000;
 /** Sockets may not sit unauthenticated; a terminal always has a cookie. */
 const ALL_TOPICS = Object.values(Topic);
 
+/** Who a socket belongs to, as much as an audience test needs to know. */
+export interface AudienceMember {
+  readonly terminalType: string | null;
+  readonly terminalId: string | null;
+  readonly permissions: readonly string[];
+}
+
+export type AudiencePredicate = (payload: unknown, member: AudienceMember) => boolean;
+
 interface Client {
   readonly socket: WebSocket;
   readonly auth: AuthContext;
@@ -39,6 +50,8 @@ interface Client {
 export class RealtimeGateway {
   private readonly wss = new WebSocketServer({ noServer: true });
   private readonly clients = new Set<Client>();
+  /** Event-specific recipient tests, e.g. who a notification is addressed to. */
+  private readonly audiences = new Map<string, AudiencePredicate>();
   private heartbeat: NodeJS.Timeout | null = null;
   private unsubscribe: (() => void) | null = null;
 
@@ -179,13 +192,35 @@ export class RealtimeGateway {
     const descriptor = describeEvent(event.name);
     if (!descriptor) return;
 
+    const audience = this.audiences.get(event.name);
+
     for (const client of this.clients) {
       if (!client.topics.has(event.topic)) continue;
       if (descriptor.permission !== null && !grants(client.auth.permissions, descriptor.permission)) {
         continue;
       }
+      // A second, event-specific gate. Filtering in the browser instead would
+      // still mean the payload reached a screen it was not addressed to.
+      if (audience && !audience(event.payload, {
+        terminalType: client.auth.terminal?.terminal_type ?? null,
+        terminalId: client.auth.terminal?.id ?? null,
+        permissions: client.auth.permissions,
+      })) {
+        continue;
+      }
       this.send(client, { type: 'event', event });
     }
+  }
+
+  /**
+   * Narrow one event to the sockets it is addressed to.
+   *
+   * Registered rather than built in, because the gateway should not learn what
+   * a notification is — it only needs to be told whether this client is one of
+   * the intended recipients.
+   */
+  setAudience(eventName: string, predicate: AudiencePredicate): void {
+    this.audiences.set(eventName, predicate);
   }
 
   private send(client: Client, frame: ServerFrame): void {

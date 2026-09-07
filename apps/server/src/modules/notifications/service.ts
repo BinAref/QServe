@@ -234,6 +234,22 @@ export class NotificationService {
       .filter((notification) => this.isFor(notification, options));
   }
 
+  /**
+   * Is this station one of the intended recipients? Used both to answer a
+   * terminal's own list and to narrow the socket fan-out, so the two can never
+   * disagree about who was told.
+   */
+  isAddressedTo(
+    notification: Notification,
+    who: {
+      terminalType?: string | null;
+      terminalId?: string | null;
+      permissions?: readonly string[];
+    },
+  ): boolean {
+    return this.isFor(notification, who);
+  }
+
   private isFor(
     notification: Notification,
     who: {

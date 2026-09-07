@@ -69,16 +69,24 @@ export function createNotificationRoutes(services: Services): Router<AppState> {
       ? services.tables.getByTerminal(auth.terminal.id)
       : null;
 
+    const orderId = body['orderId'] !== undefined
+      ? requireString(body, 'orderId', { max: 64 })
+      : null;
+
     return services.notifications.raise({
       kind,
       messageKey: `notify.${kind.toLowerCase()}`,
       actor: auth.actor,
-      ...(body['orderId'] !== undefined
-        ? { orderId: requireString(body, 'orderId', { max: 64 }) } : {}),
+      ...(orderId ? { orderId } : {}),
       ...(table ? { tableId: table.id, tableLabel: table.label } : {}),
       body: optionalString(body, 'body', { max: 400 }),
-      ...(body['params'] !== undefined
-        ? { params: asObject(body['params'], 'params') } : {}),
+      // The message reads "Table {table} is calling", so the table has to be a
+      // parameter, not merely a column the row happens to carry.
+      params: {
+        ...(table ? { table: table.label } : {}),
+        ...(auth.terminal ? { terminal: auth.terminal.id } : {}),
+        ...(body['params'] !== undefined ? asObject(body['params'], 'params') : {}),
+      },
     });
   });
 

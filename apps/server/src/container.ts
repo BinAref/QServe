@@ -10,7 +10,7 @@
 
 import { openDatabase, runMigrations, type Db } from '@qserve/db';
 import { computeDeviceFingerprint, type FingerprintResult } from '@qserve/crypto';
-import { APP_VERSION, type DeviceFingerprint } from '@qserve/shared';
+import { APP_VERSION, EventName, type DeviceFingerprint } from '@qserve/shared';
 
 import { loadServerConfig, type ServerConfig } from './config.js';
 import { ensureDirectories, readOrCreateInstallId, resolvePaths, type Paths } from './core/paths.js';
@@ -140,6 +140,10 @@ export function buildServices(options: BuildOptions = {}): Services {
   const appLock = new AppLockService(settings, audit);
   const notifications = new NotificationService(db, bus);
   const realtime = new RealtimeGateway(bus, security);
+  // A notice for the floor is not sent to the pass at all. Filtering in the
+  // browser instead would still mean the payload reached the wrong screen.
+  realtime.setAudience(EventName.NOTIFICATION, (payload, member) =>
+    notifications.isAddressedTo(payload as never, member));
   const discovery = new LocalDiscovery();
 
   const menu = new MenuRepository(db);

@@ -34,7 +34,8 @@ export class NotificationCentre {
     this.realtime = realtime;
     this.onArrive = onArrive;
 
-    realtime.on('notification', (event) => this.#receive(event.payload));
+    // The handler is called with the payload first, the envelope second.
+    realtime.on('notification', (notification) => this.#receive(notification));
     // A station that was off, or asleep in someone's apron, catches up here.
     realtime.onStateChange((state) => {
       if (state === 'open') void this.refresh();
@@ -52,14 +53,37 @@ export class NotificationCentre {
     return () => this.#listeners.delete(listener);
   }
 
+  /**
+   * Catch up on what is open.
+   *
+   * Merged rather than assigned: this fetch and the socket race on connect, and
+   * replacing the list wholesale would drop a notice that arrived while the
+   * request was in flight. In a restaurant that is a call that vanishes.
+   */
   async refresh() {
+    let fetched;
     try {
-      const { notifications } = await api.get('/api/notifications?limit=50');
-      this.#items = notifications;
-      this.#announce();
+      ({ notifications: fetched } = await api.get('/api/notifications?limit=50'));
     } catch {
       // A station with no connection has nothing to show and says so elsewhere.
+      return;
     }
+
+    const byId = new Map(fetched.map((item) => [item.id, item]));
+    for (const item of this.#items) {
+      const server = byId.get(item.id);
+      // The server's copy wins on anything it knows about; a locally
+      // acknowledged one that the server has not confirmed yet stays that way.
+      if (!server) {
+        if (!item.acknowledgedAt) byId.set(item.id, item);
+      } else if (item.acknowledgedAt && !server.acknowledgedAt) {
+        byId.set(item.id, { ...server, acknowledgedAt: item.acknowledgedAt });
+      }
+    }
+
+    this.#items = [...byId.values()]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    this.#announce();
   }
 
   #receive(notification) {
