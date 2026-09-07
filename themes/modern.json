@@ -24,7 +24,9 @@
       "warning": "#e08700",
       "error": "#e5484d",
       "info": "#6d4aff",
-      "focusRing": "#6d4aff"
+      "focusRing": "#6d4aff",
+      "lit": "#6d4aff",
+      "litTrail": "#00c2a8"
     },
     "spacing": {
       "xs": "4px",

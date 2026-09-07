@@ -32,12 +32,13 @@ export async function renderSettings(container) {
   const profileForm = h('form', { class: 'qs-card' },
     h('h2', {}, t('settings.restaurant')),
 
-    h('div', { class: 'qs-field' },
-      h('span', {}, t('setup.restaurant_name')),
-      locales.filter((entry) => entry.enabled).map((entry) =>
-        h('div', { class: 'qs-row', style: { marginBlockEnd: '6px' } },
-          h('span', { class: 'qs-badge', style: { minWidth: '46px' } }, entry.locale),
-          h('input', { name: `name.${entry.locale}`, value: restaurant.name[entry.locale] ?? '' })))),
+    // The shared control, and a placeholder showing the name already in use —
+    // a restaurant set up before it had two languages has its name stored under
+    // "any language", and empty boxes would invite someone to overwrite it.
+    localisedField(t('setup.restaurant_name'), 'name', restaurant.name, {
+      locales: enabledLocales(),
+      placeholder: pick(restaurant.name),
+    }),
 
     h('div', { class: 'qs-grid qs-grid-2' },
       field(t('settings.address'), 'address', restaurant.address),
@@ -47,10 +48,10 @@ export async function renderSettings(container) {
 
     h('div', { class: 'qs-section-title' }, t('settings.currency')),
     h('div', { class: 'qs-grid qs-grid-3' },
-      field(t('settings.currency'), 'currencyCode', restaurant.currency.code),
-      field('symbol', 'currencySymbol', restaurant.currency.symbol),
+      field(t('currencies.code'), 'currencyCode', restaurant.currency.code),
+      field(t('currencies.symbol'), 'currencySymbol', restaurant.currency.symbol),
       h('label', { class: 'qs-field' },
-        h('span', {}, 'decimals'),
+        h('span', {}, t('currencies.decimals')),
         h('input', { name: 'currencyDecimals', type: 'number', min: '0', max: '4', value: String(restaurant.currency.decimals) }))),
 
     h('div', { class: 'qs-grid qs-grid-3' },
@@ -96,12 +97,8 @@ export async function renderSettings(container) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(profileForm).entries());
 
-    const name = {};
-    for (const entry of locales) {
-      const value = String(data[`name.${entry.locale}`] ?? '').trim();
-      if (value) name[entry.locale] = value;
-    }
-    const enabledLocales = locales
+    const name = collectLocalised(data, 'name', enabledLocales());
+    const chosenLocales = locales
       .filter((entry) => data[`locale.${entry.locale}`] === 'on')
       .map((entry) => entry.locale);
 
@@ -122,7 +119,7 @@ export async function renderSettings(container) {
       taxInclusive: data.taxInclusive === 'on',
       themeId: data.themeId,
       defaultLocale: data.defaultLocale,
-      ...(enabledLocales.length > 0 ? { enabledLocales } : {}),
+      ...(chosenLocales.length > 0 ? { enabledLocales: chosenLocales } : {}),
     }));
     if (!saved) return;
     toast(t('common.saved'), 'success');
@@ -265,9 +262,41 @@ function field(label, name, value) {
 
 /**
  * The behavioural switches. Rendered from whatever keys the server reports, so
- * a module adding a setting needs no console change.
+ * a module adding a setting needs no console change — but every switch says
+ * what it does in the reader's language, and says it in a sentence.
+ *
+ * `orders.autoAcceptFromCustomer` is a name for the code to use. The owner sees
+ * "Accept diners' orders automatically", and underneath it what that will mean
+ * in their restaurant. A setting nobody has written a sentence for yet falls
+ * back to its own name spaced out, which is ugly enough to get noticed and
+ * caught by `npm run validate:audit`'s sibling check.
  */
 const HIDDEN_SETTINGS = ['backup.passphrase', 'security.', 'license.'];
+
+/** `orders.autoAcceptFromCustomer` → `setting.orders.auto_accept_from_customer`. */
+const settingKey = (key) => {
+  const [group, ...rest] = key.split('.');
+  return `setting.${group}.${rest.join('.').replace(/(?<!^)(?=[A-Z])/g, '_').toLowerCase()}`;
+};
+
+function settingLabel(key) {
+  const label = t(settingKey(key));
+  if (!label.startsWith('setting.')) return label;
+  // Last resort: "autoAcceptFromCustomer" → "Auto accept from customer".
+  const tail = key.split('.').slice(1).join('.');
+  const spaced = tail.replace(/(?<!^)(?=[A-Z])/g, ' ').toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function settingHint(key) {
+  const hint = t(`${settingKey(key)}.hint`);
+  return hint.startsWith('setting.') ? null : hint;
+}
+
+function settingGroupLabel(group) {
+  const label = t(`settings.group.${group}`);
+  return label.startsWith('settings.group.') ? group : label;
+}
 
 function operationalSettings(settings, canEdit, container) {
   const groups = new Map();
@@ -283,21 +312,31 @@ function operationalSettings(settings, canEdit, container) {
   const form = h('form', { class: 'qs-card', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
     h('h2', {}, t('settings.operations')),
     [...groups.entries()].map(([group, entries]) =>
-      h('div', {},
-        h('div', { class: 'qs-section-title' }, group),
-        entries.map(([key, value]) =>
+      h('div', { class: 'settings-group' },
+        h('div', { class: 'qs-section-title' }, settingGroupLabel(group)),
+        h('div', { class: 'settings-rows' }, entries.map(([key, value]) =>
           typeof value === 'boolean'
-            ? h('label', { class: 'qs-check' },
+            ? h('label', { class: 'qs-check settings-switch' },
                 h('input', { type: 'checkbox', name: key, checked: value, disabled: !canEdit }),
-                h('span', {}, key.split('.').slice(1).join('.')))
-            : h('label', { class: 'qs-field' },
-                h('span', {}, key.split('.').slice(1).join('.')),
+                h('span', {},
+                  settingLabel(key),
+                  settingHint(key)
+                    ? h('span', { class: 'qs-xs qs-muted settings-hint' }, settingHint(key))
+                    : null))
+            // A number gets a box the size of a number, not the width of the
+            // card: "3" in a 900px field looks like a mistake.
+            : h('label', { class: 'qs-field settings-value' },
+                h('span', {}, settingLabel(key)),
+                settingHint(key)
+                  ? h('span', { class: 'qs-xs qs-muted settings-hint' }, settingHint(key))
+                  : null,
                 h('input', {
                   name: key,
                   type: typeof value === 'number' ? 'number' : 'text',
+                  inputmode: typeof value === 'number' ? 'numeric' : undefined,
                   value: value === null ? '' : String(value),
                   disabled: !canEdit,
-                }))))),
+                })))))),
     canEdit ? h('button', { class: 'qs-btn qs-btn-primary', type: 'submit' }, t('common.save')) : null);
 
   form.addEventListener('submit', async (event) => {
@@ -981,10 +1020,17 @@ export async function renderLicense(container) {
     api.get('/api/license/vendor').catch(() => null),
   ]);
 
+  // What activation unlocks, in words rather than identifiers: this list is the
+  // honest answer to "what am I paying for", so it has to be readable.
+  const capabilityLabel = (capability) => {
+    const label = t(`capability.${capability}`);
+    return label.startsWith('capability.') ? capability : label;
+  };
+
   const capabilityRow = (capability, unlocked) =>
     h('div', { class: 'capability', 'data-unlocked': String(unlocked) },
       h('span', {}, unlocked ? '✓' : '🔒'),
-      h('span', {}, capability));
+      h('span', {}, capabilityLabel(capability)));
 
   const activateForm = h('form', {},
     h('label', { class: 'qs-field' },
@@ -1015,10 +1061,14 @@ export async function renderLicense(container) {
   mount(container,
     pageHeader(t('license.title')),
 
-    h('div', { class: 'license-hero' },
+    // In SETUP the licence panel is the thing waiting on a person, so it is
+    // what carries the travelling light. Once activated it stops — nothing on
+    // an activated console is asking for anything.
+    h('div', { class: `license-hero${isSetup() ? ' qs-lit' : ''}` },
       h('div', { class: 'qs-row qs-row-between' },
         h('h2', { style: { margin: 0 } }, t(status.explanation)),
-        h('span', { class: 'mode-badge', 'data-mode': status.mode }, status.mode)),
+        h('span', { class: 'mode-badge', 'data-mode': status.mode },
+          te('license.mode', status.mode))),
 
       h('div', { class: 'qs-grid qs-grid-2' },
         h('div', {},

@@ -27,11 +27,15 @@
 
 .kds-filters { display: flex; gap: var(--qs-spacing-xs); flex-wrap: wrap; }
 .kds-filter {
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--qs-color-border);
   background: var(--qs-color-surface-alt);
   color: var(--qs-color-text);
   border-radius: var(--qs-radius-pill);
   padding: 6px 14px;
+  /* Tapped by someone holding a pan. */
+  min-block-size: var(--qs-touch);
   font: inherit;
   cursor: pointer;
 }

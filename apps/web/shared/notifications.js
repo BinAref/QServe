@@ -229,7 +229,9 @@ export class NotificationCentre {
    * a corner is not enough — a kitchen pass is looked at from two metres away.
    */
   banner() {
-    const node = h('div', { class: 'qs-notify-banner qs-hidden' });
+    // Lit while it stands: a call nobody has answered is the definition of
+    // something waiting on a person.
+    const node = h('div', { class: 'qs-notify-banner qs-hidden qs-lit qs-lit-urgent' });
 
     const paint = () => {
       const [first] = this.urgent;

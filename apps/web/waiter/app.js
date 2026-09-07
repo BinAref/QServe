@@ -120,10 +120,12 @@ function floor() {
       onClick: () => openTable(table),
     },
       h('span', { class: 'floor-label' }, table.label),
-      h('span', { class: 'floor-status' }, te('tables.status', table.status)),
+      // The status line is dropped when the flag below already says it, rather
+      // than printing "Ready" twice on the same card.
       ready > 0
-        ? h('span', { class: 'floor-ready-flag' }, `${ready} ${te('orders.status', 'READY')}`)
-        : null,
+        ? h('span', { class: 'floor-ready-flag' },
+            t('waiter.plates_ready', { count: ready }))
+        : h('span', { class: 'floor-status' }, te('tables.status', table.status)),
       h('span', { class: 'floor-count qs-muted' },
         table.openOrders.length > 0
           ? `${table.openOrders.length} ${t('tables.open_orders')}`
@@ -152,7 +154,7 @@ function openTable(table) {
                 serveButton(order)))))));
 
   const dialog = modal({
-    title: `${t('orders.table')} ${table.label}`,
+    title: table.label,
     body,
     actions: [
       h('button', { class: 'qs-btn', value: 'cancel' }, t('common.close')),

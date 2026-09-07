@@ -10,9 +10,15 @@
 
 .till {
   display: grid;
-  grid-template-columns: minmax(280px, 380px) 1fr;
+  /* minmax(0, …) on the bill pane: a grid track's automatic minimum is its
+     content's, so without this a long line of items widens the whole till. */
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  /* The header takes what it needs and the panes take the rest. Without this
+     the auto rows share the leftover height and the header grows a chin. */
+  grid-template-rows: auto minmax(0, 1fr);
   min-block-size: 100dvh;
 }
+.till-list, .till-detail { min-inline-size: 0; }
 
 .till-head {
   grid-column: 1 / -1;
@@ -95,7 +101,7 @@
 /* ------------------------------------------------------------ on a phone */
 
 @media (max-width: 860px) {
-  .till { grid-template-columns: 1fr; }
+  .till { grid-template-columns: minmax(0, 1fr); }
 
   /*
    * One pane at a time. Which one is `data-pane` on the container, set when a
@@ -110,10 +116,21 @@
     max-block-size: none;
     padding-block-end: var(--qs-safe-bottom);
   }
-  .till[data-pane="bill"] .till-back { display: inline-flex; }
+  .till[data-pane="bill"] .till-back {
+    display: inline-flex;
+    /* Wet hands, one thumb: the same minimum as every other control. */
+    min-inline-size: var(--qs-touch);
+    min-block-size: var(--qs-touch);
+  }
   .till-bill { animation: qs-rise var(--qs-motion-normal) var(--qs-motion-ease-entrance); }
 
-  .till-head { padding-inline: var(--qs-spacing-md); }
+  /* Back, title, station, who is signed in, connection, bell: more than one
+     line's worth on a phone, so it takes two rather than a sideways scroll. */
+  .till-head {
+    flex-wrap: wrap;
+    row-gap: var(--qs-spacing-xs);
+    padding-inline: var(--qs-spacing-md);
+  }
   .till-head h1 { font-size: var(--qs-typography-size-md); }
 
   /* The keypad is the reason this screen exists on a phone at all: full
@@ -125,6 +142,6 @@
 /* ------------------------------------------------ on a real till screen */
 
 @media (min-width: 1280px) {
-  .till { grid-template-columns: minmax(320px, 420px) 1fr; }
+  .till { grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); }
   .till-keypad button { min-block-size: 64px; font-size: var(--qs-typography-size-xl); }
 }

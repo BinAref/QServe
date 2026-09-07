@@ -108,11 +108,13 @@ a { color: var(--qs-color-primary); }
 
 .qs-page {
   /*
-   * `min(…, 100%)` rather than a bare 1200px: the page centres itself with auto
-   * margins, and an auto margin opts a flex item out of stretching, leaving it
-   * sized to its widest content. On a phone that turned one wide table into a
-   * sideways scroll of the entire console.
+   * An auto margin opts a flex item out of stretching, so without an explicit
+   * width this page shrink-wrapped its content: on a desk screen the dashboard
+   * huddled into a 320px column with a metre of empty space beside it, and on a
+   * phone one wide table turned into a sideways scroll of the whole console.
+   * Fill the space, then cap it — a line of text is unreadable past ~1200px.
    */
+  inline-size: 100%;
   max-inline-size: min(1200px, 100%);
   margin-inline: auto;
   padding: var(--qs-spacing-lg);
@@ -607,6 +609,85 @@ table.qs-table { width: 100%; border-collapse: collapse; }
 .qs-stagger > *:nth-child(9) { animation-delay: 160ms; }
 .qs-stagger > *:nth-child(n+10) { animation-delay: 180ms; }
 
+/* -------------------------------------------------------- the lit border */
+
+/*
+ * A light travelling around an edge.
+ *
+ * It is reserved for the one thing on a screen that is waiting for a person:
+ * the order about to be sent, the ticket that has been at the pass too long,
+ * the call nobody has answered, the licence not yet activated. Used on more
+ * than one thing at a time it stops meaning anything, so each screen lights
+ * exactly one.
+ *
+ * The ring is a conic gradient masked down to the border band, which keeps it
+ * one element and one paint — no wrapper divs, no SVG, and nothing inside the
+ * element has to know it is lit. Where `@property` is unsupported the angle
+ * simply does not animate and the border is still lit, which is a fair
+ * degradation rather than a broken one.
+ */
+@property --qs-lit-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.qs-lit {
+  position: relative;
+  /*
+   * The isolation matters: inside this stacking context the ring paints after
+   * the element's own background and before its text, which is how a 2px band
+   * at the very edge can sit on the border without ever touching a word.
+   */
+  isolation: isolate;
+}
+
+.qs-lit::before {
+  content: '';
+  position: absolute;
+  /*
+   * Inside the border box, not outside it: a ring drawn outside would be
+   * clipped by any parent that hides its overflow, and on a full-width banner
+   * it would add its own width to the page and scroll a phone sideways.
+   */
+  inset: 0;
+  padding: var(--qs-lit-width, 2px);
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+
+  /* A comet, not a glowing outline: a bright head with a tail behind it, and
+     most of the ring dark, so the eye follows a moving point. */
+  background: conic-gradient(
+    from var(--qs-lit-angle),
+    transparent 0deg 205deg,
+    var(--qs-color-lit-trail, var(--qs-color-secondary)) 290deg,
+    var(--qs-color-lit, var(--qs-color-primary)) 334deg,
+    transparent 350deg 360deg
+  );
+  /* The glow. Small, or the edge reads as blur rather than light. */
+  filter: drop-shadow(0 0 6px var(--qs-color-lit, var(--qs-color-primary)));
+
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+
+  animation: qs-lit-travel var(--qs-lit-duration, 4s) linear infinite;
+}
+
+@keyframes qs-lit-travel {
+  to { --qs-lit-angle: 360deg; }
+}
+
+/** Faster, for something that has been waiting rather than merely inviting. */
+.qs-lit-urgent {
+  --qs-lit-duration: 2.2s;
+  --qs-lit-width: 3px;
+  --qs-color-lit: var(--qs-color-warning);
+  --qs-color-lit-trail: var(--qs-color-error);
+}
+
 /** Something that needs an answer, breathing rather than flashing. */
 .qs-attention { position: relative; }
 .qs-attention::after {
@@ -668,6 +749,12 @@ table.qs-table { width: 100%; border-collapse: collapse; }
   border: none;
   background: none;
   cursor: pointer;
+  /* A glyph is small; the thing you tap must not be. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--qs-touch);
+  min-block-size: var(--qs-touch);
   padding: var(--qs-spacing-xs) var(--qs-spacing-sm);
   border-radius: var(--qs-radius-md);
   font-size: var(--qs-typography-size-lg);

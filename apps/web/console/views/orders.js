@@ -72,7 +72,7 @@ async function openOrder(orderId) {
     body: h('div', {},
       h('div', { class: 'qs-row qs-row-between' },
         h('span', { class: 'qs-badge' }, te('orders.status', order.status)),
-        h('span', {}, `${t('orders.table')} ${order.tableLabel ?? '—'}`)),
+        h('span', {}, order.tableLabel ?? '—')),
 
       // The four accountability facts the spec asks to be persisted, not just
       // displayed: source, who created, who served, who took payment.
@@ -137,7 +137,7 @@ async function openOrder(orderId) {
           h('tbody', {}, timeline.events.map((event) =>
             h('tr', {},
               h('td', { class: 'qs-mono qs-xs' }, formatTime(event.at)),
-              h('td', {}, event.action),
+              h('td', {}, actionLabel(event.action)),
               h('td', { class: 'qs-muted' },
                 event.actor.userName ?? event.actor.terminalName ?? event.actor.kind),
               h('td', { class: 'qs-xs qs-muted' },
@@ -280,6 +280,17 @@ function breakdown(title, rows) {
 /* ------------------------------------------------------------- activity */
 
 /**
+ * An audited action, in words. A module added later whose action has no
+ * sentence yet falls back to the raw name — which is honest, and still tells an
+ * owner what happened.
+ */
+function actionLabel(action) {
+  const label = t(`audit.action.${action}`);
+  return label.startsWith('audit.action.') ? action : label;
+}
+
+
+/**
  * The activity log (spec §19).
  *
  * Every action by every person and every station, filterable by who did it,
@@ -325,7 +336,10 @@ export async function renderActivityLog(container) {
     const tr = h('tr', { 'data-expandable': String(hasChange) },
       h('td', { class: 'qs-xs qs-muted qs-nowrap' }, formatDateTime(entry.at)),
       h('td', { class: 'qs-small' },
-        h('span', { class: 'qs-mono qs-xs' }, entry.action)),
+        actionLabel(entry.action),
+        // The machine name stays underneath: an owner reads the sentence, and
+        // whoever is being shown the log as evidence can match it to the code.
+        h('div', { class: 'qs-mono qs-xs qs-muted' }, entry.action)),
       h('td', { class: 'qs-small' },
         who,
         entry.actor.terminalName && entry.actor.userName
@@ -408,7 +422,7 @@ export async function renderActivityLog(container) {
       h('span', {}, t('audit.filter_action')),
       filterInput('action', h('select', {},
         h('option', { value: '' }, t('audit.anything')),
-        facets.actions.map((action) => h('option', { value: action }, action))))),
+        facets.actions.map((action) => h('option', { value: action }, actionLabel(action)))))),
 
     h('label', { class: 'qs-field' },
       h('span', {}, t('audit.filter_entity')),

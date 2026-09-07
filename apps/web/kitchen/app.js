@@ -107,10 +107,14 @@ function ticket(entry) {
   const { order, ageSeconds, urgent, sourceLabel } = entry;
   const minutes = Math.floor(ageSeconds / 60);
 
+  // The one ticket on the board that is waiting on somebody carries the
+  // travelling light. Anything else lit at the same time would dilute it.
+  const late = urgent && order.status !== OrderStatus.READY;
+
   return h('article', {
-    class: 'kds-ticket',
+    class: `kds-ticket${late ? ' qs-lit qs-lit-urgent' : ''}`,
     'data-status': order.status,
-    'data-urgent': String(urgent && order.status !== OrderStatus.READY),
+    'data-urgent': String(late),
   },
     h('div', { class: 'kds-ticket-head' },
       h('span', { class: 'kds-number' }, `#${order.number}`),

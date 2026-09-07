@@ -219,7 +219,9 @@
   position: fixed;
   inset-inline: 0;
   inset-block-end: 0;
-  padding: var(--qs-spacing-md) var(--qs-spacing-lg);
+  /* Full-bleed bar, column-aligned contents: on a wide screen its total lines
+     up with the prices above it instead of drifting to the far edge. */
+  padding: var(--qs-spacing-md) max(var(--qs-spacing-lg), calc((100% - 1180px) / 2));
   padding-block-end: calc(var(--qs-spacing-md) + env(safe-area-inset-bottom, 0px));
   background: var(--qs-color-surface);
   border-block-start: 1px solid var(--qs-color-border);
@@ -310,5 +312,7 @@
 .menu-service .qs-btn:disabled { opacity: 0.75; }
 
 @media (min-width: 760px) {
-  .menu-service { grid-template-columns: repeat(2, minmax(0, 240px)); justify-content: center; }
+  /* Aligned with the dishes above rather than centred under them: two
+     left-hand buttons read as part of the menu, a centred pair as an advert. */
+  .menu-service { grid-template-columns: repeat(2, minmax(0, 240px)); justify-content: start; }
 }

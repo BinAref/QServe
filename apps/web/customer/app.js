@@ -423,8 +423,9 @@ function openCart() {
   };
   draw();
 
+  // The one lit thing on this screen: the button that sends the order.
   const send = h('button', {
-    class: 'qs-btn qs-btn-primary',
+    class: 'qs-btn qs-btn-primary qs-lit',
     value: 'send',
     onClick: (event) => {
       event.preventDefault();

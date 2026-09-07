@@ -157,7 +157,7 @@ function detail() {
       h('div', {},
         h('h2', {}, t('orders.order_number', { number: order.number })),
         h('div', { class: 'qs-muted qs-small' },
-          `${t('orders.table')} ${order.tableLabel ?? '—'} · `,
+          `${order.tableLabel ?? '—'} · `,
           `${t('orders.source')}: ${te('orders.source', order.source)}`,
           order.createdBy.userName ? ` — ${order.createdBy.userName}` : '')),
       h('span', { class: 'qs-badge' }, te('orders.status', order.status))),

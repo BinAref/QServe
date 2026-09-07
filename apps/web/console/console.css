@@ -302,7 +302,13 @@
   text-align: center;
   text-transform: uppercase;
 }
-.capability-list { display: grid; gap: 6px; }
+/* A column of thirteen short lines leaves most of a desk screen empty, so the
+   list flows into as many columns as the width honestly allows. */
+.capability-list {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
 .capability {
   display: flex;
   align-items: center;
@@ -460,3 +466,22 @@
 
 .qs-permission-group .qs-section-title { margin-block-end: 4px; }
 .qs-permission-group .qs-check { font-size: var(--qs-typography-size-sm); }
+
+/* ---------------------------------------------------------------- settings */
+
+/*
+ * The operational switches. Each one is a sentence and, under it, what that
+ * sentence will mean in this restaurant — so they are read in a column rather
+ * than scanned in a grid, and a number gets a box the size of a number.
+ */
+.settings-group + .settings-group { margin-block-start: var(--qs-spacing-lg); }
+.settings-rows {
+  display: grid;
+  gap: var(--qs-spacing-sm);
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  align-items: start;
+}
+.settings-switch { align-items: start; gap: var(--qs-spacing-sm); }
+.settings-switch input { margin-block-start: 3px; }
+.settings-hint { display: block; line-height: var(--qs-typography-line-height-normal); }
+.settings-value input { max-inline-size: 160px; }
