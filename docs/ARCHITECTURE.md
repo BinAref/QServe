@@ -220,6 +220,11 @@ Three rules hold across all of them:
   durations and easings in the token contract, so a "modern" theme is snappier
   than an "elegant" one without touching CSS. All of it collapses under
   `prefers-reduced-motion`.
+- **One thing on a screen may be lit.** A light travelling around an edge — one
+  masked conic gradient, in the theme's own colours — marks the single thing
+  waiting on a person: the order about to be sent, the ticket that has been at
+  the pass too long, the call nobody has answered, the licence not yet
+  activated. Two lit things at once would mean nothing, so no screen has two.
 - **Logical properties only.** `dir="rtl"` on `<html>` is still the entire cost
   of Arabic, including the drawer that slides in from the other side.
 
