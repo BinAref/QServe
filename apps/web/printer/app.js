@@ -44,7 +44,7 @@ function enqueue(job) {
   if (typeof job.body !== 'string') return;
 
   state.queue.push(job);
-  note(`${t('printing.jobs')}: ${job.jobId ?? ''}`);
+  note(t('printing.job_arrived', { job: job.jobId ?? '' }));
   drain();
 }
 
@@ -61,7 +61,7 @@ function drain() {
   requestAnimationFrame(() => {
     try {
       window.print();
-      note(`${t('common.print')} ✓`);
+      note(t('printing.sent'));
     } catch (error) {
       note(`${t('error.internal')}: ${String(error)}`);
     } finally {
@@ -99,18 +99,22 @@ function render() {
               if (state.autoPrint) drain();
             },
           }),
-          h('span', {}, `${t('common.print')} — ${t('common.enabled')}`)),
+          // What the tick does, in one sentence. "Print — Enabled" was two
+          // labels stuck together and neither of them said "automatically".
+          h('span', {}, t('printing.auto'))),
 
         h('div', { class: 'qs-row' },
           h('button', {
             class: 'qs-btn',
             disabled: state.queue.length === 0,
             onClick: drain,
-          }, `${t('common.print')} (${state.queue.length})`),
+          }, t('printing.queued_jobs', { count: state.queue.length })),
+          // This button empties the log. It was labelled "Refresh", which is
+          // the one thing it does not do.
           h('button', {
             class: 'qs-btn qs-btn-ghost',
             onClick: () => { state.log = []; render(); },
-          }, t('common.refresh'))),
+          }, t('printing.clear_log'))),
 
         h('div', { class: 'qs-section-title' }, t('printing.jobs')),
         h('div', { class: 'bridge-log' },
@@ -133,7 +137,9 @@ async function main() {
   });
 
   render();
-  note(t('app.name'));
+  // The first line of the log says the bridge is up and listening. It used to
+  // say "QServe", which the person reading the log already knows.
+  note(t('printing.bridge_ready'));
 
   realtime.on('print.job_queued', (job) => enqueue(job));
 
