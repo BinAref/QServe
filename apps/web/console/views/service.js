@@ -12,7 +12,7 @@
 import { api, guard, t, toast, stationLabel } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { pick, te, formatDateTime } from '../../shared/i18n.js';
-import { localisedField, collectLocalised } from '../../shared/fields.js';
+import { localisedField, mergeLocalised, languageNote } from '../../shared/fields.js';
 import { Capability, Permission, TerminalType } from '../../shared/events.js';
 import { state, has, can, pageHeader, lockedPanel, enabledLocales } from '../app.js';
 
@@ -281,7 +281,8 @@ function openTerminalForm(container, terminal) {
   const locales = enabledLocales();
 
   const form = h('form', {},
-    localisedField(t('common.name'), 'name', terminal?.name ?? {}, { locales }),
+    languageNote(locales),
+    localisedField(t('common.name'), 'name', terminal?.name ?? {}, { required: true }),
 
     terminal
       ? null
@@ -349,7 +350,7 @@ function openTerminalForm(container, terminal) {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
 
-          const name = collectLocalised(data, 'name', locales);
+          const name = mergeLocalised(terminal?.name ?? {}, data, 'name');
           if (Object.keys(name).length === 0) {
             toast(t('error.validation'), 'error');
             return;

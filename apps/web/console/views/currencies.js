@@ -13,7 +13,7 @@
 import { api, guard, t, toast } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { pick, formatMoney } from '../../shared/i18n.js';
-import { moneyField } from '../../shared/fields.js';
+import { moneyField, localisedField, mergeLocalised } from '../../shared/fields.js';
 import { pageHeader, reroute } from '../app.js';
 
 export async function renderCurrencies(container) {
@@ -138,10 +138,12 @@ function openCurrencyForm(container, currency, base, existing) {
     name: 'symbol', required: true, maxlength: '8', placeholder: '₺',
     value: currency?.symbol ?? '',
   });
-  const nameInput = h('input', {
-    name: 'name', maxlength: '60', placeholder: 'Turkish lira',
-    value: pick(currency?.name ?? {}) ?? '',
+  // The currency's name is read by whoever is reading the console, so it is
+  // written the same way every other name is: one box, in this language.
+  const nameField = localisedField(t('currencies.name'), 'name', currency?.name ?? {}, {
+    placeholder: 'Turkish lira',
   });
+  const nameInput = nameField.querySelector('input');
   const decimalsSelect = h('select', { name: 'decimals' },
     [0, 2, 3].map((value) =>
       h('option', { value: String(value), selected: (currency?.decimals ?? 2) === value },
@@ -204,8 +206,7 @@ function openCurrencyForm(container, currency, base, existing) {
         h('label', { class: 'qs-field' },
           h('span', {}, t('currencies.symbol')), symbolInput,
           h('small', { class: 'qs-muted' }, t('currencies.symbol_help'))),
-        h('label', { class: 'qs-field' },
-          h('span', {}, t('currencies.name')), nameInput),
+        nameField,
         h('label', { class: 'qs-field' },
           h('span', {}, t('currencies.decimals')), decimalsSelect),
         h('label', { class: 'qs-field' },
@@ -234,7 +235,7 @@ function openCurrencyForm(container, currency, base, existing) {
 
           const payload = {
             symbol: symbolInput.value.trim(),
-            name: nameInput.value.trim() ? { '*': nameInput.value.trim() } : {},
+            name: mergeLocalised(currency?.name ?? {}, { name: nameInput.value }, 'name'),
             decimals: Number(decimalsSelect.value),
             symbolPosition: positionSelect.value,
             display: displaySelect.value,

@@ -10,7 +10,7 @@
 import { api, guard, t, toast, roleLabel, setRoleNames } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { pick, te, formatDateTime, formatMoney } from '../../shared/i18n.js';
-import { localisedField, collectLocalised } from '../../shared/fields.js';
+import { localisedField, mergeLocalised, languageNote } from '../../shared/fields.js';
 import { Capability, Permission, PrintDocumentType, PrinterTransport } from '../../shared/events.js';
 import {
   state, has, can, isSetup, pageHeader, lockedPanel, refreshStatus, navigate, enabledLocales,
@@ -32,13 +32,11 @@ export async function renderSettings(container) {
   const profileForm = h('form', { class: 'qs-card' },
     h('h2', {}, t('settings.restaurant')),
 
-    // The shared control, and a placeholder showing the name already in use —
-    // a restaurant set up before it had two languages has its name stored under
-    // "any language", and empty boxes would invite someone to overwrite it.
-    localisedField(t('setup.restaurant_name'), 'name', restaurant.name, {
-      locales: enabledLocales(),
-      placeholder: pick(restaurant.name),
-    }),
+    // The name in the language the console is in. A restaurant set up before it
+    // had a second language holds its name under "any language", which is what
+    // the placeholder shows: what a diner reads today.
+    localisedField(t('setup.restaurant_name'), 'name', restaurant.name),
+    languageNote(enabledLocales()),
 
     h('div', { class: 'qs-grid qs-grid-2' },
       field(t('settings.address'), 'address', restaurant.address),
@@ -97,7 +95,7 @@ export async function renderSettings(container) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(profileForm).entries());
 
-    const name = collectLocalised(data, 'name', enabledLocales());
+    const name = mergeLocalised(restaurant.name, data, 'name');
     const chosenLocales = locales
       .filter((entry) => data[`locale.${entry.locale}`] === 'on')
       .map((entry) => entry.locale);
@@ -595,9 +593,9 @@ function openRoleForm(container, role, availablePermissions, roles) {
 
   const form = h('form', {},
     localisedField(t('users.role_name'), 'name', role?.name ?? {}, {
-      locales,
       ...(system ? { placeholder: shippedRoleLabel(role.key), hint: t('users.role_name_hint') } : {}),
     }),
+    languageNote(locales),
 
     h('p', { class: 'qs-muted qs-small' },
       locked ? t('users.permissions_fixed') : t('users.custom_permissions')),
@@ -659,7 +657,7 @@ function openRoleForm(container, role, availablePermissions, roles) {
         onClick: async (event) => {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
-          const name = collectLocalised(data, 'name', locales);
+          const name = mergeLocalised(role?.name ?? {}, data, 'name');
           const permissions = availablePermissions.filter((permission) => data[permission] === 'on');
 
           if (creating) {

@@ -960,3 +960,22 @@ button.qs-amount-currency {
   line-height: 1.7;
   white-space: nowrap;
 }
+
+/* ------------------------------------------------------- localised fields */
+
+/*
+ * One box, in the language the console is in. The badge is what tells a person
+ * which language they are writing, so it sits with the label rather than under
+ * the box, where it would read as a hint about the text they just typed.
+ */
+.qs-localised > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: var(--qs-spacing-sm);
+}
+.qs-locale-badge {
+  font-family: var(--qs-typography-font-family-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--qs-color-text-muted);
+}

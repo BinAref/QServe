@@ -38,6 +38,10 @@ export const locale = () => pack.locale;
 export const direction = () => pack.direction;
 export const isRtl = () => pack.direction === 'rtl';
 export const availableLocales = () => available;
+
+/** "ar" → "العربية". Falls back to the code, which is better than nothing. */
+export const languageName = (code) =>
+  available.find((entry) => entry.locale === code)?.name ?? code;
 export const currentPack = () => pack;
 
 export function onLocaleChange(listener) {

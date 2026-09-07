@@ -9,7 +9,7 @@
  */
 
 import { h, mount, modal } from './dom.js';
-import { t, formatMoney, pick } from './i18n.js';
+import { t, formatMoney, pick, locale, languageName } from './i18n.js';
 import {
   amountToInput, CurrencyDisplay, displayed, parseAmount, sanitiseAmountInput, toBaseMinor,
 } from './money.js';
@@ -280,8 +280,6 @@ export function integerField({
     return state;
   };
 
-  paintButton();
-
   input.addEventListener('input', () => {
     const cleaned = [...input.value].filter((c) => c >= '0' && c <= '9').join('');
     if (cleaned !== input.value) {
@@ -365,40 +363,79 @@ export function currencySelect({ currencies, value = null, name = 'currencyCode'
 /* ------------------------------------------------------ localised inputs */
 
 /**
- * One input per language the restaurant offers.
+ * One field, in the language the reader is in.
  *
- * Every name an owner types — a category, a dish, a station, what they call
- * their waiters — is stored per language rather than as one string, because the
- * diner reads the menu in Arabic while the kitchen ticket prints in English.
- * Three screens needed this control, so it lives here rather than three times.
+ * A name still lives per language — the diner reads Arabic while the kitchen
+ * ticket prints English — but a form that asks for the same name three times
+ * makes a two-language restaurant fill six boxes to add one dish. So the box is
+ * the language of the console: write the name, switch the console to English,
+ * write it again. What the reader is not writing is not shown, and is never
+ * lost — saving merges into whatever the other languages already hold.
  *
- * `locales` is passed in rather than read from a global: the console knows
- * which languages are enabled, this module has no business knowing.
+ * The placeholder is what a diner sees today, so a field left blank in a new
+ * language is visibly falling back rather than looking empty.
  */
 export function localisedField(label, name, current = {}, {
-  locales = ['en'], textarea = false, placeholder = '', hint = '',
+  textarea = false, placeholder = '', hint = '', required = false,
 } = {}) {
-  return h('div', { class: 'qs-field' },
-    h('span', {}, label),
+  const language = locale();
+  // "*" means "this text, whatever the language" — what a single-language
+  // restaurant wrote before it had a second. It is a fallback, not a language,
+  // so it belongs in the placeholder and not in a list of translations.
+  const written = Object.keys(current)
+    .filter((key) => key !== language && key !== '*' && current[key]);
+  const value = current[language] ?? '';
+
+  /*
+   * "Required" means the thing must be named *somewhere*, not in this language.
+   * A dish named in English is still a named dish while its Arabic box is empty,
+   * and demanding a translation before a price can be edited would be absurd.
+   */
+  const demand = required && written.length === 0;
+
+  return h('div', { class: 'qs-field qs-localised' },
+    h('span', {},
+      label,
+      // Which language this box is: small, always there, never in the way.
+      h('span', { class: 'qs-badge qs-locale-badge' }, language)),
     hint ? h('span', { class: 'qs-xs qs-muted' }, hint) : null,
-    locales.map((locale) =>
-      h('div', { class: 'qs-row', style: { marginBlockEnd: '6px' } },
-        h('span', { class: 'qs-badge', style: { minWidth: '46px' } }, locale),
-        textarea
-          ? h('textarea', { name: `${name}.${locale}`, rows: '2' }, current[locale] ?? '')
-          : h('input', {
-              name: `${name}.${locale}`,
-              value: current[locale] ?? '',
-              ...(placeholder ? { placeholder } : {}),
-            }))));
+    textarea
+      ? h('textarea', {
+          name, rows: '2', ...(demand ? { required: true } : {}),
+          ...(placeholder || pick(current) ? { placeholder: placeholder || pick(current) } : {}),
+        }, value)
+      : h('input', {
+          name, value, ...(demand ? { required: true } : {}),
+          ...(placeholder || pick(current) ? { placeholder: placeholder || pick(current) } : {}),
+        }),
+    written.length > 0
+      ? h('span', { class: 'qs-xs qs-muted' },
+          t('common.also_written_in', { languages: written.map(languageName).join('، ') }))
+      : null);
 }
 
-/** Collect `name.en`, `name.ar`, … back into one object, dropping blanks. */
-export function collectLocalised(data, name, locales = ['en']) {
-  const out = {};
-  for (const locale of locales) {
-    const value = String(data[`${name}.${locale}`] ?? '').trim();
-    if (value) out[locale] = value;
-  }
-  return out;
+/**
+ * Merge what was typed into what the other languages already say.
+ *
+ * Clearing the box removes this language's text and leaves the rest, which is
+ * how a translation is withdrawn without deleting the dish.
+ */
+export function mergeLocalised(current, data, name) {
+  const language = locale();
+  const value = String(data[name] ?? '').trim();
+  const merged = { ...current };
+  if (value) merged[language] = value;
+  else delete merged[language];
+  return merged;
+}
+
+/**
+ * The one line a form needs to explain the rule above. Rendered only where a
+ * restaurant actually has a second language — with one language there is
+ * nothing to explain.
+ */
+export function languageNote(locales = []) {
+  if (locales.length < 2) return null;
+  return h('p', { class: 'qs-xs qs-muted' },
+    t('common.writing_in', { language: languageName(locale()) }));
 }

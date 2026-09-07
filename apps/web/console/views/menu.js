@@ -14,7 +14,7 @@ import { api, guard, t, toast } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../../shared/dom.js';
 import { formatMoney, pick } from '../../shared/i18n.js';
 import {
-  moneyField, integerField, localisedField as sharedLocalisedField, collectLocalised as sharedCollectLocalised,
+  moneyField, integerField, localisedField, mergeLocalised, languageNote,
 } from '../../shared/fields.js';
 import { displayed } from '../../shared/money.js';
 import { Permission } from '../../shared/events.js';
@@ -56,14 +56,6 @@ async function load() {
     selectedCategoryId = categories[0]?.id ?? null;
   }
 }
-
-/* ------------------------------------------------------ localised inputs */
-
-/** The shared control, bound to the languages this restaurant offers. */
-const localisedField = (label, name, current = {}, options = {}) =>
-  sharedLocalisedField(label, name, current, { ...options, locales: locales() });
-
-const collectLocalised = (data, name) => sharedCollectLocalised(data, name, locales());
 
 /* ------------------------------------------------------------- drag sort */
 
@@ -185,8 +177,8 @@ function openCategoryForm(category) {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
           const payload = {
-            name: collectLocalised(data, 'name'),
-            description: collectLocalised(data, 'description'),
+            name: mergeLocalised(category?.name ?? {}, data, 'name'),
+            description: mergeLocalised(category?.description ?? {}, data, 'description'),
             visible: data.visible === 'on',
           };
           if (Object.keys(payload.name).length === 0) {
@@ -281,7 +273,8 @@ function openProductForm(product) {
   });
 
   const form = h('form', { id: 'prod-form' },
-    localisedField(t('common.name'), 'name', product?.name ?? {}),
+    languageNote(locales()),
+    localisedField(t('common.name'), 'name', product?.name ?? {}, { required: true }),
     localisedField(t('common.description'), 'description', product?.description ?? {}, { textarea: true }),
 
     h('div', { class: 'qs-grid qs-grid-2' },
@@ -369,8 +362,8 @@ function openProductForm(product) {
 
           const payload = {
             categoryId: data.categoryId,
-            name: collectLocalised(data, 'name'),
-            description: collectLocalised(data, 'description'),
+            name: mergeLocalised(product?.name ?? {}, data, 'name'),
+            description: mergeLocalised(product?.description ?? {}, data, 'description'),
             priceMinor: amount.minor,
             currencyCode: amount.currencyCode,
             currencyDisplay: amount.currencyDisplay,
@@ -504,7 +497,8 @@ function optionEditor(product) {
 
 function openOptionForm(product, redraw) {
   const form = h('form', {},
-    localisedField(t('common.name'), 'name'),
+    languageNote(locales()),
+    localisedField(t('common.name'), 'name', {}, { required: true }),
     h('div', { class: 'qs-grid qs-grid-2' },
       h('label', { class: 'qs-field' },
         h('span', {}, 'min'),
@@ -528,7 +522,7 @@ function openOptionForm(product, redraw) {
           event.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
           const created = await guard(() => api.post(`/api/menu/products/${product.id}/options`, {
-            name: collectLocalised(data, 'name'),
+            name: mergeLocalised({}, data, 'name'),
             required: data.required === 'on',
             minSelect: Number(data.minSelect ?? 0),
             maxSelect: Number(data.maxSelect ?? 1),
@@ -556,7 +550,8 @@ function openChoiceForm(option, redraw, productCurrencyCode) {
   });
 
   const form = h('form', {},
-    localisedField(t('common.name'), 'name'),
+    languageNote(locales()),
+    localisedField(t('common.name'), 'name', {}, { required: true }),
     delta.node,
     h('label', { class: 'qs-check' },
       h('input', { type: 'checkbox', name: 'isDefault' }),
@@ -578,7 +573,7 @@ function openChoiceForm(option, redraw, productCurrencyCode) {
           else if (!delta.validate().ok) { delta.focus(); return; }
 
           const created = await guard(() => api.post(`/api/menu/options/${option.id}/choices`, {
-            name: collectLocalised(data, 'name'),
+            name: mergeLocalised({}, data, 'name'),
             priceDeltaMinor: extra.minor,
             isDefault: data.isDefault === 'on',
           }));
@@ -621,7 +616,8 @@ function openAddonForm(addon) {
   });
 
   const form = h('form', {},
-    localisedField(t('common.name'), 'name', addon?.name ?? {}),
+    languageNote(locales()),
+    localisedField(t('common.name'), 'name', addon?.name ?? {}, { required: true }),
     price.node,
     h('label', { class: 'qs-check' },
       h('input', { type: 'checkbox', name: 'available', checked: addon ? addon.available : true }),
@@ -652,7 +648,7 @@ function openAddonForm(addon) {
           if (!amount.ok) { price.focus(); return; }
 
           const payload = {
-            name: collectLocalised(data, 'name'),
+            name: mergeLocalised(addon?.name ?? {}, data, 'name'),
             priceMinor: amount.minor,
             currencyCode: amount.currencyCode,
             currencyDisplay: amount.currencyDisplay,
