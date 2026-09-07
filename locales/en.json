@@ -267,6 +267,7 @@
     "developer.vendor_copy": "Copy the template",
     "developer.vendor_intro": "Name, prices and how to reach you. This ships inside the build, so a restaurant that has never been online still knows who to ask for a licence — and whatever it later fetches from your licence server replaces it.",
     "developer.vendor_none": "This build carries no vendor details",
+    "developer.vendor_paste": "Paste your details here",
     "error.app_locked": "This computer is locked",
     "error.bad_frame": "Unexpected message",
     "error.body_too_large": "That file is too large",

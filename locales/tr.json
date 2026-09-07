@@ -267,6 +267,7 @@
     "developer.vendor_copy": "Şablonu kopyala",
     "developer.vendor_intro": "Ad, fiyatlar ve size nasıl ulaşılacağı. Derlemenin içinde gelir; böylece hiç çevrimiçi olmamış bir restoran bile lisans için kime soracağını bilir — sonradan lisans sunucunuzdan aldığı bilgi bunun yerini alır.",
     "developer.vendor_none": "Bu derleme satıcı bilgisi taşımıyor",
+    "developer.vendor_paste": "Bilgilerinizi buraya yapıştırın",
     "error.app_locked": "Bu bilgisayar kilitli",
     "error.bad_frame": "Beklenmeyen mesaj",
     "error.body_too_large": "Bu dosya çok büyük",

@@ -260,7 +260,7 @@ function vendorEditor(container, vendor) {
       }, t('developer.vendor_copy'))),
 
     h('label', { class: 'qs-field', style: { marginBlockStart: 'var(--qs-spacing-md)' } },
-      h('span', {}, t('themes.paste')), paste),
+      h('span', {}, t('developer.vendor_paste')), paste),
 
     h('div', { class: 'qs-row' },
       h('button', { class: 'qs-btn qs-btn-primary', onClick: save }, t('common.save'))));
