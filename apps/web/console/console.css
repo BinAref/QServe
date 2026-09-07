@@ -426,21 +426,6 @@
 .lock-card { inline-size: min(420px, 100%); text-align: center; }
 .lock-mark { font-size: 48px; line-height: 1; }
 
-/* ------------------------------------------------------------- currencies */
-
-.currency-card { display: grid; gap: var(--qs-spacing-sm); }
-.currency-card[data-base="true"] { border-color: var(--qs-color-success); }
-.currency-symbol {
-  display: grid;
-  place-items: center;
-  inline-size: 44px;
-  block-size: 44px;
-  border-radius: var(--qs-radius-md);
-  background: var(--qs-color-surface-alt);
-  font-size: var(--qs-typography-size-lg);
-  font-weight: var(--qs-typography-weight-bold);
-}
-
 /* ------------------------------------------------------------------- roles */
 
 /*

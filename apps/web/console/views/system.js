@@ -335,7 +335,11 @@ function appearancePanel(restaurant, locales, themes, canEdit, savePatch) {
       h('label', { class: 'qs-row-item' },
         h('div', {},
           h('div', { class: 'qs-row-label' }, entry.name),
-          h('p', { class: 'qs-row-hint' }, `${entry.englishName} · ${entry.direction}`)),
+          // "ltr" is a value in a file, not a word: the direction is written
+          // out in the same sentence as the language's English name.
+          h('p', { class: 'qs-row-hint' },
+            `${entry.englishName} · `,
+            t(entry.direction === 'rtl' ? 'languages.direction_rtl' : 'languages.direction_ltr'))),
         h('div', { class: 'qs-row-control' },
           h('input', {
             type: 'checkbox', name: `locale.${entry.locale}`,

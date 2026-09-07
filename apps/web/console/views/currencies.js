@@ -19,12 +19,19 @@ import { pageHeader, reroute } from '../app.js';
 export async function renderCurrencies(container) {
   const { currencies, base } = await api.get('/api/currencies');
 
-  const card = (currency) => {
-    const usage = h('span', { class: 'qs-xs qs-muted' });
+  /**
+   * One currency, one line: what it is, what a diner reads, what it is worth,
+   * and what it is already priced on. The card this replaced said "SAR" three
+   * times and "0 dish(es), 0 add-on(s)" once.
+   */
+  const row = (currency) => {
+    const usage = h('p', { class: 'qs-row-hint' });
     // Asked lazily: the answer only matters when someone reaches for delete.
     void api.get(`/api/currencies/${currency.code}/usage`)
       .then((counts) => {
-        usage.textContent = t('currencies.in_use', counts);
+        usage.textContent = counts.products + counts.addons === 0
+          ? t('currencies.in_use_none')
+          : t('currencies.in_use', counts);
       })
       .catch(() => {});
 
@@ -33,37 +40,29 @@ export async function renderCurrencies(container) {
     const oneUnit = 10 ** currency.decimals;
     const inBase = Math.round(currency.rateToBase * 10 ** base.decimals);
 
-    return h('div', { class: 'qs-card currency-card', 'data-base': String(currency.isBase) },
-      h('div', { class: 'qs-row qs-row-between' },
-        h('div', { class: 'qs-row' },
-          h('span', { class: 'currency-symbol' }, currency.symbol),
-          h('div', {},
-            h('strong', {}, currency.code),
-            pick(currency.name)
-              ? h('div', { class: 'qs-xs qs-muted' }, pick(currency.name))
-              : null)),
-        currency.isBase
-          ? h('span', { class: 'qs-badge qs-badge-success' }, t('currencies.base'))
-          : h('span', { class: 'qs-badge' }, t(currency.enabled ? 'common.enabled' : 'common.disabled'))),
+    return h('div', { class: 'qs-row-item' },
+      h('div', {},
+        h('div', { class: 'qs-row-label' },
+          currency.code,
+          pick(currency.name) ? h('span', { class: 'qs-muted' }, ` — ${pick(currency.name)}`) : null,
+          currency.isBase
+            ? h('span', { class: 'qs-badge qs-badge-success' }, t('currencies.base'))
+            : null),
 
-      h('div', { class: 'qs-xs qs-muted' },
-        currency.isBase
-          ? t('currencies.base_explain')
-          : `${formatMoney(oneUnit, currency)} = ${formatMoney(inBase, base)}`),
-      // Both written forms, with the default marked: the owner sees what a
-      // diner will actually read before any dish is priced.
-      h('div', { class: 'qs-row qs-xs' },
-        h('span', {
-          class: currency.display === 'SYMBOL' ? 'qs-badge qs-badge-success' : 'qs-badge',
-        }, `${currency.symbol} · ${t('currencies.as_symbol')}`),
-        currency.symbol === currency.code
-          ? null
-          : h('span', {
-              class: currency.display === 'CODE' ? 'qs-badge qs-badge-success' : 'qs-badge',
-            }, `${currency.code} · ${t('currencies.as_code')}`)),
-      usage,
+        // What a diner will actually read, before any dish is priced — and for
+        // anything but the base, the same example carries the rate, so there is
+        // no reason to print "1.00 ₺" twice on one line.
+        h('p', { class: 'qs-row-hint' },
+          currency.isBase
+            ? t('currencies.shown_as', { example: formatMoney(oneUnit, currency) })
+            : `${formatMoney(oneUnit, currency)} = ${formatMoney(inBase, base)}`,
+          currency.enabled ? '' : ` · ${t('common.disabled')}`),
 
-      h('div', { class: 'qs-row' },
+        currency.isBase
+          ? h('p', { class: 'qs-row-hint' }, t('currencies.base_explain'))
+          : usage),
+
+      h('div', { class: 'qs-row-control' },
         h('button', {
           class: 'qs-btn qs-btn-sm',
           onClick: () => openCurrencyForm(container, currency, base, currencies),
@@ -89,10 +88,12 @@ export async function renderCurrencies(container) {
               },
             }, t('currencies.make_base')),
 
+        // The base currency has no delete, and the reason is under the row
+        // rather than in the place a button would be.
         currency.isBase
-          ? h('span', { class: 'qs-xs qs-muted' }, t('currencies.delete_base'))
+          ? null
           : h('button', {
-              class: 'qs-btn qs-btn-sm qs-btn-danger',
+              class: 'qs-btn qs-btn-sm qs-btn-ghost',
               onClick: async () => {
                 const counts = await guard(() => api.get(`/api/currencies/${currency.code}/usage`));
                 if (!counts) return;
@@ -122,7 +123,8 @@ export async function renderCurrencies(container) {
       }, t('currencies.add'))),
 
     h('p', { class: 'qs-muted' }, t('currencies.subtitle')),
-    h('div', { class: 'qs-grid qs-grid-2' }, currencies.map(card)));
+    h('div', { class: 'qs-card qs-narrow' },
+      h('div', { class: 'qs-rows' }, currencies.map(row))));
 }
 
 function openCurrencyForm(container, currency, base, existing) {
