@@ -2,12 +2,40 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      The only permission this app asks for. A terminal that cannot reach the
-      restaurant's computer is useless; a terminal that could read the contacts
-      on a waiter's own phone would be indefensible.
+      Every permission here, and why a restaurant should be willing to grant it.
+      A terminal that could read the contacts on a waiter's own phone would be
+      indefensible, so the list stops where the job stops.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Reading a station's printed code. Asked for at the moment it is used,
+         never at install, and the app works without it: the address can still
+         be typed or arrive from the phone's own camera app. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      Staying connected while the screen is off.
+
+      A kitchen tablet on a shelf, a phone in an apron pocket: both are asleep
+      most of a service, and both have to keep hearing about orders. Android
+      will otherwise suspend the process and the restaurant finds out when a
+      ticket never arrives.
+    -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Android 13+ asks before an app may show the notification that a
+         foreground service is required to have. Declined, the station still
+         works; it just sleeps when Android decides to. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Wanted, not required: a tablet with no camera is still a fine kitchen
+         screen, and should not be told this app will not install. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
         android:allowBackup="false"
@@ -51,5 +79,29 @@
                 <data android:scheme="http" android:host="*.local" android:pathPrefix="/r/" />
             </intent-filter>
         </activity>
+
+        <!-- The camera, borrowed for as long as it takes to read one code. -->
+        <activity
+            android:name=".ScannerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
+            android:screenOrientation="portrait" />
+
+        <!--
+          What keeps a station answering while the phone is locked or asleep.
+
+          `specialUse` rather than `dataSync`, and the difference matters: from
+          Android 14 a dataSync service is capped at six hours in a day, which
+          is shorter than a lunch and a dinner service. This is a device doing
+          the job it was put on the shelf to do, all day, in one building.
+        -->
+        <service
+            android:name=".TerminalService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a point-of-sale station connected to the restaurant's own local server while its screen is off, so kitchen tickets and order updates are not missed during a service." />
+        </service>
     </application>
 </manifest>

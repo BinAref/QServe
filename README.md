@@ -52,10 +52,12 @@ how to get a licence for your own testing — is in
 
 ### Running it without a checkout
 
-A restaurant does not clone a repository. Each release carries two files: a
-Windows folder with `QServe.exe` in it, and an Android APK for the restaurant's
-own phones and tablets. See [PACKAGING.md](docs/PACKAGING.md) for how both are
-built, and the Releases page for the current ones.
+A restaurant does not clone a repository. Each release carries two files:
+`QServe-<version>-windows-x64.exe` for the restaurant's computer — one file,
+nothing to unzip, no installer, and no console window when it runs — and an
+Android APK for the restaurant's own phones and tablets. See
+[PACKAGING.md](docs/PACKAGING.md) for how both are built, and the Releases page
+for the current ones.
 
 ---
 

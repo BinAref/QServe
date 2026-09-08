@@ -64,11 +64,26 @@
                 android:textColorHint="@color/muted"
                 android:textSize="17sp" />
 
+            <!--
+              Scanning first, and typing second, because that is the order the
+              two are actually used in: a station's code is on a card in the
+              person's other hand, and the address under it is what you fall
+              back to when the tablet has no camera.
+            -->
+            <Button
+                android:id="@+id/scan"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:minHeight="56dp"
+                android:text="@string/scan_button"
+                android:textSize="17sp" />
+
             <Button
                 android:id="@+id/connect"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:minHeight="56dp"
                 android:text="@string/connect"
                 android:textSize="17sp" />

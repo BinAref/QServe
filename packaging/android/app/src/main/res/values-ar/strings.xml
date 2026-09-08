@@ -2,11 +2,22 @@
 <resources>
     <string name="app_name">كيوسيرف — جهاز</string>
     <string name="address_title">وجّه هذا الجهاز إلى مطعمك</string>
-    <string name="address_intro">هذا التطبيق نافذة على الحاسوب الذي يُشغّل مطعمك. افتح لوحة تحكم كيوسيرف على ذلك الحاسوب، واذهب إلى الأجهزة، ثم وجّه كاميرا الهاتف إلى رمز المحطة — وسيعرض عليك أندرويد فتحه هنا. أو انسخ العنوان والصقه بالأسفل، وسيتذكره الجهاز.</string>
+    <string name="address_intro">هذا التطبيق نافذة على الحاسوب الذي يُشغّل مطعمك. افتح لوحة تحكم كيوسيرف على ذلك الحاسوب، واذهب إلى الأجهزة، ثم اطبع رمز المحطة أو اعرضه على الشاشة — ثم اضغط «امسح رمز المحطة» بالأسفل ووجّه الجهاز إليه. ويمكنك كتابة العنوان يدويًا، وسيتذكره الجهاز.</string>
     <string name="address_needs">يجب أن يكون حاسوب المطعم يعمل ببرنامج كيوسيرف، وعلى شبكة الواي فاي نفسها، وترخيصه مُفعَّل. قبل التفعيل لا يُقدَّم شيء للأجهزة إطلاقًا.</string>
     <string name="address_hint">http://qserve-rest-000001.local:7020</string>
     <string name="connect">اتصال</string>
     <string name="unreachable_title">تعذّر الوصول إلى المطعم</string>
     <string name="unreachable_body">هذا الجهاز ليس على شبكة المطعم، أو أن الحاسوب الرئيسي مُطفأ، أو أن الترخيص لم يُفعَّل بعد.</string>
     <string name="address_needed">أدخل عنوان حاسوب المطعم.</string>
+    <string name="scan_button">امسح رمز المحطة</string>
+    <string name="scan_hint">وجّه الكاميرا إلى الرمز المطبوع لهذه المحطة.</string>
+    <string name="scan_cancel">إلغاء</string>
+    <string name="scan_no_camera">بدون الكاميرا، اكتب العنوان بدلاً من ذلك.</string>
+    <string name="scan_failed">تعذّر على هذا الجهاز فتح الكاميرا.</string>
+    <string name="scan_not_a_station">هذا ليس رمز محطة كيوسيرف.</string>
+    <string name="service_channel">محطة</string>
+    <string name="service_channel_description">يظهر أثناء عمل هذا الجهاز كمحطة، ليبقى يستقبل الطلبات والشاشة مطفأة.</string>
+    <string name="service_title">المحطة متصلة</string>
+    <string name="service_body">تستقبل الطلبات والشاشة مطفأة.</string>
+    <string name="service_stop">إيقاف</string>
 </resources>

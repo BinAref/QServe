@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The status-bar mark for a running station.
+
+  A notification icon is drawn from its alpha channel alone — the system picks
+  the colour — so this is one flat white shape and no detail that would turn to
+  mud at 24dp. It reads as a screen on a stand, which is what a station is.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,4h16a1,1 0 0 1 1,1v10a1,1 0 0 1 -1,1h-16a1,1 0 0 1 -1,-1v-10a1,1 0 0 1 1,-1zM5,6v8h14v-8z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,18h8v2h-8z" />
+</vector>

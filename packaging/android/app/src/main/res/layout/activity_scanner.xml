@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The camera, and two pieces of text.
+
+  Nothing is drawn over the middle of the picture: a frame or a cut-out would
+  suggest the code has to be lined up inside it, and it does not — the decoder
+  reads the whole frame. Somebody holding a table card at arm's length should
+  not also be solving an aiming puzzle.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginTop="48dp"
+        android:paddingHorizontal="32dp"
+        android:text="@string/scan_hint"
+        android:textAlignment="center"
+        android:textColor="@android:color/white"
+        android:textSize="17sp"
+        android:shadowColor="@android:color/black"
+        android:shadowRadius="8"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/cancel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="48dp"
+        android:minWidth="160dp"
+        android:minHeight="56dp"
+        android:text="@string/scan_cancel"
+        android:textSize="17sp" />
+</FrameLayout>

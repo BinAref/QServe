@@ -2,11 +2,22 @@
 <resources>
     <string name="app_name">QServe Terminal</string>
     <string name="address_title">Bu cihazı restoranınıza yönlendirin</string>
-    <string name="address_intro">Bu uygulama, restoranınızı çalıştıran bilgisayara açılan bir penceredir. O bilgisayarda QServe konsolunu açın, İstasyonlar bölümüne gidin ve telefonun kamerasını istasyonun koduna tutun — Android bunu burada açmayı önerir. Ya da adresi kopyalayıp aşağıya yapıştırın. Bu cihaz adresi hatırlar.</string>
+    <string name="address_intro">Bu uygulama, restoranınızı çalıştıran bilgisayara açılan bir penceredir. O bilgisayarda QServe konsolunu açın, İstasyonlar bölümüne gidin ve istasyonun kodunu yazdırın ya da ekranda gösterin — sonra aşağıdaki Tara düğmesine dokunup cihazı koda tutun. Adresi elle de yazabilirsiniz. Bu cihaz adresi hatırlar.</string>
     <string name="address_needs">Restoran bilgisayarında QServe çalışıyor, aynı Wi-Fi ağında ve lisansı etkinleştirilmiş olmalıdır. Etkinleştirmeden önce cihazlara hiçbir şey sunulmaz.</string>
     <string name="address_hint">http://qserve-rest-000001.local:7020</string>
     <string name="connect">Bağlan</string>
     <string name="unreachable_title">Restorana ulaşılamıyor</string>
     <string name="unreachable_body">Bu cihaz restoranın Wi-Fi ağında değil, ana bilgisayar kapalı ya da lisans henüz etkinleştirilmemiş.</string>
     <string name="address_needed">Restoran bilgisayarının adresini girin.</string>
+    <string name="scan_button">İstasyon kodunu tara</string>
+    <string name="scan_hint">Kamerayı bu istasyon için basılmış koda tutun.</string>
+    <string name="scan_cancel">İptal</string>
+    <string name="scan_no_camera">Kamera olmadan adresi elle yazın.</string>
+    <string name="scan_failed">Bu cihaz kamerasını açamadı.</string>
+    <string name="scan_not_a_station">Bu bir QServe istasyon kodu değil.</string>
+    <string name="service_channel">İstasyon</string>
+    <string name="service_channel_description">Bu cihaz istasyon olarak çalışırken görünür; ekran kapalıyken de sipariş almayı sürdürür.</string>
+    <string name="service_title">İstasyon bağlı</string>
+    <string name="service_body">Ekran kapalıyken sipariş alınıyor.</string>
+    <string name="service_stop">Durdur</string>
 </resources>
