@@ -648,4 +648,40 @@ export const migrations: readonly Migration[] = [
       }
     },
   },
+
+  {
+    version: 7,
+    name: 'seed_new_system_roles',
+    up: (db) => {
+      /*
+       * Built-in roles added after this database was created.
+       *
+       * Migration 1 seeds whatever `SystemRole` held on the day an install was
+       * made, and `assertSystemGrants` repairs the grants of roles that already
+       * exist — it deliberately does not invent missing ones. So a restaurant
+       * that installed last month would never hear about MENU_ENTRY.
+       *
+       * Written against the whole catalogue rather than the one new key, so the
+       * next role the product ships needs no migration at all: this one runs
+       * once, and `assertSystemGrants` keeps it honest at every boot after.
+       */
+      const existing = new Set(
+        (db.prepare('SELECT key FROM roles').all() as { key: string }[]).map((row) => row.key),
+      );
+      const insertRole = db.prepare(
+        'INSERT INTO roles (id, key, name_json, is_system, created_at) VALUES (?, ?, ?, 1, ?)',
+      );
+      const insertGrant = db.prepare(
+        'INSERT OR IGNORE INTO role_permissions (role_id, permission) VALUES (?, ?)',
+      );
+      const at = new Date().toISOString();
+
+      for (const key of Object.values(SystemRole)) {
+        if (existing.has(key)) continue;
+        const roleId = `ROLE-${key}`;
+        insertRole.run(roleId, key, '{}', at);
+        for (const permission of DEFAULT_ROLE_PERMISSIONS[key]) insertGrant.run(roleId, permission);
+      }
+    },
+  },
 ];

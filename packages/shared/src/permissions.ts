@@ -74,6 +74,16 @@ export const SystemRole = {
   CASHIER: 'CASHIER',
   WAITER: 'WAITER',
   KITCHEN: 'KITCHEN',
+  /**
+   * Somebody who types the menu in and nothing else.
+   *
+   * Building a real menu is days of work — hundreds of dishes, their prices,
+   * their photographs, their translations — and it is not the owner who does
+   * it. Before this role, handing that job to somebody meant handing them a
+   * manager's account, which also opens the till, the reports and the takings.
+   * This is the same job with none of that: the menu, and the doors it needs.
+   */
+  MENU_ENTRY: 'MENU_ENTRY',
   CUSTOMER: 'CUSTOMER',
 } as const;
 export type SystemRole = (typeof SystemRole)[keyof typeof SystemRole];
@@ -129,6 +139,15 @@ export const DEFAULT_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly stri
     P.KITCHEN_VIEW,
     P.PRINTING_USE,
   ],
+
+  /**
+   * The menu, and nothing that has money or people in it.
+   *
+   * `MENU_MANAGE` is what the asset routes check, so this role can also upload
+   * the dish photography — a menu builder who cannot add a picture would have
+   * to hand every image back to the owner.
+   */
+  [SystemRole.MENU_ENTRY]: [P.MENU_VIEW, P.MENU_MANAGE],
 
   /** Anonymous diners scanning a table QR. Deliberately tiny. */
   [SystemRole.CUSTOMER]: [P.MENU_VIEW, P.ORDERS_CREATE, P.ORDERS_VIEW],

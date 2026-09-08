@@ -1227,3 +1227,115 @@ button.qs-amount-currency {
   letter-spacing: 0.04em;
   color: var(--qs-color-text-muted);
 }
+
+/* ---------------------------------------------------------------------------
+ * Paste and clear, in every box a person can type into.
+ *
+ * The buttons sit inside the field rather than beside it, so a form does not
+ * grow a second column and a narrow phone does not wrap every row. The field
+ * is given room for them with padding, which is why the count is on the
+ * wrapper: a box with no paste button should not reserve space for one.
+ *
+ * See `shared/field-actions.js`, which puts these on every field in the
+ * product without any view asking for them.
+ * ------------------------------------------------------------------------- */
+
+.qs-fa {
+  position: relative;
+  display: block;
+  /* Inputs are often flex children — the amount row, the toolbars. The wrapper
+     takes over that job, since it is now the child the flex container sees. */
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.qs-fa-buttons {
+  position: absolute;
+  inset-inline-end: 4px;
+  inset-block-start: 0;
+  block-size: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* The wrapper is only a frame; clicks belong to the field underneath except
+     on the buttons themselves. */
+  pointer-events: none;
+}
+
+/* A tall box is scrolled, so the buttons ride at the top rather than floating
+   in the middle of somebody's third paragraph. */
+.qs-fa-tall .qs-fa-buttons {
+  block-size: auto;
+  inset-block-start: 6px;
+  /* Clear of the resize grip, which lives in the opposite corner. */
+  inset-inline-end: 6px;
+}
+
+.qs-fa-btn {
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  inline-size: 30px;
+  block-size: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--qs-radius-sm);
+  background: transparent;
+  color: var(--qs-color-text-muted);
+  cursor: pointer;
+  opacity: 0.75;
+  transition:
+    opacity var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    background-color var(--qs-motion-fast) var(--qs-motion-ease-standard),
+    color var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+/* `display` on a class beats the browser's own `[hidden]` rule, and the clear
+   button is hidden exactly that way when the field is empty. Without this it
+   would be shown on every empty box in the product. */
+.qs-fa-btn[hidden] { display: none; }
+.qs-fa-btn svg { inline-size: 17px; block-size: 17px; }
+.qs-fa-btn:hover { opacity: 1; background: var(--qs-color-surface-alt); color: var(--qs-color-text); }
+.qs-fa-btn:active { transform: scale(0.92); }
+.qs-fa-clear:hover { color: var(--qs-color-danger); }
+
+/* Room for the buttons, so a long value never runs underneath them. */
+.qs-fa[data-buttons="1"] > input,
+.qs-fa[data-buttons="1"] > textarea { padding-inline-end: 38px; }
+.qs-fa[data-buttons="2"] > input,
+.qs-fa[data-buttons="2"] > textarea { padding-inline-end: 70px; }
+
+/* A finger is not a mouse: on touch the buttons are always at full strength,
+   because there is no hover to reveal them with. */
+@media (hover: none) {
+  .qs-fa-btn { opacity: 1; }
+}
+
+/* The restaurant's mark, in Settings → Brand. Shown at the size it will
+   actually be seen at on a home screen, not blown up to fill the card: an icon
+   that looks good at 400px and muddy at 48px is worth finding out about here. */
+.qs-brand-row {
+  display: flex;
+  gap: var(--qs-spacing-lg);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.qs-brand-preview {
+  inline-size: 96px;
+  block-size: 96px;
+  flex: 0 0 auto;
+  border-radius: var(--qs-radius-md);
+  border: 1px solid var(--qs-component-input-border-color);
+  background: var(--qs-color-surface-alt);
+  object-fit: contain;
+  padding: 6px;
+}
+.qs-brand-empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 8px;
+  font-size: var(--qs-typography-size-sm);
+  color: var(--qs-color-text-muted);
+  border-style: dashed;
+}
+.qs-brand-actions { flex: 1 1 260px; min-inline-size: 0; }

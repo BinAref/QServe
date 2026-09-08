@@ -15,6 +15,7 @@ import { Realtime } from './realtime.js';
 import { NotificationCentre } from './notifications.js';
 import { setRoleNames } from './roles.js';
 import { EventName } from './events.js';
+import { fieldActions } from './field-actions.js';
 import { h, mount, toast } from './dom.js';
 
 export { api, ApiError, t, describeError, sound, toast };
@@ -71,6 +72,14 @@ export async function boot({
     await setLocale('en', { remember: false });
   });
   await applyTheme(session.themeId ?? 'light');
+
+  /*
+   * Paste and clear on every box in this terminal, from here on. It goes in
+   * after the language pack, because the buttons name themselves in the
+   * restaurant's own words, and before the first view is drawn, so no field
+   * is ever painted without them.
+   */
+  fieldActions();
 
   if (session.terminal?.soundProfile) sound.setProfile(session.terminal.soundProfile);
 

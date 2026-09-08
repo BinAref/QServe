@@ -30,6 +30,7 @@ const SETTINGS_SECTIONS = [
   { id: 'restaurant', label: 'settings.restaurant' },
   { id: 'money', label: 'settings.currency' },
   { id: 'appearance', label: 'settings.appearance' },
+  { id: 'brand', label: 'settings.brand' },
   { id: 'operations', label: 'settings.operations' },
   { id: 'lock', label: 'lock.title' },
 ];
@@ -63,6 +64,8 @@ export async function renderSettings(container) {
     else if (settingsSection === 'money') mount(body, moneyPanel(restaurant, canEdit, savePatch));
     else if (settingsSection === 'appearance') {
       mount(body, appearancePanel(restaurant, locales, themes, canEdit, savePatch));
+    } else if (settingsSection === 'brand') {
+      mount(body, brandPanel(restaurant, canEdit, savePatch));
     } else if (settingsSection === 'operations') {
       mount(body, operationalSettings(settings, canEdit, container));
     } else {
@@ -361,6 +364,72 @@ function appearancePanel(restaurant, locales, themes, canEdit, savePatch) {
     });
   });
   return form;
+}
+
+/**
+ * The restaurant's own mark, used as the icon of every screen it runs.
+ *
+ * Not decoration. A waiter with four stations added to a phone's home screen
+ * needs to tell them apart at a glance, and a diner who has just scanned a
+ * table code should see the restaurant they are sitting in rather than the
+ * name of the software it bought. So whatever is uploaded here becomes the
+ * browser tab icon, the home-screen icon and the icon in the task switcher on
+ * every terminal, at once.
+ */
+function brandPanel(restaurant, canEdit, savePatch) {
+  const current = restaurant.logoAssetId ?? null;
+
+  // The icon URL is the same for everyone, so it is cache-busted by the asset
+  // id — otherwise an owner uploads a new logo and sees the old one until they
+  // work out what a hard refresh is.
+  const preview = current
+    ? h('img', {
+      class: 'qs-brand-preview',
+      src: `/app-icon?v=${encodeURIComponent(current)}`,
+      alt: t('settings.app_icon'),
+    })
+    : h('div', { class: 'qs-brand-preview qs-brand-empty' }, t('settings.app_icon_none'));
+
+  const picker = h('input', {
+    type: 'file',
+    // The three the asset store accepts. Offering a PDF here would only teach
+    // an owner what the error message looks like.
+    accept: 'image/png,image/jpeg,image/svg+xml',
+    disabled: !canEdit,
+  });
+
+  picker.addEventListener('change', async () => {
+    const file = picker.files?.[0];
+    if (!file) return;
+    await guard(async () => {
+      const bytes = await file.arrayBuffer();
+      const asset = await api.upload('/api/assets?kind=logo', bytes, file.type);
+      // Two steps, and the second is the one that matters: an uploaded image
+      // that is never pointed at is just an orphan in the asset store.
+      await savePatch({ logoAssetId: asset.id });
+    });
+    picker.value = '';
+  });
+
+  return h('div', { class: 'qs-card' },
+    h('div', { class: 'qs-panel-head' },
+      h('h2', {}, t('settings.brand')),
+      h('p', {}, t('settings.brand_intro'))),
+
+    h('div', { class: 'qs-brand-row' },
+      preview,
+      h('div', { class: 'qs-brand-actions' },
+        h('label', { class: 'qs-field' },
+          h('span', {}, t('settings.app_icon')),
+          picker),
+        h('p', { class: 'qs-row-hint' }, t('settings.app_icon_hint')),
+        canEdit && current
+          ? h('button', {
+            class: 'qs-btn qs-btn-danger',
+            type: 'button',
+            onClick: () => savePatch({ logoAssetId: null }),
+          }, t('settings.app_icon_remove'))
+          : null)));
 }
 
 function field(label, name, value) {

@@ -4,8 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#ffffff" />
-  <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="/shared/favicon.svg" />
+  <!-- The restaurant's own mark, served from its settings. A restaurant that
+       has uploaded a logo sees it here rather than the QServe one. -->
+  <link rel="icon" href="/app-icon" />
+  <link rel="apple-touch-icon" href="/app-icon" />
+  <link rel="manifest" href="/app.webmanifest?app=customer" />
   <title>Menu</title>
   <link rel="stylesheet" href="/shared/base.css" />
   <link rel="stylesheet" href="/menu/menu.css" />

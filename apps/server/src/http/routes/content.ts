@@ -10,6 +10,8 @@ import {
   Capability, forbidden, notFound, optionalString, Permission,
   requireEnum, unauthenticated, validationError,
 } from '@qserve/shared';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { HttpResponse, Router } from '@qserve/http';
 import type { Services } from '../../container.js';
 import { clearTerminalCookie, terminalCookie, type AppState } from '../../core/security.js';
@@ -121,7 +123,104 @@ export function createAssetFileRoutes(services: Services): Router<AppState> {
     });
   });
 
+  /**
+   * The restaurant's own mark, as the icon of every screen it runs (spec §34).
+   *
+   * A restaurant that has uploaded a logo in Console → Settings → Brand should
+   * see it on the browser tab, on the phone's home screen when a waiter adds
+   * the station there, and in the task switcher — not the QServe mark. So every
+   * front-end points its `<link rel="icon">` here rather than at a file, and
+   * this answers with whatever the restaurant has chosen today.
+   *
+   * Unauthenticated, like the images beside it: a browser asks for a favicon
+   * before it has run a line of the page's script, cookies and all.
+   */
+  router.get('/app-icon', async (ctx) => {
+    const profile = services.settings.profile();
+    const logoId = profile?.logoAssetId ?? null;
+
+    /*
+     * The icon changes when the restaurant changes it and at no other time, so
+     * it is revalidated rather than cached blind: an owner who uploads a new
+     * logo should not have to explain to their staff how to clear a cache. The
+     * tag is the asset id, which is a hash of the image itself.
+     */
+    const etag = `"icon-${logoId ?? 'qserve'}"`;
+    if (ctx.req.headers['if-none-match'] === etag) {
+      return new HttpResponse(304, Buffer.alloc(0), { etag, 'cache-control': 'no-cache' });
+    }
+
+    if (logoId) {
+      // A logo deleted from under the profile must not take the icon — and with
+      // it the page's `<head>` — down with it.
+      const asset = await services.assets.read(logoId).catch(() => null);
+      if (asset) {
+        return new HttpResponse(200, asset.bytes, {
+          'content-type': asset.contentType,
+          'content-length': String(asset.bytes.length),
+          'cache-control': 'no-cache',
+          etag,
+        });
+      }
+    }
+
+    const fallback = await readFile(join(services.config.webRoot, 'shared', 'favicon.svg'));
+    return new HttpResponse(200, fallback, {
+      'content-type': 'image/svg+xml',
+      'content-length': String(fallback.length),
+      'cache-control': 'no-cache',
+      etag,
+    });
+  });
+
+  /**
+   * The manifest that makes "add to home screen" produce the restaurant's own
+   * app: its name, its mark, its colours. Each front-end asks for its own, so a
+   * waiter's home screen gains "Anwar — Waiter" pointing at the waiter station
+   * rather than one nameless icon for all six.
+   */
+  router.get('/app.webmanifest', (ctx) => {
+    const profile = services.settings.profile();
+    const station = ctx.query.get('app') ?? 'console';
+    // Whitelisted rather than interpolated: `start_url` comes from a query
+    // string, and a manifest is not the place to find out what that allows.
+    const known = ['console', 'customer', 'waiter', 'cashier', 'kitchen', 'printer'];
+    const app = known.includes(station) ? station : 'console';
+
+    const name = localisedName(profile) ?? 'QServe';
+    return new HttpResponse(200, Buffer.from(JSON.stringify({
+      name: `${name} — ${app}`,
+      short_name: name,
+      start_url: `/${app}/`,
+      scope: `/${app}/`,
+      display: 'standalone',
+      background_color: '#101418',
+      theme_color: '#101418',
+      icons: [
+        // One entry, no sizes: the icon is whatever the restaurant uploaded, and
+        // declaring sizes we have not made would be a lie the launcher acts on.
+        { src: '/app-icon', sizes: 'any', purpose: 'any' },
+      ],
+    }, null, 2)), {
+      'content-type': 'application/manifest+json; charset=utf-8',
+      'cache-control': 'no-cache',
+    });
+  });
+
   return router;
+}
+
+/** The restaurant's name in its own default language, for a manifest or a tab. */
+function localisedName(profile: { name: unknown; defaultLocale?: string } | null): string | null {
+  if (!profile) return null;
+  const { name } = profile;
+  if (typeof name === 'string') return name || null;
+  if (name && typeof name === 'object') {
+    const entries = name as Record<string, string>;
+    const preferred = profile.defaultLocale ? entries[profile.defaultLocale] : undefined;
+    return preferred || Object.values(entries).find((value) => Boolean(value)) || null;
+  }
+  return null;
 }
 
 /**
