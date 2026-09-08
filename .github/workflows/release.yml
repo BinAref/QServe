@@ -45,7 +45,7 @@ jobs:
       - run: npm test
 
   windows:
-    name: Windows bundle
+    name: Windows executable
     needs: check
     runs-on: windows-latest
     steps:
@@ -81,13 +81,15 @@ jobs:
             echo "no QSERVE_VENDOR_INFO secret: the licence screen will say 'ask us'"
           fi
 
+      # One file out: no zip to unpack, no folder to keep together. What lands
+      # on the releases page is what an owner runs.
       - name: Build QServe.exe
         run: node packaging/windows/build.mjs
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/*.zip
+          path: dist/*.exe
           if-no-files-found: error
 
   android:
@@ -158,7 +160,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          find artifacts -type f \( -name '*.zip' -o -name '*.apk' \) -exec cp {} dist/ \;
+          find artifacts -type f \( -name '*.exe' -o -name '*.apk' \) -exec cp {} dist/ \;
           ls -l dist
 
       - name: Publish

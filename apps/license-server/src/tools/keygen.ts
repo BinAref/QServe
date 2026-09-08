@@ -16,6 +16,7 @@
 
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { generateSigningKeyPair } from '@qserve/crypto';
 
 interface TrustedKeysFile {
@@ -93,6 +94,6 @@ export function main(argv: readonly string[] = process.argv.slice(2)): void {
   console.log(`  QSERVE_LS_SIGNING_KEY_FILE=${out} npm run start:license-server`);
 }
 
-if (process.argv[1] && import.meta.url === `file://${resolve(process.argv[1])}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }

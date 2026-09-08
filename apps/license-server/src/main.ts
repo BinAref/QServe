@@ -7,7 +7,7 @@
  */
 
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openDatabase, runMigrations } from '@qserve/db';
 import { computeKeyId } from '@qserve/crypto';
 import { generateLicenseKey } from '@qserve/shared';
@@ -125,7 +125,7 @@ export async function start(config = loadConfig()): Promise<StartedServer> {
 }
 
 // Only auto-start when executed directly, so tests can import `start`.
-if (process.argv[1] && import.meta.url === `file://${resolve(process.argv[1])}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   start().catch((error: unknown) => {
     console.error('[license-server] failed to start:', error);
     process.exitCode = 1;

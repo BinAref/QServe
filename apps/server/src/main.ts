@@ -7,7 +7,7 @@
  * activate or move a licence (spec §37, §38).
  */
 
-import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { RestaurantMode } from '@qserve/shared';
 import { buildServices } from './container.js';
 import { QServeApp } from './app.js';
@@ -52,7 +52,7 @@ export async function start(config = loadServerConfig()): Promise<StartedApp> {
 }
 
 // Only auto-start when run directly, so tests can import and drive the app.
-if (process.argv[1] && import.meta.url === `file://${resolve(process.argv[1])}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const started = await start().catch((error: unknown) => {
     console.error('[qserve] failed to start:', error);
     process.exit(1);
