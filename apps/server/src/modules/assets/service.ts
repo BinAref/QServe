@@ -165,6 +165,58 @@ export class AssetService {
 }
 
 /** Magic-byte sniffing for the formats we accept. */
+/**
+ * An SVG is a program, not a picture.
+ *
+ * The other four formats here are decoded by an image decoder and can do
+ * nothing but be wrong. SVG is XML that a browser renders as a *document* — it
+ * can carry script, event handlers, embedded HTML and external references, and
+ * a restaurant's logo is uploaded by whoever holds `menu.manage`, which since
+ * the menu-entry role is deliberately not only the owner.
+ *
+ * The previous check read the first kilobyte and looked for `<script`. A
+ * payload past that offset went straight through, and an `onload=` attribute
+ * was never looked for at all, so a file with both was accepted. This reads all
+ * of it and names what it will not take.
+ *
+ * This is the second line, not the only one: assets are served with a
+ * `sandbox` CSP, which is what actually makes them inert. A restaurant should
+ * not be one loosened header away from having uploaded a program.
+ */
+function looksLikeSafeSvg(bytes: Buffer): boolean {
+  const source = bytes.toString('utf8');
+  const head = source.trimStart().slice(0, 200).toLowerCase();
+  if (!head.startsWith('<?xml') && !head.startsWith('<!doctype') && !head.startsWith('<svg')) {
+    return false;
+  }
+
+  const text = source.toLowerCase();
+  const refuse = [
+    // Script, in each of the ways SVG offers.
+    '<script',
+    '<foreignobject',        // arbitrary HTML, and everything HTML can do
+    'javascript:',
+    'data:text/html',
+    // An external entity is how an XML parser is talked into reading files.
+    '<!entity',
+    // Anything that pulls in a second document to run.
+    '<iframe', '<embed', '<object', '<use xlink:href="http', '<use href="http',
+  ];
+  for (const marker of refuse) {
+    if (text.includes(marker)) return false;
+  }
+
+  /*
+   * Event handlers: `onload`, `onclick`, `onmouseover` and the eighty others.
+   * Matched in attribute position — preceded by whitespace or a quote and
+   * followed by `=` — so a logo whose font is called "Fonts on Demand" is not
+   * turned away for the word "on".
+   */
+  if (/[\s"'/]on[a-z]+\s*=/.test(text)) return false;
+
+  return true;
+}
+
 function looksLikeImage(bytes: Buffer, contentType: string): boolean {
   const startsWith = (...signature: number[]): boolean =>
     signature.every((byte, index) => bytes[index] === byte);
@@ -179,13 +231,8 @@ function looksLikeImage(bytes: Buffer, contentType: string): boolean {
     case 'image/webp':
       return startsWith(0x52, 0x49, 0x46, 0x46) &&
         bytes.subarray(8, 12).toString('ascii') === 'WEBP';
-    case 'image/svg+xml': {
-      const head = bytes.subarray(0, 1024).toString('utf8').trimStart().toLowerCase();
-      // SVG is XML, so it can carry script. It is served with a CSP that blocks
-      // inline execution, but reject the obvious cases up front anyway.
-      if (head.includes('<script') || head.includes('javascript:')) return false;
-      return head.startsWith('<?xml') || head.startsWith('<svg');
-    }
+    case 'image/svg+xml':
+      return looksLikeSafeSvg(bytes);
     default:
       return false;
   }

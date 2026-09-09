@@ -110,6 +110,27 @@ export function createContentRoutes(services: Services): Router<AppState> {
  * Unauthenticated on purpose: a diner has to see the burger photo before they
  * have any session, and the id is a random token rather than a guessable name.
  */
+/**
+ * What an uploaded image is allowed to be, once it is being served back.
+ *
+ * Four of the five formats this store accepts are decoded by an image decoder
+ * and can only ever be a wrong picture. SVG is XML, and a browser asked to
+ * navigate to one renders it as a document on this origin — able, in principle,
+ * to carry script, embedded HTML, and a convincing copy of the console's own
+ * sign-in form at the restaurant's own address.
+ *
+ * `sandbox` is the answer, and it is worth more than the upload checks: the
+ * document is given an opaque origin with no scripts, no forms and no access to
+ * anything of ours, whatever the file turned out to contain and whatever the
+ * application-wide policy is loosened to later. `<img>` and `<link rel="icon">`
+ * are untouched — a CSP travels with a document, and an image being decoded is
+ * not one.
+ *
+ * Route headers replace the server's defaults rather than adding to them, so
+ * this policy states everything it needs.
+ */
+const UPLOADED_CONTENT_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
 export function createAssetFileRoutes(services: Services): Router<AppState> {
   const router = new Router<AppState>();
 
@@ -120,6 +141,7 @@ export function createAssetFileRoutes(services: Services): Router<AppState> {
       'content-length': String(asset.bytes.length),
       // Content-addressed: an edited image gets a new id, so this never staleness-traps.
       'cache-control': 'public, max-age=86400, immutable',
+      'content-security-policy': UPLOADED_CONTENT_POLICY,
     });
   });
 
@@ -147,7 +169,21 @@ export function createAssetFileRoutes(services: Services): Router<AppState> {
      */
     const etag = `"icon-${logoId ?? 'qserve'}"`;
     if (ctx.req.headers['if-none-match'] === etag) {
-      return new HttpResponse(304, Buffer.alloc(0), { etag, 'cache-control': 'no-cache' });
+      /*
+       * The policy travels on the 304 as well as the 200.
+       *
+       * A browser answering from its cache keeps the headers it stored with the
+       * body, and takes from the 304 only what the 304 restates. Leave the
+       * policy off and every device that fetched an icon before this code
+       * existed goes on using the response it already has — unsandboxed — for
+       * as long as its cache survives. Which is exactly the case that matters:
+       * the icon that was uploaded before anyone was checking.
+       */
+      return new HttpResponse(304, Buffer.alloc(0), {
+        etag,
+        'cache-control': 'no-cache',
+        'content-security-policy': UPLOADED_CONTENT_POLICY,
+      });
     }
 
     if (logoId) {
@@ -159,6 +195,7 @@ export function createAssetFileRoutes(services: Services): Router<AppState> {
           'content-type': asset.contentType,
           'content-length': String(asset.bytes.length),
           'cache-control': 'no-cache',
+          'content-security-policy': UPLOADED_CONTENT_POLICY,
           etag,
         });
       }
@@ -169,6 +206,7 @@ export function createAssetFileRoutes(services: Services): Router<AppState> {
       'content-type': 'image/svg+xml',
       'content-length': String(fallback.length),
       'cache-control': 'no-cache',
+      'content-security-policy': UPLOADED_CONTENT_POLICY,
       etag,
     });
   });
