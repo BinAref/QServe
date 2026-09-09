@@ -229,16 +229,26 @@ export function createAssetFileRoutes(services: Services): Router<AppState> {
      * what a query string is allowed to put in `start_url`, since an unknown
      * value simply is not in the map.
      */
-    const served: Readonly<Record<string, string>> = {
-      console: '/console/',
-      customer: '/menu/',
-      waiter: '/waiter/',
-      cashier: '/cashier/',
-      kitchen: '/kitchen/',
-      printer: '/printer/',
-    };
-    const app = station in served ? station : 'console';
-    const path = served[app]!;
+    const served = new Map([
+      ['console', '/console/'],
+      ['customer', '/menu/'],
+      ['waiter', '/waiter/'],
+      ['cashier', '/cashier/'],
+      ['kitchen', '/kitchen/'],
+      ['printer', '/printer/'],
+    ]);
+    /*
+     * A Map, and not an object with `in`.
+     *
+     * `'toString' in {}` is true — `in` walks the prototype chain — so an
+     * allowlist checked that way is not a list of six names, it is those six
+     * plus every property Object.prototype has. `?app=toString` came out the
+     * far side as an accepted station whose path was a function, and the
+     * manifest went out with no start_url at all. A Map has no prototype keys
+     * to inherit, so the list is the list.
+     */
+    const path = served.get(station) ?? served.get('console')!;
+    const app = served.has(station) ? station : 'console';
 
     const name = localisedName(profile) ?? 'QServe';
     return new HttpResponse(200, Buffer.from(JSON.stringify({

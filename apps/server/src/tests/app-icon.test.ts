@@ -142,10 +142,22 @@ describe('the manifest each station points at', () => {
   });
 
   test('an unknown station is not a way to choose a start_url', async () => {
-    for (const junk of ['../../etc/passwd', 'https://example.com', '']) {
-      const parsed = await manifest(encodeURIComponent(junk));
+    const junk = [
+      '../../etc/passwd', 'https://example.com', '',
+      /*
+       * The ones that got through. An allowlist checked with `in` also accepts
+       * everything Object.prototype carries, so `?app=toString` was an accepted
+       * station whose path was a function and whose manifest had no start_url.
+       */
+      'toString', 'constructor', '__proto__', 'valueOf', 'hasOwnProperty',
+    ];
+    for (const value of junk) {
+      const parsed = await manifest(encodeURIComponent(value));
       assert.equal(parsed['start_url'], '/console/',
-        'a query string picks from the map or gets the default, never writes the path');
+        `?app=${value} must fall back, not escape the list`);
+      assert.equal(parsed['scope'], '/console/', `?app=${value} must not lose its scope`);
+      assert.ok(String(parsed['name']).endsWith('console'),
+        `?app=${value} must not name a station that does not exist`);
     }
   });
 });
