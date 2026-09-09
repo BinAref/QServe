@@ -1,12 +1,9 @@
-v1.0.4
+v1.0.5
 
 Writing a version here and pushing it is how a release is cut: the workflow in
 .github/workflows/release.yml builds the Windows bundle and the Android
 terminal, tags this commit, and publishes both. Only the first line is read;
 everything after it is for whoever opens this file next.
-
-Re-cut carrying the vendor trust store, so a licence issued by the licence
-server can actually be activated on a restaurant computer.
 
 Pushing this file again re-runs the build and updates the release in place, so
 a fix to the packaging does not need a new version number.
