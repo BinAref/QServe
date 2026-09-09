@@ -85,6 +85,27 @@ const shippable = (source) =>
   !source.includes(`${sep}dist${sep}tests`)
   && !source.endsWith('.d.ts') && !source.endsWith('.d.ts.map') && !source.endsWith('.js.map');
 
+/*
+ * What a C++ compiler leaves behind, which is not the product.
+ *
+ * `better-sqlite3` normally arrives as a prebuilt binary and this matters not
+ * at all. On a machine that has no prebuild for its Node version it is compiled
+ * instead, and then `build/` holds the object files, the import libraries, the
+ * SQLite amalgamation and ten megabytes of PDB debug symbols beside the one
+ * 1.7 MB `.node` that is actually loaded. Locally that was 16 MB of a 21 MB
+ * payload — shipped to every restaurant, and shipped or not depending on whose
+ * machine cut the release, which is the part worth fixing.
+ *
+ * The compiled module itself sits in `build/Release/` and is none of these, so
+ * it survives.
+ */
+const COMPILER_LEFTOVERS = ['.pdb', '.ipdb', '.iobj', '.obj', '.lib', '.exp', '.map'];
+const nativeLeftover = (source) =>
+  source.includes(`${sep}build${sep}`)
+  && (source.includes(`${sep}obj${sep}`)
+    || source.includes(`${sep}deps${sep}`)
+    || COMPILER_LEFTOVERS.some((extension) => source.endsWith(extension)));
+
 /* -------------------------------------------- the dependencies, installed first */
 
 /*
@@ -218,8 +239,12 @@ const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) 
   return entry.isDirectory() ? walk(full) : [full];
 });
 // Sorted, so two builds of the same source produce the same archive and a
-// release can be checked by rebuilding it.
-const files = walk(stage).sort();
+// release can be checked by rebuilding it — which is also why the compiler's
+// leftovers go here rather than being left to whether this machine happened to
+// find a prebuilt SQLite.
+const staged = walk(stage).sort();
+const files = staged.filter((file) => !nativeLeftover(file));
+const dropped = staged.length - files.length;
 const payload = makeZip(files.map((file) => [
   relative(stage, file).split(sep).join('/'),
   readFileSync(file),
@@ -227,8 +252,18 @@ const payload = makeZip(files.map((file) => [
 const payloadFile = join(build, 'payload.zip');
 writeFileSync(payloadFile, payload);
 process.stdout.write(
-  `  ${files.length} files, ${(payload.length / 1024 / 1024).toFixed(1)} MB compressed\n`,
+  `  ${files.length} files, ${(payload.length / 1024 / 1024).toFixed(1)} MB compressed`
+  + `${dropped > 0 ? ` (${dropped} compiler leftovers dropped)` : ''}\n`,
 );
+
+/*
+ * The native module is the one file in there that cannot be replaced by
+ * anything else, and the filter above walks the same folder it lives in. Say so
+ * here rather than let a restaurant find out when its database will not open.
+ */
+if (!files.some((file) => file.endsWith('better_sqlite3.node'))) {
+  throw new Error('the payload has no compiled SQLite — the leftover filter took too much');
+}
 
 /* ------------------------------------------------- the runtime to ship on */
 
