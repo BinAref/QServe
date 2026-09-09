@@ -220,17 +220,32 @@ export function createAssetFileRoutes(services: Services): Router<AppState> {
   router.get('/app.webmanifest', (ctx) => {
     const profile = services.settings.profile();
     const station = ctx.query.get('app') ?? 'console';
-    // Whitelisted rather than interpolated: `start_url` comes from a query
-    // string, and a manifest is not the place to find out what that allows.
-    const known = ['console', 'customer', 'waiter', 'cashier', 'kitchen', 'printer'];
-    const app = known.includes(station) ? station : 'console';
+    /*
+     * The front-end's folder name is not the address it is served at. The
+     * diner's app lives in `web/customer` and is served at `/menu`, because
+     * that is the word on the printed card and in the URL a diner sees.
+     *
+     * So the path is looked up rather than interpolated — which also settles
+     * what a query string is allowed to put in `start_url`, since an unknown
+     * value simply is not in the map.
+     */
+    const served: Readonly<Record<string, string>> = {
+      console: '/console/',
+      customer: '/menu/',
+      waiter: '/waiter/',
+      cashier: '/cashier/',
+      kitchen: '/kitchen/',
+      printer: '/printer/',
+    };
+    const app = station in served ? station : 'console';
+    const path = served[app]!;
 
     const name = localisedName(profile) ?? 'QServe';
     return new HttpResponse(200, Buffer.from(JSON.stringify({
       name: `${name} — ${app}`,
       short_name: name,
-      start_url: `/${app}/`,
-      scope: `/${app}/`,
+      start_url: path,
+      scope: path,
       display: 'standalone',
       background_color: '#101418',
       theme_color: '#101418',
