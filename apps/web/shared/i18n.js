@@ -50,13 +50,55 @@ export function onLocaleChange(listener) {
 }
 
 /** The locale to start with: the viewer's choice, then the restaurant default. */
+/**
+ * Which language to open in, before anybody has chosen one.
+ *
+ * Three sources, in the order a person would expect:
+ *
+ *   1. what this device chose last, if it has been here before
+ *   2. what this device's own language is — a diner scanning a table code has
+ *      a phone set to the language they read, and it is the only thing we know
+ *      about them. Only ever matched against the languages the restaurant has
+ *      actually enabled: this picks among the restaurant's offer, it does not
+ *      widen it.
+ *   3. the restaurant's own default, and English behind that
+ *
+ * `navigator.languages` is ordered by preference, so a phone set to Turkish
+ * then English gets Turkish in a restaurant offering both, and English in one
+ * offering English and Arabic. Region is ignored — `tr-CY` is Turkish, and a
+ * menu is not going to differ between Cyprus and Türkiye.
+ */
 export function preferredLocale(fallback = 'en') {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return stored;
   } catch {
-    // Private browsing on a diner's phone: fall through to the default.
+    // Private browsing on a diner's phone: fall through to what follows.
   }
+
+  /*
+   * Only the languages this restaurant has switched on.
+   *
+   * `/api/i18n/locales` answers with every pack the installation has, each
+   * carrying whether it is enabled — the console needs the full list to draw
+   * the switches. A terminal does not: offering a diner a language the
+   * restaurant turned off would hand them a half-translated menu.
+   */
+  const offered = available
+    .filter((entry) => entry.enabled !== false)
+    .map((entry) => entry.locale);
+  const wanted = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language].filter(Boolean);
+
+  for (const tag of wanted) {
+    const base = String(tag).toLowerCase().split('-')[0];
+    // An exact tag first, so a pack published as `pt-BR` still wins outright.
+    const match = offered.find((code) => code.toLowerCase() === String(tag).toLowerCase())
+      ?? offered.find((code) => code.toLowerCase().split('-')[0] === base);
+    if (match) return match;
+  }
+
   return fallback;
 }
 

@@ -175,3 +175,21 @@ names. No flags: a flag is a country, and Arabic is not a country.
 Both choices are applied where an app's resources are attached, so they reach
 every screen, every button, the scanner, the toasts and the station notification
 — not just the screen the choice was made on.
+
+## What changed in 1.0.7
+
+**Every screen opens in the language of the device reading it.** A diner scans a
+table code on a phone set to Turkish and gets the menu in Turkish; the waiter
+beside them, on an Arabic phone, gets Arabic — from the same restaurant, at the
+same table, with nothing to set on either device.
+
+It only ever picks among the languages the restaurant has switched on, so this
+widens nothing: a restaurant offering Arabic and English offers exactly that,
+and a device asking for anything else gets the restaurant's own default. A
+language chosen by hand on a device still wins over all of it.
+
+This also fixes something that was quietly wrong: `/api/i18n/locales` answers
+with every language pack installed, each carrying whether it is enabled — the
+console needs the full list to draw its switches. The terminals were reading
+that list as though it were the restaurant's offer, so a restaurant that had
+switched a language off could still be shown it.
