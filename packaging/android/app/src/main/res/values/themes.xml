@@ -1,13 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Deliberately plain: the restaurant's own theme is served by the page
-      inside the WebView, so anything this shell paints would fight it. What is
-      left is a full-screen surface in the right colour while the page loads.
+      The shell's theme.
+
+      Still deliberately plain — the restaurant's own theme is served by the page
+      inside the WebView, and anything this shell paints over it would fight it.
+      What it does now is match: the colours here are the ones in
+      `themes/dark.json`, so the setup screen and the first page the server
+      draws are recognisably the same product rather than two.
     -->
     <style name="Theme.QServe" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/surface</item>
-        <item name="android:statusBarColor">@color/surface</item>
-        <item name="android:navigationBarColor">@color/surface</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:colorAccent">@color/primary</item>
+        <item name="android:textColorHighlight">@color/border_strong</item>
+        <!-- The caret and the selection handles. Left at the platform default
+             they are the one green thing on a blue screen. -->
+        <item name="android:colorControlActivated">@color/primary</item>
+    </style>
+
+    <!--
+      A language, offered as a chip.
+
+      Each one is written in its own script and never translated: somebody
+      looking for Turkish is looking for the word "Türkçe", not for whatever
+      the current language calls Turkish.
+    -->
+    <style name="LanguageChip">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:background">@drawable/bg_language</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minWidth">88dp</item>
+        <item name="android:paddingHorizontal">18dp</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
     </style>
 </resources>

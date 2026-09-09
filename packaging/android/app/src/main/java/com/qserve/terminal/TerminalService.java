@@ -62,6 +62,12 @@ public class TerminalService extends Service {
         context.stopService(new Intent(context, TerminalService.class));
     }
 
+    /** Resources in the language this device was set to, not the phone's. */
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Language.apply(base));
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {

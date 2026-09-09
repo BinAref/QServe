@@ -1,6 +1,7 @@
 package com.qserve.terminal;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.os.Bundle;
@@ -60,6 +61,12 @@ public class ScannerActivity extends ComponentActivity {
     private final AtomicBoolean claimed = new AtomicBoolean(false);
     private ExecutorService decoder;
     private PreviewView preview;
+
+    /** Resources in the language this device was set to, not the phone's. */
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Language.apply(base));
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle state) {

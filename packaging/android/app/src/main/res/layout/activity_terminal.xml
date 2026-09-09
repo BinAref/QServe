@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pointing a device at its restaurant.
+
+  This screen is seen once per device and then never again, by somebody standing
+  in a kitchen holding a printed card. It used to be two paragraphs of
+  explanation above two identical grey buttons, which is a wall of reading in
+  front of a job that takes four seconds.
+
+  So it is ordered by what the person is about to do rather than by what there
+  is to say: the one action they came for, then the way round it if the camera
+  will not play, then the conditions that have to be true — small, at the
+  bottom, where a note belongs.
+-->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/surface">
+    android:background="@color/background">
 
     <WebView
         android:id="@+id/web"
@@ -10,17 +23,27 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <!-- The address form, shown until this device knows where its restaurant is. -->
     <ScrollView
         android:id="@+id/setup"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="24dp">
+        android:fillViewport="true"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="24dp">
+
+            <ImageView
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginBottom="20dp"
+                android:src="@mipmap/ic_launcher"
+                android:contentDescription="@string/app_name" />
 
             <TextView
                 android:id="@+id/title"
@@ -28,65 +51,186 @@
                 android:layout_height="wrap_content"
                 android:text="@string/address_title"
                 android:textColor="@color/text"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:lineSpacingMultiplier="1.15" />
 
             <TextView
                 android:id="@+id/intro"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="10dp"
                 android:text="@string/address_intro"
                 android:textColor="@color/muted"
-                android:textSize="15sp" />
+                android:textSize="15sp"
+                android:lineSpacingMultiplier="1.35" />
 
-            <!-- What has to be true before any address will answer. -->
+            <!-- The card holds the doing. Everything above it is orientation. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="vertical"
+                android:background="@drawable/bg_card"
+                android:padding="16dp"
+                android:elevation="2dp">
+
+                <Button
+                    android:id="@+id/scan"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_button_primary"
+                    android:drawableStart="@drawable/ic_scan"
+                    android:drawablePadding="10dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="16dp"
+                    android:text="@string/scan_button"
+                    android:textAllCaps="false"
+                    android:textColor="@color/primary_contrast"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <!-- "or type it": the second path, named, so the box below is
+                     not mistaken for something that also has to be filled in. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginVertical="16dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1"
+                        android:background="@color/border" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="12dp"
+                        android:text="@string/or_type_it"
+                        android:textColor="@color/muted"
+                        android:textSize="13sp" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1"
+                        android:background="@color/border" />
+                </LinearLayout>
+
+                <!--
+                  The address, with paste and clear inside it.
+
+                  `addStatesFromChildren` is what puts the focus ring on the box
+                  when the caret is in the field: the background lives on this
+                  row, and the focus lives on the EditText inside it.
+                -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_input"
+                    android:addStatesFromChildren="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="6dp">
+
+                    <EditText
+                        android:id="@+id/address"
+                        android:layout_width="0dp"
+                        android:layout_height="56dp"
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:autofillHints="none"
+                        android:importantForAutofill="no"
+                        android:hint="@string/address_hint"
+                        android:inputType="textUri"
+                        android:imeOptions="actionGo"
+                        android:maxLines="1"
+                        android:textColor="@color/text"
+                        android:textColorHint="@color/muted"
+                        android:textCursorDrawable="@null"
+                        android:textSize="16sp"
+                        android:textDirection="ltr" />
+
+                    <ImageButton
+                        android:id="@+id/paste"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_field_action"
+                        android:contentDescription="@string/paste"
+                        android:padding="9dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_paste" />
+
+                    <ImageButton
+                        android:id="@+id/clear"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_field_action"
+                        android:contentDescription="@string/clear"
+                        android:padding="10dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_clear"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/connect"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_button_outlined"
+                    android:text="@string/connect"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/needs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="20dp"
                 android:text="@string/address_needs"
                 android:textColor="@color/muted"
-                android:textSize="14sp" />
-
-            <EditText
-                android:id="@+id/address"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:autofillHints="none"
-                android:hint="@string/address_hint"
-                android:importantForAutofill="no"
-                android:inputType="textUri"
-                android:minHeight="56dp"
-                android:textColor="@color/text"
-                android:textColorHint="@color/muted"
-                android:textSize="17sp" />
+                android:textSize="13sp"
+                android:lineSpacingMultiplier="1.35" />
 
             <!--
-              Scanning first, and typing second, because that is the order the
-              two are actually used in: a station's code is on a card in the
-              person's other hand, and the address under it is what you fall
-              back to when the tablet has no camera.
-            -->
-            <Button
-                android:id="@+id/scan"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:minHeight="56dp"
-                android:text="@string/scan_button"
-                android:textSize="17sp" />
+              The language, on the screen rather than in Android's settings.
 
-            <Button
-                android:id="@+id/connect"
-                android:layout_width="match_parent"
+              A restaurant hands a phone to whoever is on shift, and the phone's
+              own language is not a decision that person made or can be expected
+              to change. Three words, always visible, always in their own script.
+            -->
+            <LinearLayout
+                android:id="@+id/languages"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minHeight="56dp"
-                android:text="@string/connect"
-                android:textSize="17sp" />
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="28dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/lang_ar"
+                    style="@style/LanguageChip"
+                    android:text="@string/language_ar" />
+
+                <TextView
+                    android:id="@+id/lang_en"
+                    style="@style/LanguageChip"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/language_en" />
+
+                <TextView
+                    android:id="@+id/lang_tr"
+                    style="@style/LanguageChip"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/language_tr" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 </FrameLayout>

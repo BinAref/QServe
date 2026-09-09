@@ -1,23 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">QServe Terminal</string>
+
+    <!--
+      Setup, in as few words as the job needs.
+
+      This screen used to open with two paragraphs. A person setting up a
+      station is holding a printed card and is not reading either of them, so
+      the explanation is now one line and the conditions are a note at the
+      bottom, where somebody who is stuck can find them.
+    -->
     <string name="address_title">Point this device at your restaurant</string>
-    <string name="address_intro">This app is a window onto the computer that runs your restaurant. Open the QServe console on that computer, go to Terminals, and print or show the station\'s code — then tap Scan below and point this device at it. You can also type the address by hand. This device remembers it.</string>
-    <string name="address_needs">The restaurant computer has to be running QServe, on the same Wi-Fi, with its licence activated. Before activation nothing is served to devices at all.</string>
-    <string name="address_hint">http://qserve-rest-000001.local:7020</string>
+    <string name="address_intro">Open the QServe console on the restaurant computer, go to Terminals, and scan the code for this station.</string>
+    <string name="or_type_it">or type it</string>
+    <string name="address_hint">qserve-rest-000001.local:7020</string>
     <string name="connect">Connect</string>
+    <string name="address_needs">The restaurant computer must be running QServe on the same Wi-Fi, with its licence activated.</string>
+    <string name="address_needed">Enter the address of the restaurant computer.</string>
+
     <string name="unreachable_title">Cannot reach the restaurant</string>
     <string name="unreachable_body">This device is not on the restaurant\'s Wi-Fi, the main computer is switched off, or the licence has not been activated yet.</string>
-    <string name="address_needed">Enter the address of the restaurant computer.</string>
+
+    <string name="paste">Paste</string>
+    <string name="clear">Clear</string>
+    <string name="clipboard_empty">There is nothing to paste</string>
+
     <string name="scan_button">Scan a station code</string>
     <string name="scan_hint">Point the camera at the code printed for this station.</string>
     <string name="scan_cancel">Cancel</string>
     <string name="scan_no_camera">Without the camera, type the address instead.</string>
     <string name="scan_failed">This device would not open its camera.</string>
     <string name="scan_not_a_station">That is not a QServe station code.</string>
+
     <string name="service_channel">Station</string>
     <string name="service_channel_description">Shown while this device is working as a station, so it keeps receiving orders with the screen off.</string>
     <string name="service_title">Station connected</string>
     <string name="service_body">Receiving orders with the screen off.</string>
     <string name="service_stop">Stop</string>
+
+    <!--
+      The languages, each written in its own script and never translated.
+      Somebody looking for Turkish is looking for "Türkçe", not for whatever
+      the language currently on screen happens to call it. Kept only here, so
+      all three packs necessarily agree.
+    -->
+    <string name="language_ar" translatable="false">العربية</string>
+    <string name="language_en" translatable="false">English</string>
+    <string name="language_tr" translatable="false">Türkçe</string>
 </resources>

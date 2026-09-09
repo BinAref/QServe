@@ -135,3 +135,25 @@ the camera is asked for at the moment it is used.
 phone in an apron pocket used to be suspended by Android between orders. The app
 now runs as a station service with a notification you can stop it from, holding
 the CPU and the Wi-Fi radio awake for as long as it is pointed at a restaurant.
+
+## What changed in 1.0.5
+
+**The Android setup screen was rebuilt.** It was a wall of explanation above two
+identical grey buttons — the platform's defaults, in a product that has its own
+themes. It now uses the same palette the restaurant's own screens are drawn in,
+and it is ordered by what a person standing in a kitchen with a printed card is
+about to do: scan, or failing that type, with the conditions as a note at the
+bottom rather than two paragraphs at the top.
+
+**Paste and clear, in the address box.** The same pair the product puts in every
+field on every screen, for the same reason: an address arrives by message and is
+pasted, and clearing a box by hand on a phone is a long press and a drag. Clear
+appears only when there is something to clear.
+
+**The app's language is picked in the app.** Arabic, English and Turkish, on the
+setup screen. A restaurant's second-hand tablets arrive in whatever language the
+last owner left them in, and a waiter's own phone is in the waiter's — neither
+is a decision the restaurant made, and neither should send somebody into Android
+settings before a station can be set up. The choice is remembered per device and
+reaches the screens, the scanner and the station notification. Unchosen, the
+phone's own language still wins.

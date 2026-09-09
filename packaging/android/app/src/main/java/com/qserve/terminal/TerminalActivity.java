@@ -13,7 +13,9 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -54,10 +56,18 @@ public class TerminalActivity extends ComponentActivity {
     private static final String PREFS = "qserve.terminal";
     private static final String KEY_ADDRESS = "address";
 
+    /**
+     * Set when the activity restarts itself after a language change, so that a
+     * device which already knows its station stays on the setup screen instead
+     * of being thrown back into the WebView the moment the language is picked.
+     */
+    private static final String EXTRA_SHOW_SETUP = "show_setup";
+
     private WebView web;
     private View setup;
     private EditText address;
     private TextView title;
+    private View clearButton;
 
     /**
      * The host of the page currently loaded, kept on this side so the clipboard
@@ -66,6 +76,12 @@ public class TerminalActivity extends ComponentActivity {
     private volatile String loadedHost;
 
     private ActivityResultLauncher<Intent> scanner;
+
+    /** Resources in the language this device was set to, not the phone's. */
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Language.apply(base));
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -80,6 +96,9 @@ public class TerminalActivity extends ComponentActivity {
         Button connect = findViewById(R.id.connect);
         Button scan = findViewById(R.id.scan);
 
+        wireFieldActions();
+        wireLanguages();
+
         // A kitchen screen that sleeps is a kitchen screen that misses a
         // ticket, and a table's menu that sleeps mid-order loses the order.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -91,7 +110,7 @@ public class TerminalActivity extends ComponentActivity {
         settings.setSupportZoom(false);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
-        web.setBackgroundColor(Color.parseColor("#101418"));
+        web.setBackgroundColor(getResources().getColor(R.color.background, getTheme()));
 
         /*
          * The clipboard, handed to the restaurant's own pages.
@@ -170,11 +189,99 @@ public class TerminalActivity extends ComponentActivity {
         // camera at a station's code is telling this device where it belongs.
         if (openFromIntent(getIntent())) return;
 
+        // Just came back from picking a language: stay where they were.
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_SHOW_SETUP, false)) {
+            address.setText(prefs().getString(KEY_ADDRESS, ""));
+            return;
+        }
+
         String saved = prefs().getString(KEY_ADDRESS, null);
         // The box is left empty so the example address shows through as a hint.
         // Pre-filling it with "http://" hid the one thing a person needed to
         // see: the shape of what they are being asked for.
         if (saved != null) open(saved);
+    }
+
+    /**
+     * Paste and clear, inside the address box.
+     *
+     * The same pair the product puts in every field on every screen, for the
+     * same reason: this box is filled by pasting an address somebody sent, on a
+     * phone, and clearing it by hand means a long press, a magnifier and a
+     * drag. Clear appears only when there is something to clear, so the button
+     * showing up is itself the signal that the box is not empty.
+     */
+    private void wireFieldActions() {
+        View paste = findViewById(R.id.paste);
+        clearButton = findViewById(R.id.clear);
+
+        paste.setOnClickListener(v -> {
+            ClipboardManager clipboard = getSystemService(ClipboardManager.class);
+            ClipData clip = clipboard == null ? null : clipboard.getPrimaryClip();
+            CharSequence text = clip == null || clip.getItemCount() == 0
+                ? null : clip.getItemAt(0).coerceToText(this);
+
+            if (text == null || text.toString().trim().isEmpty()) {
+                Toast.makeText(this, R.string.clipboard_empty, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            // Replacing rather than appending: there is one address, and a
+            // half-typed one plus a pasted one is not a third address.
+            address.setText(text.toString().trim());
+            address.setSelection(address.getText().length());
+        });
+
+        clearButton.setOnClickListener(v -> {
+            address.setText("");
+            address.requestFocus();
+        });
+
+        address.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void afterTextChanged(Editable s) { syncClear(); }
+        });
+        syncClear();
+    }
+
+    private void syncClear() {
+        clearButton.setVisibility(address.getText().length() == 0 ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * The three languages the product ships in, offered here rather than left
+     * to Android's settings. Picking one restarts the screen, because a
+     * language is applied when resources are attached and there is no way to
+     * re-attach them under a running activity.
+     */
+    private void wireLanguages() {
+        int[] chips = { R.id.lang_ar, R.id.lang_en, R.id.lang_tr };
+        String[] tags = { "ar", "en", "tr" };
+
+        String current = Language.chosen(this);
+        if (current == null) {
+            // Nothing chosen yet: show the one the phone is already in, so the
+            // marked chip always matches what is on screen.
+            current = getResources().getConfiguration().getLocales().get(0).getLanguage();
+        }
+
+        for (int i = 0; i < chips.length; i += 1) {
+            View chip = findViewById(chips[i]);
+            String tag = tags[i];
+            chip.setSelected(tag.equals(current));
+            chip.setOnClickListener(v -> {
+                if (tag.equals(Language.chosen(this))) return;
+                Language.choose(this, tag);
+
+                Intent again = new Intent(this, TerminalActivity.class);
+                again.putExtra(EXTRA_SHOW_SETUP, true);
+                again.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                finish();
+                startActivity(again);
+                // No slide: the screen is the same screen, in another language.
+                overridePendingTransition(0, 0);
+            });
+        }
     }
 
     /**
