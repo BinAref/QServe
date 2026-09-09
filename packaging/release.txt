@@ -1,4 +1,4 @@
-v1.0.6
+v1.0.7
 
 Writing a version here and pushing it is how a release is cut: the workflow in
 .github/workflows/release.yml builds the Windows bundle and the Android
