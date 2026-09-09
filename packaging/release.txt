@@ -5,8 +5,8 @@ Writing a version here and pushing it is how a release is cut: the workflow in
 terminal, tags this commit, and publishes both. Only the first line is read;
 everything after it is for whoever opens this file next.
 
-Re-cut for the manifest fix in 3c72184: the diner app is served at /menu,
-and the home-screen manifest was sending people to /customer.
+Re-cut carrying the vendor trust store, so a licence issued by the licence
+server can actually be activated on a restaurant computer.
 
 Pushing this file again re-runs the build and updates the release in place, so
 a fix to the packaging does not need a new version number.
