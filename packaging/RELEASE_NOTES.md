@@ -157,3 +157,21 @@ is a decision the restaurant made, and neither should send somebody into Android
 settings before a station can be set up. The choice is remembered per device and
 reaches the screens, the scanner and the station notification. Unchosen, the
 phone's own language still wins.
+
+## What changed in 1.0.6
+
+**The Android app has a light theme and a dark one, and follows the device.**
+Both palettes are the product's own — `themes/light.json` and `themes/dark.json`,
+the same ones the restaurant's screens are drawn in. A tablet set to dark gets a
+dark setup screen with no setting to find, and a device set to light gets a light
+one. It can also be told: **Theme → System, Light, Dark.**
+
+**The language follows the device too**, and can be told the same way:
+**Language → System, العربية, English, Türkçe.** A device set to a language
+QServe does not ship — French, Korean, anything — gets English, because that is
+what the app's default strings are. Both controls are plain dropdowns listing
+names. No flags: a flag is a country, and Arabic is not a country.
+
+Both choices are applied where an app's resources are attached, so they reach
+every screen, every button, the scanner, the toasts and the station notification
+— not just the screen the choice was made on.

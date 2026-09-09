@@ -26,6 +26,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -80,7 +81,7 @@ public class TerminalActivity extends ComponentActivity {
     /** Resources in the language this device was set to, not the phone's. */
     @Override
     protected void attachBaseContext(Context base) {
-        super.attachBaseContext(Language.apply(base));
+        super.attachBaseContext(Appearance.apply(base));
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -97,7 +98,7 @@ public class TerminalActivity extends ComponentActivity {
         Button scan = findViewById(R.id.scan);
 
         wireFieldActions();
-        wireLanguages();
+        wireAppearance();
 
         // A kitchen screen that sleeps is a kitchen screen that misses a
         // ticket, and a table's menu that sleeps mid-order loses the order.
@@ -249,39 +250,80 @@ public class TerminalActivity extends ComponentActivity {
     }
 
     /**
-     * The three languages the product ships in, offered here rather than left
-     * to Android's settings. Picking one restarts the screen, because a
-     * language is applied when resources are attached and there is no way to
-     * re-attach them under a running activity.
+     * The two dropdowns at the foot of the screen.
+     *
+     * Picking either restarts the screen: a language and a night mode are
+     * applied when resources are attached, and there is no way to re-attach
+     * them under a running activity.
      */
-    private void wireLanguages() {
-        int[] chips = { R.id.lang_ar, R.id.lang_en, R.id.lang_tr };
-        String[] tags = { "ar", "en", "tr" };
-
-        String current = Language.chosen(this);
-        if (current == null) {
-            // Nothing chosen yet: show the one the phone is already in, so the
-            // marked chip always matches what is on screen.
-            current = getResources().getConfiguration().getLocales().get(0).getLanguage();
-        }
-
-        for (int i = 0; i < chips.length; i += 1) {
-            View chip = findViewById(chips[i]);
-            String tag = tags[i];
-            chip.setSelected(tag.equals(current));
-            chip.setOnClickListener(v -> {
-                if (tag.equals(Language.chosen(this))) return;
-                Language.choose(this, tag);
-
-                Intent again = new Intent(this, TerminalActivity.class);
-                again.putExtra(EXTRA_SHOW_SETUP, true);
-                again.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                finish();
-                startActivity(again);
-                // No slide: the screen is the same screen, in another language.
-                overridePendingTransition(0, 0);
+    private void wireAppearance() {
+        dropdown(findViewById(R.id.language), Appearance.LANGUAGES,
+            Appearance.language(this), this::languageName, chosen -> {
+                Appearance.setLanguage(this, chosen);
+                restart();
             });
+
+        dropdown(findViewById(R.id.theme), Appearance.THEMES,
+            Appearance.theme(this), this::themeName, chosen -> {
+                Appearance.setTheme(this, chosen);
+                restart();
+            });
+    }
+
+    /** A name for a language, written in that language and never translated. */
+    private String languageName(String value) {
+        switch (value) {
+            case "ar": return getString(R.string.language_ar);
+            case "en": return getString(R.string.language_en);
+            case "tr": return getString(R.string.language_tr);
+            default: return getString(R.string.follow_device);
         }
+    }
+
+    private String themeName(String value) {
+        switch (value) {
+            case Appearance.LIGHT: return getString(R.string.theme_light);
+            case Appearance.DARK: return getString(R.string.theme_dark);
+            default: return getString(R.string.follow_device);
+        }
+    }
+
+    /**
+     * Turn a label into a dropdown over a fixed set of values.
+     *
+     * A PopupMenu rather than a Spinner: a Spinner brings its own idea of what
+     * a control looks like, and this screen has a look already.
+     */
+    private void dropdown(
+        TextView label, String[] values, String current,
+        java.util.function.Function<String, String> naming,
+        java.util.function.Consumer<String> onPick) {
+
+        label.setText(naming.apply(current));
+        label.setOnClickListener(v -> {
+            PopupMenu menu = new PopupMenu(this, label);
+            for (int i = 0; i < values.length; i += 1) {
+                menu.getMenu().add(0, i, i, naming.apply(values[i]));
+            }
+            menu.setOnMenuItemClickListener(item -> {
+                String picked = values[item.getItemId()];
+                if (picked.equals(current)) return true;
+                onPick.accept(picked);
+                return true;
+            });
+            menu.show();
+        });
+    }
+
+    /** Draw this screen again under the new language or theme. */
+    private void restart() {
+        Intent again = new Intent(this, TerminalActivity.class);
+        again.putExtra(EXTRA_SHOW_SETUP, true);
+        again.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        finish();
+        startActivity(again);
+        // No slide: it is the same screen, in another language or another shade.
+        overridePendingTransition(0, 0);
     }
 
     /**

@@ -35,11 +35,14 @@
     <Button
         android:id="@+id/cancel"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="52dp"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="48dp"
-        android:minWidth="160dp"
-        android:minHeight="56dp"
+        android:background="@drawable/bg_button_on_camera"
+        android:minWidth="180dp"
+        android:paddingHorizontal="28dp"
         android:text="@string/scan_cancel"
-        android:textSize="17sp" />
+        android:textAllCaps="false"
+        android:textColor="@android:color/white"
+        android:textSize="16sp" />
 </FrameLayout>

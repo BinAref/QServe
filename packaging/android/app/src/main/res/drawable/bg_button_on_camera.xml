@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The one control over a live camera preview.
+
+  This is the one place in the app that does not follow the theme, and it is not
+  an oversight: a camera preview is whatever the kitchen looks like, and a light
+  button on it would be invisible against a white wall and blinding against a
+  dark one. A translucent dark pill with a light edge reads on both.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#40FFFFFF">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#CC0B0F16" />
+            <corners android:radius="999dp" />
+            <stroke android:width="1dp" android:color="#59FFFFFF" />
+        </shape>
+    </item>
+</ripple>

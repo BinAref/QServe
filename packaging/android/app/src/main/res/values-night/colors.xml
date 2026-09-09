@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The dark palette, from `themes/dark.json`. See values/colors.xml. -->
+<resources>
+    <color name="background">#0B0F16</color>
+    <color name="surface">#131923</color>
+    <color name="surface_alt">#1B2331</color>
+
+    <color name="text">#E8EEF7</color>
+    <color name="muted">#97A5B8</color>
+
+    <color name="primary">#5AA2FF</color>
+    <color name="primary_contrast">#06121F</color>
+
+    <color name="border">#232C3A</color>
+    <color name="border_strong">#354153</color>
+    <color name="danger">#FF6B62</color>
+
+    <color name="ripple">#1F5AA2FF</color>
+    <color name="scrim">#B3020610</color>
+</resources>

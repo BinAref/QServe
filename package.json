@@ -1,6 +1,6 @@
 {
   "name": "qserve",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "description": "QServe \u2014 Local Restaurant Operating System. Offline-first, modular, perpetual-licensed restaurant operations platform.",
   "license": "UNLICENSED",

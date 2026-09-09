@@ -29,4 +29,9 @@
     <string name="service_title">المحطة متصلة</string>
     <string name="service_body">تستقبل الطلبات والشاشة مطفأة.</string>
     <string name="service_stop">إيقاف</string>
+    <string name="language">اللغة</string>
+    <string name="theme">المظهر</string>
+    <string name="follow_device">حسب الجهاز</string>
+    <string name="theme_light">فاتح</string>
+    <string name="theme_dark">داكن</string>
 </resources>

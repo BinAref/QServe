@@ -29,4 +29,9 @@
     <string name="service_title">İstasyon bağlı</string>
     <string name="service_body">Ekran kapalıyken sipariş alınıyor.</string>
     <string name="service_stop">Durdur</string>
+    <string name="language">Dil</string>
+    <string name="theme">Tema</string>
+    <string name="follow_device">Sistem</string>
+    <string name="theme_light">Açık</string>
+    <string name="theme_dark">Koyu</string>
 </resources>

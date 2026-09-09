@@ -65,7 +65,7 @@ public class TerminalService extends Service {
     /** Resources in the language this device was set to, not the phone's. */
     @Override
     protected void attachBaseContext(Context base) {
-        super.attachBaseContext(Language.apply(base));
+        super.attachBaseContext(Appearance.apply(base));
     }
 
     @Override

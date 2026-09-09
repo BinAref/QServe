@@ -1,42 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      The shell's theme.
+      The shell's theme, light.
 
       Still deliberately plain — the restaurant's own theme is served by the page
       inside the WebView, and anything this shell paints over it would fight it.
-      What it does now is match: the colours here are the ones in
-      `themes/dark.json`, so the setup screen and the first page the server
-      draws are recognisably the same product rather than two.
+      What it does is match: the colours are the product's own, and the dark
+      variant in `values-night/` is the same style with the other palette, so a
+      device set to dark gets a dark setup screen without a line of code.
     -->
-    <style name="Theme.QServe" parent="@android:style/Theme.Material.NoActionBar">
+    <style name="Theme.QServe" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/background</item>
         <item name="android:colorAccent">@color/primary</item>
-        <item name="android:textColorHighlight">@color/border_strong</item>
-        <!-- The caret and the selection handles. Left at the platform default
-             they are the one green thing on a blue screen. -->
         <item name="android:colorControlActivated">@color/primary</item>
+        <item name="android:textColorHighlight">@color/border_strong</item>
+        <!-- Dark icons in the status bar, because the bar is now light. The
+             night variant leaves these out and gets light icons. -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
     <!--
-      A language, offered as a chip.
-
-      Each one is written in its own script and never translated: somebody
-      looking for Turkish is looking for the word "Türkçe", not for whatever
-      the current language calls Turkish.
+      A dropdown: the control the language and the theme are both chosen with.
+      Names only, no flags — a flag is a country, and Arabic is not a country.
     -->
-    <style name="LanguageChip">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">40dp</item>
-        <item name="android:background">@drawable/bg_language</item>
-        <item name="android:gravity">center</item>
-        <item name="android:minWidth">88dp</item>
-        <item name="android:paddingHorizontal">18dp</item>
+    <style name="Dropdown">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:background">@drawable/bg_dropdown</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:drawablePadding">8dp</item>
         <item name="android:textColor">@color/text</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="FieldLabel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">6dp</item>
+        <item name="android:textColor">@color/muted</item>
+        <item name="android:textSize">13sp</item>
     </style>
 </resources>

@@ -1,30 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The product's own palette, not a second one invented for the shell.
+  The light palette, from `themes/light.json`.
 
-  These are the tokens from `themes/dark.json` — the theme the WebView is about
-  to paint with. The setup screen is the only thing in this app a person sees
-  that the restaurant's server did not draw, and it should not be the one screen
-  that looks like it came from somewhere else.
+  These are the product's own tokens rather than a second set invented for the
+  shell. The dark ones live in `values-night/colors.xml`, and Android swaps
+  between the two files on its own — so nothing in the layouts or the code names
+  a colour twice, and adding a third theme would mean one more file and no other
+  change.
 -->
 <resources>
-    <color name="background">#0B0F16</color>
-    <color name="surface">#131923</color>
-    <color name="surface_alt">#1B2331</color>
+    <color name="background">#F2F4F8</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_alt">#E9EDF4</color>
 
-    <color name="text">#E8EEF7</color>
-    <color name="muted">#97A5B8</color>
+    <color name="text">#0F1419</color>
+    <color name="muted">#566072</color>
 
-    <color name="primary">#5AA2FF</color>
-    <!-- Text on top of the primary colour. Dark on purpose: #5AA2FF is a light
-         blue, and white on it fails contrast at button-label size. -->
-    <color name="primary_contrast">#06121F</color>
-    <color name="primary_pressed">#4790EC</color>
+    <color name="primary">#1558D6</color>
+    <color name="primary_contrast">#FFFFFF</color>
 
-    <color name="border">#232C3A</color>
-    <color name="border_strong">#354153</color>
-    <color name="danger">#FF6B62</color>
+    <color name="border">#DDE2EA</color>
+    <color name="border_strong">#BCC5D4</color>
+    <color name="danger">#C8232C</color>
 
-    <color name="ripple">#1F5AA2FF</color>
-    <color name="scrim">#B3020610</color>
+    <color name="ripple">#1F1558D6</color>
+    <color name="scrim">#33FFFFFF</color>
 </resources>
