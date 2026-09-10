@@ -193,3 +193,34 @@ with every language pack installed, each carrying whether it is enabled — the
 console needs the full list to draw its switches. The terminals were reading
 that list as though it were the restaurant's offer, so a restaurant that had
 switched a language off could still be shown it.
+
+## What changed in 1.0.8
+
+**Three things ship now, not two, and each has its own folder.**
+
+| | |
+|---|---|
+| `QServe-Vendor-<version>-windows-x64.exe` | **new.** The licence server, for whoever sells QServe. A restaurant never runs it. |
+| `QServe-<version>-windows-x64.exe` | The restaurant's own server, as before. |
+| `QServe-Terminal-<version>.apk` | The Android app, as before. |
+
+The licence server had no packaged form at all: running it meant cloning the
+repository and knowing which npm script to type, which is a strange thing to ask
+of the person whose whole job is selling the software. It is now one file that
+opens no window, like the other one — and on first run it **makes its own
+signing key**, then says so in a dialog nobody can miss. That key is the thing
+every licence you ever issue is verified against; it cannot be recovered or
+reissued, so back it up the day you make it. The public half lands beside it,
+ready to go into the restaurant builds you ship.
+
+**Every screen opens in the language of the device reading it** — carried over
+from 1.0.7 and now confirmed against the cases that matter. A restaurant
+offering Arabic and English, with Arabic as its own default:
+
+  a phone in Arabic   ->  Arabic     the device's own language, offered
+  a phone in English  ->  English    the device's own language, offered
+  a phone in Korean   ->  Arabic     not offered, so the restaurant's default
+
+It never widens what the restaurant offers: a device asking for a language that
+has been switched off gets the restaurant's default, and a language chosen by
+hand on a device still wins over all of it.

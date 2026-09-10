@@ -19,13 +19,13 @@ const read = (path) => readFileSync(resolve(path), 'utf8');
 const npmVersion = JSON.parse(read('package.json')).version;
 const appVersion = read('packages/shared/src/index.ts')
   .match(/APP_VERSION = '([^']+)'/)?.[1];
-const androidVersion = read('packaging/android/app/build.gradle.kts')
+const androidVersion = read('packaging/phone/app/build.gradle.kts')
   .match(/versionName = "([^"]+)"/)?.[1];
 
 const found = {
   'package.json': npmVersion,
   'packages/shared/src/index.ts (APP_VERSION)': appVersion,
-  'packaging/android/app/build.gradle.kts (versionName)': androidVersion,
+  'packaging/phone/app/build.gradle.kts (versionName)': androidVersion,
 };
 
 const distinct = [...new Set(Object.values(found))];

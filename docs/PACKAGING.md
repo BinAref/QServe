@@ -1,39 +1,53 @@
 # Packaging and releases
 
-Two things a restaurant installs, and neither is the repository:
+Three things ship, and none of them is the repository. Each has its own folder
+under `packaging/`, its own build script, and its own README:
 
-| Artifact | Who runs it | What it is |
+| Folder | Artifact | Who runs it |
 |---|---|---|
-| `QServe-<version>-windows-x64.exe` | the restaurant's computer | the whole product in one file: server, console, six front-ends, language and theme packs |
-| `QServe-Terminal-<version>.apk` | the restaurant's own phones and tablets | a window onto that computer |
+| [`developer/`](../packaging/developer/) | `QServe-Vendor-<version>-windows-x64.exe` | **you**, the vendor. The licence server that issues keys. A restaurant never runs this. |
+| [`restaurant/`](../packaging/restaurant/) | `QServe-<version>-windows-x64.exe` | the restaurant's computer. Server, console, six front-ends, packs — one file. |
+| [`phone/`](../packaging/phone/) | `QServe-Terminal-<version>.apk` | the restaurant's own phones and tablets. A window onto that computer. |
 
-Neither can be built honestly on one machine: the Windows executable carries a
-native SQLite that must be compiled on Windows, and the Android package needs
-the Android SDK. `.github/workflows/release.yml` builds each on a runner that
-has what it needs, so cutting a release is a commit:
+```
+npm run build:developer      # -> dist/developer/
+npm run build:restaurant     # -> dist/restaurant/
+npm run build:phone          # -> packaging/phone/app/build/outputs/apk/release/
+npm run build:all
+```
+
+The two Windows executables share everything from "stage a folder" onwards —
+fetch a Node runtime, zip the payload, bake both into it, stop Windows opening a
+console — so that half lives once in [`packaging/lib/windows-exe.mjs`](../packaging/lib/windows-exe.mjs)
+and each build script only stages its own payload.
+
+None of them can be built honestly on one machine: both Windows executables
+carry a native SQLite that must be compiled on Windows, and the Android package
+needs the Android SDK. `.github/workflows/release.yml` builds each on a runner
+that has what it needs, so cutting a release is a commit:
 
 ```
 echo v1.0.1 > packaging/release.txt   # then commit and push it
 ```
 
-Pushing that file is the trigger. The workflow builds both artifacts, tags the
+Pushing that file is the trigger. The workflow builds all three, tags the
 commit, and publishes a release carrying them — no tag push and no token with
 special powers, and the reason for the release sits in the commit message beside
 it. Only the first line of the file is read.
 
 The same workflow can be run by hand from the Actions tab; given a tag it
-publishes, and without one it builds both artifacts and attaches them to the run.
+publishes, and without one it builds all three and attaches them to the run.
 
 ---
 
-## The Windows executable
+## The restaurant's executable
 
 ```
-node packaging/windows/build.mjs            # one .exe in dist/
-node packaging/windows/build.mjs --no-pack  # stage the payload only, for checking the layout
+node packaging/restaurant/build.mjs            # one .exe in dist/
+node packaging/restaurant/build.mjs --no-pack  # stage the payload only, for checking the layout
 ```
 
-Produces `dist/QServe-<version>-windows-x64.exe` — one file, around 110 MB.
+Produces `dist/restaurant/QServe-<version>-windows-x64.exe` — one file, ~90 MB.
 There is nothing to unzip, no folder to keep together and no installer. Run the
 build on Windows: it is the step that compiles `better-sqlite3`, and an
 executable built anywhere else carries the wrong native binary. The script says
@@ -43,7 +57,7 @@ so rather than shipping it quietly.
 
 The build stages the product into a folder, ZIPs it, and bakes the ZIP into a
 copy of the Node runtime as a [SEA](https://nodejs.org/api/single-executable-applications.html)
-asset alongside `packaging/windows/launcher.js`:
+asset alongside `packaging/restaurant/launcher.js`:
 
 ```
 app/server/dist    the server
@@ -123,10 +137,112 @@ See [SECURITY.md](SECURITY.md).
 
 ---
 
+## The vendor's executable
+
+```
+node packaging/developer/build.mjs
+```
+
+Produces `dist/developer/QServe-Vendor-<version>-windows-x64.exe`. Same
+technique as the restaurant's and for the same reason — one file, no window —
+but this one is yours rather than a customer's, and it had no packaged form at
+all until recently. Running the licence server meant cloning the repository and
+knowing which npm script to type, which is a strange thing to ask of the person
+whose whole job is selling the software.
+
+Two things it does that the restaurant build does not:
+
+**It makes its own signing key on first run**, into
+`%LOCALAPPDATA%\QServe Vendor\secrets\`, and then says so in a dialog nobody can
+miss. From a checkout that is `npm run keygen`, which is the right shape for
+somebody who already has a terminal open; a vendor who downloaded one .exe has
+not, and a licence server with no key looks like it works right up until the
+first sale. The public half lands beside it, ready for the `QSERVE_TRUSTED_KEYS`
+repository secret.
+
+**It listens on the network.** The restaurant server binds its console to
+loopback and only opens to the LAN once a licence is active; this one has to
+answer restaurants activating, so it binds where it is told. It is the only part
+of QServe that needs to be reachable from the internet, and only for activation
+and transfer — never during a service.
+
+The keygen tool is deliberately staged into this payload and deliberately kept
+out of the restaurant's: a restaurant should never be shipped code that mints
+its own activation certificates.
+
+---
+
+## The vendor's executable
+
+\
+▸ preparing
+
+▸ installing runtime dependencies
+  $ npm install --omit=dev --no-audit --no-fund
+
+added 38 packages in 1m
+
+▸ staging the workspace packages
+
+▸ staging the licence server
+
+▸ checking the payload
+  8 required paths present
+
+▸ packing the payload
+  420 files, 1.5 MB compressed (66 compiler leftovers dropped)
+
+▸ fetching node 24.18.0 for windows-x64
+  $ powershell -NoProfile -Command Expand-Archive -Path 'D:QServeQServepackagingdeveloperuild
+ode-v24.18.0-win-x64.zip' -DestinationPath 'D:QServeQServepackagingdeveloperuild' -Force
+
+▸ building QServe-Vendor-1.0.7-windows-x64.exe
+  $ C:Program Files
+odejs
+ode.exe --experimental-sea-config D:QServeQServepackagingdeveloperuildsea-config.json
+  $ npx --yes postject D:QServeQServedistdeveloperQServe-Vendor-1.0.7-windows-x64.exe NODE_SEA_BLOB D:QServeQServepackagingdeveloperuildsea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+[36mStart injection of NODE_SEA_BLOB in D:QServeQServedistdeveloperQServe-Vendor-1.0.7-windows-x64.exe...[0m
+[32m💉 Injection done![0m
+
+▸ removing the console window
+  console subsystem 3 → GUI subsystem 2
+
+▸ done: QServe-Vendor-1.0.7-windows-x64.exe (90 MB)
+
+  This one is yours, not a restaurant's. It makes its own signing key on
+  first run and tells you where — back that file up the same day.
+Produces . Same technique
+as the restaurant's and for the same reason — one file, no window — but this one
+is yours rather than a customer's, and it had no packaged form at all until
+recently. Running the licence server meant cloning the repository and knowing
+which npm script to type, which is a strange thing to ask of the person whose
+whole job is selling the software.
+
+Two things it does that the restaurant build does not:
+
+**It makes its own signing key on first run**, into
+, and then says so in a dialog nobody can
+miss. From a checkout that is , which is the right shape for
+somebody who already has a terminal open; a vendor who downloaded one .exe has
+not, and a licence server with no key looks like it works right up until the
+first sale. The public half lands beside it, ready for the
+ repository secret.
+
+**It listens on the network.** The restaurant server binds its console to
+loopback and only opens to the LAN once a licence is active; this one has to
+answer restaurants activating, so it binds where it is told. It is the only part
+of QServe that needs to be reachable from the internet.
+
+The keygen tool is deliberately staged into this payload and deliberately kept
+out of the restaurant's: a restaurant should never be shipped code that mints
+its own activation certificates.
+
+---
+
 ## The Android terminal
 
 ```
-cd packaging/android && gradle assembleRelease
+cd packaging/phone && gradle assembleRelease
 ```
 
 A small app: one WebView on the restaurant's own server, one remembered address.

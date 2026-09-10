@@ -1,8 +1,8 @@
 {
   "name": "qserve",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": true,
-  "description": "QServe \u2014 Local Restaurant Operating System. Offline-first, modular, perpetual-licensed restaurant operations platform.",
+  "description": "QServe — Local Restaurant Operating System. Offline-first, modular, perpetual-licensed restaurant operations platform.",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
@@ -27,7 +27,11 @@
     "dev": "npm run build && npm run start",
     "keygen": "node apps/license-server/dist/tools/keygen.js",
     "test:quick": "node --test --test-reporter=dot \"packages/*/dist/**/*.test.js\" \"apps/*/dist/**/*.test.js\"",
-    "check": "npm run build && npm run validate && npm test"
+    "check": "npm run build && npm run validate && npm test",
+    "build:developer": "npm run build && node packaging/developer/build.mjs",
+    "build:restaurant": "npm run build && node packaging/restaurant/build.mjs",
+    "build:phone": "cd packaging/phone && gradle assembleRelease",
+    "build:all": "npm run build:developer && npm run build:restaurant && npm run build:phone"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

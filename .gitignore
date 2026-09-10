@@ -21,7 +21,6 @@ apps/server/config/vendor.json
 .DS_Store
 
 # Packaging output: assembled bundles and the runtimes they are built from.
-packaging/windows/build/
-packaging/android/.gradle/
-packaging/android/build/
-packaging/android/app/build/
+packaging/*/build/
+packaging/phone/.gradle/
+packaging/phone/app/build/

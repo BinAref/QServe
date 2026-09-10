@@ -1,4 +1,8 @@
-# Build the two things a restaurant installs, and publish them.
+# Build the three things this product ships, and publish them.
+#
+#   developer/   the vendor's licence server. Not a thing a restaurant runs.
+#   restaurant/  the restaurant's own server, console and front-ends.
+#   phone/       the Android app for a restaurant's own devices.
 #
 # Neither can honestly be built on a developer's laptop alone: the Windows
 # bundle carries a native SQLite that has to be compiled on Windows, and the
@@ -45,7 +49,7 @@ jobs:
       - run: npm test
 
   windows:
-    name: Windows executable
+    name: Windows executables
     needs: check
     runs-on: windows-latest
     steps:
@@ -81,15 +85,21 @@ jobs:
             echo "no QSERVE_VENDOR_INFO secret: the licence screen will say 'ask us'"
           fi
 
-      # One file out: no zip to unpack, no folder to keep together. What lands
-      # on the releases page is what an owner runs.
-      - name: Build QServe.exe
-        run: node packaging/windows/build.mjs
+      # Both Windows halves on the one runner: they need the same toolchain,
+      # and the setup costs more than either build. One file out apiece — no
+      # zip to unpack, no folder to keep together.
+      - name: Build the restaurant server
+        run: node packaging/restaurant/build.mjs
+
+      - name: Build the vendor licence server
+        run: node packaging/developer/build.mjs
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/*.exe
+          path: |
+            dist/restaurant/*.exe
+            dist/developer/*.exe
           if-no-files-found: error
 
   android:
@@ -113,21 +123,21 @@ jobs:
           gradle-version: '8.11.1'
 
       - name: Build the APK
-        working-directory: packaging/android
+        working-directory: packaging/phone
         run: gradle --no-daemon assembleRelease
 
       - name: Name it after the version
         shell: bash
         run: |
           version=$(node -p "require('./package.json').version")
-          mkdir -p dist
-          cp packaging/android/app/build/outputs/apk/release/app-release.apk \
-             "dist/QServe-Terminal-${version}.apk"
+          mkdir -p dist/phone
+          cp packaging/phone/app/build/outputs/apk/release/app-release.apk \
+             "dist/phone/QServe-Terminal-${version}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: dist/*.apk
+          path: dist/phone/*.apk
           if-no-files-found: error
 
   publish:

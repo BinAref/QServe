@@ -23,4 +23,4 @@ export * from './models.js';
 export * from './validate.js';
 
 /** Bumped on every release; embedded in activation requests and backups. */
-export const APP_VERSION = '1.0.7';
+export const APP_VERSION = '1.0.8';
