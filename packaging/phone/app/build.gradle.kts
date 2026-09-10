@@ -12,8 +12,8 @@ android {
         // second-hand today is past it.
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.0.11"
+        versionCode = 13
+        versionName = "1.0.12"
     }
 
     buildFeatures {
@@ -40,6 +40,10 @@ android {
             dimension = "audience"
             applicationId = "com.qserve.terminal"
             buildConfigField("boolean", "BUILD_FOR_VENDOR", "false")
+            // A restaurant's terminal is told where it belongs by the station
+            // code it scans, so there is nothing to bake in here.
+            buildConfigField("String", "VENDOR_URL", "\"\"")
+            buildConfigField("String", "VENDOR_CODE", "\"\"")
         }
         create("developer") {
             dimension = "audience"
@@ -47,6 +51,32 @@ android {
             // installs both, and one must not replace the other.
             applicationId = "com.qserve.vendor"
             buildConfigField("boolean", "BUILD_FOR_VENDOR", "true")
+
+            /*
+             * Where this build goes, and the code it opens with.
+             *
+             * A restaurant's terminal has to be told which restaurant it belongs
+             * to, because there are many of them and the app cannot know. The
+             * vendor has exactly one licence server — their own — so asking them
+             * for its address every time they install the app is asking a
+             * question with one possible answer. Baked in at build time, the app
+             * opens straight onto the console.
+             *
+             * Both come from outside this file and neither has a default. They
+             * are read from gradle properties or the environment, which is how
+             * the release workflow passes them in from repository secrets —
+             * because an .apk can be taken apart by anyone who has it, and a
+             * value written here would additionally be readable by anyone who
+             * can see this repository, which is a different and larger set of
+             * people. Absent, the app simply asks, as it did before.
+             */
+            val vendorUrl = (project.findProperty("qserve.vendor.url") as String?)
+                ?: System.getenv("QSERVE_VENDOR_URL") ?: ""
+            val vendorCode = (project.findProperty("qserve.vendor.code") as String?)
+                ?: System.getenv("QSERVE_VENDOR_CODE") ?: ""
+
+            buildConfigField("String", "VENDOR_URL", "\"${vendorUrl.trim()}\"")
+            buildConfigField("String", "VENDOR_CODE", "\"${vendorCode.trim()}\"")
         }
     }
 

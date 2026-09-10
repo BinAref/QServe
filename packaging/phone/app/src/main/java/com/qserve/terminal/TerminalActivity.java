@@ -99,6 +99,8 @@ public class TerminalActivity extends ComponentActivity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        // Before the guard below can ask for a code, in case this build ships one.
+        AppLock.seedFromBuild(this, BuildConfig.VENDOR_CODE);
         setContentView(R.layout.activity_terminal);
 
         web = findViewById(R.id.web);
@@ -241,6 +243,18 @@ public class TerminalActivity extends ComponentActivity {
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_SHOW_SETUP, false)) {
             address.setText(prefs().getString(KEY_ADDRESS, ""));
             return;
+        }
+
+        /*
+         * A build that was told where it belongs goes there.
+         *
+         * The vendor has one licence server, so the address screen would be a
+         * question with one answer. Remembered like a typed one, so "point at a
+         * different server" still works and still sticks.
+         */
+        if (prefs().getString(KEY_ADDRESS, null) == null
+            && !BuildConfig.VENDOR_URL.isEmpty()) {
+            remember(BuildConfig.VENDOR_URL);
         }
 
         String saved = prefs().getString(KEY_ADDRESS, null);

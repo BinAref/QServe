@@ -5,7 +5,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.RadialGradient;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -40,6 +41,7 @@ public class Viewfinder extends View {
 
     private final RectF window = new RectF();
     private final Path cut = new Path();
+    private final Path beam = new Path();
 
     private final float density;
     private float progress = 0f;
@@ -48,6 +50,10 @@ public class Viewfinder extends View {
     public Viewfinder(Context context, AttributeSet attrs) {
         super(context, attrs);
         density = getResources().getDisplayMetrics().density;
+
+        // Flat, and deliberately so: the frame is the only line on this
+        // screen, and a graded surround competes with it for the eye.
+        dim.setColor(0xA6000000);
 
         corner.setStyle(Paint.Style.STROKE);
         corner.setStrokeWidth(4f * density);
@@ -71,31 +77,20 @@ public class Viewfinder extends View {
         window.set(left, top, left + side, top + side);
 
         /*
-         * The surround darkens outwards rather than switching at the window.
+         * The line, faded along its own length.
          *
-         * A flat dim with a hard edge draws a second rectangle on the screen, in
-         * competition with the frame that is meant to be the only one. Grading
-         * it — clear at the window, deepest at the edges of the picture — does
-         * the same job of saying "look here" while leaving the frame as the only
-         * line on the screen. It also stops the corner of a table card that
-         * strays outside the square from vanishing into a flat black.
+         * Strongest through the middle and gone by either end, so it reads as a
+         * beam crossing the frame rather than a bar laid across it. Its shape
+         * tapers to a point at each end as well — see `onDraw` — and the two
+         * together are what stop it looking like a drawn rule.
          */
-        float centreX = window.centerX();
-        float centreY = window.centerY();
-        float inner = side * 0.62f;
-        float outer = (float) Math.hypot(Math.max(centreX, width - centreX),
-                                         Math.max(centreY, height - centreY));
-
-        dim.setShader(new RadialGradient(
-            centreX, centreY, Math.max(outer, inner + 1f),
-            new int[] { 0x00000000, 0x59000000, 0xB8000000, 0xD9000000 },
-            new float[] { inner / outer, 0.62f, 0.86f, 1f },
-            Shader.TileMode.CLAMP));
-
         sweep.setShader(new LinearGradient(
-            0, 0, 0, 40f * density,
-            new int[] { 0x00000000, corner.getColor(), 0x00000000 },
-            null, Shader.TileMode.CLAMP));
+            window.left, 0, window.right, 0,
+            new int[] { 0x00000000, 0x66000000, 0xFF000000, 0x66000000, 0x00000000 },
+            new float[] { 0f, 0.18f, 0.5f, 0.82f, 1f },
+            Shader.TileMode.CLAMP));
+        sweep.setColorFilter(new PorterDuffColorFilter(
+            corner.getColor(), PorterDuff.Mode.SRC_IN));
 
         startSweeping();
     }
@@ -157,13 +152,31 @@ public class Viewfinder extends View {
 
         canvas.drawPath(brackets, corner);
 
-        // The line. Clipped to the window so it never runs over the corners.
+        /*
+         * The line, drawn as a lens rather than a bar.
+         *
+         * Thickest through the middle and tapering to a point at each end: two
+         * quadratic curves meeting at the left and right edges of the frame. A
+         * rectangle of uniform height read as a rule somebody had drawn across
+         * the picture; this reads as a beam passing over it, which is what it is
+         * meant to say — the scanner is looking.
+         *
+         * Clipped to the window so it never runs over the corner brackets.
+         */
         canvas.save();
         canvas.clipPath(cut);
+
         float inset = 24f * density;
         float y = window.top + inset + (window.height() - inset * 2) * progress;
-        canvas.translate(0, y - 20f * density);
-        canvas.drawRect(window.left, 0, window.right, 40f * density, sweep);
+        float thickest = 5f * density;
+
+        beam.reset();
+        beam.moveTo(window.left, y);
+        beam.quadTo(window.centerX(), y - thickest, window.right, y);
+        beam.quadTo(window.centerX(), y + thickest, window.left, y);
+        beam.close();
+        canvas.drawPath(beam, sweep);
+
         canvas.restore();
     }
 

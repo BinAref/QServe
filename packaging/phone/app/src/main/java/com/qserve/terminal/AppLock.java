@@ -40,6 +40,28 @@ final class AppLock {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+    /**
+     * Put the code this build was given in place, once, on a device that has
+     * none.
+     *
+     * The vendor's build carries a code so that the app it installs is locked
+     * the first time it opens rather than after somebody remembers to lock it.
+     * It is a starting code and not a fixed one: it is stored the same way a
+     * typed one is, and changing it in the app replaces it for good. Seeding
+     * only when nothing is set is what makes that true — otherwise every
+     * update would put the shipped code back over the chosen one.
+     *
+     * Worth saying plainly: a code compiled into an .apk can be read by anyone
+     * holding that file. This locks the app against somebody picking up the
+     * phone, which is what it is for. It is not a secret, and the licence
+     * server behind it has its own sign-in that is.
+     */
+    static void seedFromBuild(Context context, String code) {
+        if (code == null || code.length() < MIN_LENGTH) return;
+        if (isSet(context)) return;
+        set(context, code);
+    }
+
     static boolean isSet(Context context) {
         return prefs(context).getString(KEY_HASH, null) != null;
     }

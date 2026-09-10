@@ -125,8 +125,17 @@ jobs:
       # One build, two flavours: the restaurant's terminal and the vendor's
       # console. Same source — what differs is the name, which server it points
       # at, and that the vendor's asks for a code before it opens.
+      # The vendor build is told where its licence server is and what code it
+      # opens with. Both come from repository secrets rather than from the
+      # source: an .apk can be taken apart by whoever holds it, and a value
+      # written into this repository would additionally be readable by everyone
+      # who can see the repository, which is a much larger set of people.
+      # Absent, the vendor app asks for an address and ships unlocked.
       - name: Build both apps
         working-directory: packaging/phone
+        env:
+          QSERVE_VENDOR_URL: ${{ secrets.QSERVE_VENDOR_URL }}
+          QSERVE_VENDOR_CODE: ${{ secrets.QSERVE_VENDOR_CODE }}
         run: gradle --no-daemon assembleRelease
 
       - name: Name them after the version

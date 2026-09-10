@@ -312,3 +312,30 @@ you get its own menu: set or change the code, the language, the theme, sign out,
 or point the device somewhere else. The lock code in particular used to live on
 the address screen, which a device passes through once and never sees again — so
 setting a lock meant leaving the thing you wanted to lock.
+
+## What changed in 1.0.12
+
+**The scan line is a beam, not a bar.** Thickest through the middle and tapering
+to a point at each end, fading out along its own length as it goes. A rectangle
+of even height read as a rule somebody had drawn across the picture; this reads
+as a beam passing over it, which is the thing it is meant to say. The dimming
+around the frame is unchanged — it was right as it was.
+
+**The vendor's app no longer asks where to go.** A restaurant's terminal has to
+be told which restaurant it belongs to, because there are thousands of them. The
+vendor has one licence server — their own — so that screen was a question with a
+single possible answer. The address is set when the app is built, and it opens
+straight onto the console. "Point at a different server" is still there if it is
+ever needed, and still sticks.
+
+**And it opens locked.** The code is set when the app is built too, so the app is
+locked the first time it is opened rather than after somebody remembers to lock
+it. It is a starting code, not a fixed one: change it inside the app and the new
+one replaces it for good — an update will not put the shipped one back.
+
+Both are given to the build from repository secrets rather than written into the
+source. An .apk can be taken apart by anyone holding it, so a code inside one is
+never secret from whoever has the file — but writing it into a public repository
+would hand it to everyone who can read the repository as well, for nothing. What
+the lock does is stop somebody who picks up the phone. The licence server behind
+it has its own sign-in, and that one is a real secret.

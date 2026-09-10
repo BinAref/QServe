@@ -37,6 +37,20 @@ the restaurant's app is, pointed at your licence server instead. Built from the
 same source as [../phone/](../phone/) as a second flavour, with its own package
 id so a vendor testing against a restaurant can install both.
 
+### Two things the build is told
+
+| secret | what it does |
+|---|---|
+| `QSERVE_VENDOR_URL` | the address of your licence server. Set, the app opens straight onto the console — you have one server, so asking every install for its address is a question with one answer. Unset, it asks. |
+| `QSERVE_VENDOR_CODE` | the code the app opens with, in place from the first launch rather than after somebody remembers to set one. It is a starting code: changing it inside the app replaces it for good, and an update will not put this one back. |
+
+Both are **repository secrets, not values in this repository**. An .apk can be
+taken apart by anyone holding it, so a code in a build is never a secret from
+whoever has the file — but writing it into a public repository would hand it to
+everyone who can read the repository too, which is a much larger group for no
+gain. The app lock stops somebody who picks up the phone; the licence server
+behind it has its own sign-in, and that one is a real secret.
+
 It has no QR scanner: your server issues licence keys, it does not print cards.
 What it does have is an **app lock** — a code asked for every time it opens.
 That app can issue licences, and a phone gets left on a counter. The code is
