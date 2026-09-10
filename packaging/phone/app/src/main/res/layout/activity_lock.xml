@@ -1,60 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One field and one button, centred. Nothing else belongs on a lock screen:
-     everything it could show is the thing it is there to keep back. -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  The code, asked for before anything else is drawn.
+
+  The mark, the dots, and one button. Nothing else belongs on a lock screen:
+  everything it could show is the thing it is there to keep back.
+
+  The field itself is invisible and one pixel wide. It exists to hold the text
+  and raise the keyboard; what a person looks at is the row of dots, which is
+  the only question they have — how many have I pressed.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background"
-    android:fillViewport="true"
-    android:scrollbars="none">
+    android:background="@color/background">
 
     <LinearLayout
+        android:id="@+id/panel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:layout_gravity="center_vertical"
+        android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingHorizontal="32dp"
-        android:paddingVertical="48dp">
+        android:paddingHorizontal="36dp">
 
         <ImageView
-            android:layout_width="52dp"
-            android:layout_height="52dp"
+            android:id="@+id/mark"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
             android:src="@drawable/ic_brand"
             android:contentDescription="@string/app_name" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
+            android:layout_marginTop="24dp"
             android:text="@string/lock_title"
             android:textColor="@color/text"
-            android:textSize="21sp"
-            android:textStyle="bold" />
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:letterSpacing="-0.01" />
 
-        <EditText
-            android:id="@+id/code"
-            android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:layout_marginTop="26dp"
-            android:background="@drawable/bg_input"
-            android:hint="@string/lock_hint"
-            android:importantForAutofill="no"
-            android:inputType="numberPassword"
-            android:imeOptions="actionGo"
-            android:letterSpacing="0.35"
-            android:maxLength="32"
-            android:paddingHorizontal="18dp"
-            android:textAlignment="center"
-            android:textColor="@color/text"
-            android:textColorHint="@color/muted"
-            android:textCursorDrawable="@null"
-            android:textSize="20sp" />
+        <!-- What the person is actually looking at. -->
+        <com.qserve.terminal.PinDots
+            android:id="@+id/dots"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:layout_marginTop="26dp" />
 
         <TextView
             android:id="@+id/error"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="2dp"
+            android:minHeight="22dp"
             android:text="@string/lock_wrong"
             android:textAlignment="center"
             android:textColor="@color/danger"
@@ -64,13 +62,30 @@
         <Button
             android:id="@+id/unlock"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="14dp"
+            android:layout_height="58dp"
+            android:layout_marginTop="20dp"
             android:background="@drawable/bg_button_primary"
             android:text="@string/lock_unlock"
             android:textAllCaps="false"
             android:textColor="@color/primary_contrast"
             android:textSize="16sp"
             android:textStyle="bold" />
+
+        <!--
+          The real field: focusable, keyboard-raising, and invisible. Zero-sized
+          rather than `visibility=gone`, because a gone view takes no input.
+        -->
+        <EditText
+            android:id="@+id/code"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:background="@null"
+            android:importantForAutofill="no"
+            android:inputType="numberPassword"
+            android:imeOptions="actionGo|flagNoExtractUi"
+            android:maxLength="32"
+            android:textColor="@android:color/transparent"
+            android:textCursorDrawable="@null"
+            android:textSize="1sp" />
     </LinearLayout>
-</ScrollView>
+</FrameLayout>

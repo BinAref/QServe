@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Four crossings of a sine wave: out, back, out, back, still. The motion a
+     head makes saying no, which is understood before the words under it. -->
+<cycleInterpolator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:cycles="4" />

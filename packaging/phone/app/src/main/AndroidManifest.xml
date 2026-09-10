@@ -97,6 +97,7 @@
         <activity
             android:name=".ScannerActivity"
             android:exported="false"
+            android:theme="@style/Theme.QServe.Camera"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
             android:screenOrientation="portrait" />
 

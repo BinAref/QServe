@@ -253,3 +253,34 @@ a salted SHA-256 of it — and the lock screen carries `FLAG_SECURE`, so the tas
 switcher shows a blank card rather than the console behind it. Five wrong tries
 and it stops answering for half a minute. The restaurant's app has the same lock,
 switched off by default.
+
+## What changed in 1.0.10
+
+**The lock screen was rebuilt around dots.** A masked text field shows the same
+thing badly — the dots are whatever size the font makes them, and on a short code
+they are a huddle in a wide box. A code is entered by feel, glancing down, and
+the only question is "how many have I pressed". That is now answered at a size
+you can read without looking properly, each dot landing as the key does. A wrong
+code shakes them and turns them red; five wrong tries and it waits half a minute.
+
+**The QR scanner has a viewfinder.** It had none on purpose: the decoder reads
+the whole picture, so a cut-out would suggest a code has to be lined up when it
+does not. That was right about the decoder and wrong about the person — a plain
+preview gives no sign that anything is happening, and no way to tell a working
+scanner from a frozen one. So there is a frame, and the old reasoning is kept by
+what the frame does: the surround is dimmed rather than masked, the corners are
+open rather than a closed box, and a code read anywhere in the picture is still a
+code read. It aims without demanding. The line sweeping down it is there to say
+the scanner is alive, which is worth its pixels.
+
+**Dropdowns open onto the product's own surface** — a rounded sheet in the
+theme's colours rather than the platform's sharp-cornered slab — and the chevron
+turns over while the menu is open, so the control shows its own state.
+
+**And things arrive rather than being there.** The setup screen comes in from the
+mark down to the action, each block a little after the one above it, so the eye
+is led instead of meeting the whole screen at once. Screens cross-fade rather
+than slide, because the language switch and the lock are the same screen
+differently, not somewhere else. All of it is scaled by the device's own
+animation setting, so a phone with animation turned off in accessibility gets
+none of it and needs no switch here.

@@ -12,5 +12,23 @@
         <item name="android:colorAccent">@color/primary</item>
         <item name="android:colorControlActivated">@color/primary</item>
         <item name="android:textColorHighlight">@color/border_strong</item>
+        <!-- Dropdowns open onto the product's own surface, not the
+             platform's sharp-cornered slab. -->
+        <item name="android:popupMenuStyle">@style/QServePopup</item>
+        <item name="android:textAppearanceLargePopupMenu">@style/QServePopupText</item>
+        <item name="android:textAppearanceSmallPopupMenu">@style/QServePopupText</item>
+    </style>
+
+    <!--
+      The scanner. Its system bars are black whatever the theme is, because
+      what is behind them is a camera preview and a light status bar over a
+      dark kitchen is a white stripe with nothing to do with the app.
+    -->
+    <style name="Theme.QServe.Camera" parent="@style/Theme.QServe">
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

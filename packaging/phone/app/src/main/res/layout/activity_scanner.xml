@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The camera, and two pieces of text.
+  Reading a station's printed code.
 
-  Nothing is drawn over the middle of the picture: a frame or a cut-out would
-  suggest the code has to be lined up inside it, and it does not — the decoder
-  reads the whole frame. Somebody holding a table card at arm's length should
-  not also be solving an aiming puzzle.
+  The preview, a frame over it, one line of instruction and one way out. The
+  frame aims without demanding: the surround is dimmed rather than cut away and
+  the corners are open, because the decoder reads the whole picture and a code
+  held slightly outside the square is still a code read.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -17,19 +17,26 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <com.qserve.terminal.Viewfinder
+        android:id="@+id/viewfinder"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/hint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:layout_marginTop="48dp"
-        android:paddingHorizontal="32dp"
+        android:layout_marginTop="72dp"
+        android:paddingHorizontal="40dp"
         android:text="@string/scan_hint"
         android:textAlignment="center"
         android:textColor="@android:color/white"
         android:textSize="17sp"
+        android:lineSpacingMultiplier="1.3"
         android:shadowColor="@android:color/black"
-        android:shadowRadius="8"
+        android:shadowRadius="10"
         android:visibility="gone" />
 
     <Button
@@ -37,7 +44,7 @@
         android:layout_width="wrap_content"
         android:layout_height="52dp"
         android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="48dp"
+        android:layout_marginBottom="52dp"
         android:background="@drawable/bg_button_on_camera"
         android:minWidth="180dp"
         android:paddingHorizontal="28dp"

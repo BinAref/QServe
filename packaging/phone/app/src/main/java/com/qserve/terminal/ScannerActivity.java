@@ -7,6 +7,7 @@ import android.graphics.ImageFormat;
 import android.os.Bundle;
 import android.util.Size;
 import android.view.View;
+import android.view.animation.AnimationUtils;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -108,7 +109,13 @@ public class ScannerActivity extends ComponentActivity {
 
     private void startCamera() {
         TextView hint = findViewById(R.id.hint);
+        View viewfinder = findViewById(R.id.viewfinder);
+        // Both appear with the preview. Shown before it, they float on black
+        // and look like the camera has failed.
         hint.setVisibility(View.VISIBLE);
+        viewfinder.setVisibility(View.VISIBLE);
+        hint.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in));
+        viewfinder.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in));
 
         var future = ProcessCameraProvider.getInstance(this);
         future.addListener(() -> {

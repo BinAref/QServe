@@ -20,7 +20,10 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -107,6 +110,7 @@ public class TerminalActivity extends ComponentActivity {
         wireFieldActions();
         wireAppearance();
         wireLock();
+        arrive();
 
         /*
          * The vendor's build has no station codes to read: its server issues
@@ -191,8 +195,10 @@ public class TerminalActivity extends ComponentActivity {
                 open(prefs().getString(KEY_ADDRESS, scanned));
             });
 
-        scan.setOnClickListener(v ->
-            scanner.launch(new Intent(this, ScannerActivity.class)));
+        scan.setOnClickListener(v -> {
+            scanner.launch(new Intent(this, ScannerActivity.class));
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+        });
 
         connect.setOnClickListener(v -> {
             String typed = address.getText().toString().trim();
@@ -228,6 +234,28 @@ public class TerminalActivity extends ComponentActivity {
         // Pre-filling it with "http://" hid the one thing a person needed to
         // see: the shape of what they are being asked for.
         if (saved != null) open(saved);
+    }
+
+    /**
+     * The setup screen, arriving rather than being there.
+     *
+     * Each block starts a little after the one above it, so the eye is led from
+     * the mark down to the action instead of meeting the whole screen at once.
+     * The whole cascade is under half a second; past that it stops being a
+     * screen appearing and becomes a screen somebody is waiting for.
+     *
+     * Android scales every animation by the device's own animator duration —
+     * zero on a phone whose owner has turned animation off in accessibility
+     * settings — so this needs no switch of its own to respect that.
+     */
+    private void arrive() {
+        ViewGroup column = (ViewGroup) ((ViewGroup) setup).getChildAt(0);
+        for (int i = 0; i < column.getChildCount(); i += 1) {
+            Animation rise = AnimationUtils.loadAnimation(this, R.anim.rise_in);
+            // Capped, so a screen that grows a row does not grow a longer wait.
+            rise.setStartOffset(Math.min(i, 5) * 55L);
+            column.getChildAt(i).startAnimation(rise);
+        }
     }
 
     /**
@@ -327,8 +355,13 @@ public class TerminalActivity extends ComponentActivity {
         java.util.function.Consumer<String> onPick) {
 
         label.setText(naming.apply(current));
+        ownChevron(label);
         label.setOnClickListener(v -> {
+            // The chevron turns over while the menu is open: a control that
+            // shows its own state needs no second affordance beside it.
+            turnChevron(label, true);
             PopupMenu menu = new PopupMenu(this, label);
+            menu.setOnDismissListener(m -> turnChevron(label, false));
             for (int i = 0; i < values.length; i += 1) {
                 menu.getMenu().add(0, i, i, naming.apply(values[i]));
             }
@@ -347,10 +380,13 @@ public class TerminalActivity extends ComponentActivity {
      */
     private void wireLock() {
         TextView row = findViewById(R.id.lock);
+        ownChevron(row);
         paintLock(row);
 
         row.setOnClickListener(v -> {
+            turnChevron(row, true);
             PopupMenu menu = new PopupMenu(this, row);
+            menu.setOnDismissListener(m -> turnChevron(row, false));
             boolean set = AppLock.isSet(this);
             menu.getMenu().add(0, 0, 0, getString(set ? R.string.app_lock_change : R.string.app_lock_set));
             if (set) menu.getMenu().add(0, 1, 1, getString(R.string.app_lock_remove));
@@ -418,6 +454,44 @@ public class TerminalActivity extends ComponentActivity {
         else finishAffinity();
     }
 
+    /**
+     * Turn a dropdown's chevron over while its menu is open.
+     *
+     * The drawable is rotated rather than swapped for a second icon, so there
+     * is one chevron in the project and the halfway frames exist.
+     */
+    /**
+     * Give this label's chevron a state of its own.
+     *
+     * Drawables loaded from the same resource share a ConstantState, so a level
+     * set on one is set on every one — which showed as all three chevrons
+     * turning over when a single dropdown opened.  breaks the sharing,
+     * and the result has to be set back on the view to take effect.
+     */
+    private void ownChevron(TextView label) {
+        android.graphics.drawable.Drawable[] all = label.getCompoundDrawablesRelative();
+        if (all[2] == null) return;
+        label.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            all[0], all[1], all[2].mutate(), all[3]);
+    }
+
+    private void turnChevron(TextView label, boolean open) {
+        android.graphics.drawable.Drawable[] all = label.getCompoundDrawablesRelative();
+        android.graphics.drawable.Drawable chevron = all[2];
+        if (chevron == null) return;
+
+        android.animation.ValueAnimator turn = android.animation.ValueAnimator.ofFloat(
+            open ? 0f : 180f, open ? 180f : 0f);
+        turn.setDuration(180);
+        turn.addUpdateListener(a -> {
+            // Level is 0..10000 over a full turn; the drawable is wrapped in a
+            // rotate so the level drives the angle.
+            float degrees = (float) a.getAnimatedValue();
+            chevron.setLevel((int) (degrees / 360f * 10000f));
+        });
+        turn.start();
+    }
+
     /** Draw this screen again under the new language or theme. */
     private void restart() {
         Intent again = new Intent(this, TerminalActivity.class);
@@ -425,8 +499,9 @@ public class TerminalActivity extends ComponentActivity {
         again.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         finish();
         startActivity(again);
-        // No slide: it is the same screen, in another language or another shade.
-        overridePendingTransition(0, 0);
+        // The same screen in another language or another shade, so it dissolves
+        // rather than sliding in from somewhere it did not come from.
+        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
     }
 
     /**

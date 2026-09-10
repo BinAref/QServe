@@ -16,6 +16,11 @@
         <item name="android:colorAccent">@color/primary</item>
         <item name="android:colorControlActivated">@color/primary</item>
         <item name="android:textColorHighlight">@color/border_strong</item>
+        <!-- Dropdowns open onto the product's own surface, not the
+             platform's sharp-cornered slab. -->
+        <item name="android:popupMenuStyle">@style/QServePopup</item>
+        <item name="android:textAppearanceLargePopupMenu">@style/QServePopupText</item>
+        <item name="android:textAppearanceSmallPopupMenu">@style/QServePopupText</item>
         <!-- Dark icons in the status bar, because the bar is now light. The
              night variant leaves these out and gets light icons. -->
         <item name="android:windowLightStatusBar">true</item>
@@ -47,5 +52,29 @@
         <item name="android:layout_marginBottom">6dp</item>
         <item name="android:textColor">@color/muted</item>
         <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="QServePopup" parent="@android:style/Widget.Material.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_popup</item>
+        <item name="android:popupElevation">14dp</item>
+        <item name="android:overlapAnchor">false</item>
+    </style>
+
+    <style name="QServePopupText" parent="@android:style/TextAppearance.Material.Widget.PopupMenu.Large">
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <!--
+      The scanner. Its system bars are black whatever the theme is, because
+      what is behind them is a camera preview and a light status bar over a
+      dark kitchen is a white stripe with nothing to do with the app.
+    -->
+    <style name="Theme.QServe.Camera" parent="@style/Theme.QServe">
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>
