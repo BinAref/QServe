@@ -34,4 +34,21 @@
     <string name="follow_device">Sistem</string>
     <string name="theme_light">Açık</string>
     <string name="theme_dark">Koyu</string>
+    <string name="lock_title">Kodunuzu girin</string>
+    <string name="lock_hint">Kod</string>
+    <string name="lock_unlock">Kilidi aç</string>
+    <string name="lock_wrong">Bu kod doğru değil</string>
+    <string name="lock_too_many">Çok fazla deneme. Biraz bekleyin.</string>
+    <string name="app_lock">Uygulama kilidi</string>
+    <string name="app_lock_off">Kapalı</string>
+    <string name="app_lock_on">Açık</string>
+    <string name="app_lock_set">Bir kod belirleyin</string>
+    <string name="app_lock_change">Kodu değiştir</string>
+    <string name="app_lock_remove">Kilidi kaldır</string>
+    <string name="app_lock_hint">Uygulama her açıldığında sorulur.</string>
+    <string name="app_lock_too_short">En az 4 karakter kullanın</string>
+    <string name="app_lock_saved">Uygulama kilidi açık</string>
+    <string name="app_lock_removed">Uygulama kilidi kapalı</string>
+    <string name="cancel">İptal</string>
+    <string name="save">Kaydet</string>
 </resources>

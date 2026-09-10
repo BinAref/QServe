@@ -12,7 +12,10 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
+import android.app.AlertDialog;
 import android.os.Bundle;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -26,6 +29,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -64,6 +68,9 @@ public class TerminalActivity extends ComponentActivity {
      */
     private static final String EXTRA_SHOW_SETUP = "show_setup";
 
+    /** The lock screen, answered before anything behind it is drawn. */
+    private static final int UNLOCK_REQUEST = 21;
+
     private WebView web;
     private View setup;
     private EditText address;
@@ -99,6 +106,18 @@ public class TerminalActivity extends ComponentActivity {
 
         wireFieldActions();
         wireAppearance();
+        wireLock();
+
+        /*
+         * The vendor's build has no station codes to read: its server issues
+         * licences, it does not print QR cards. Offering a camera button that
+         * can only ever fail is worse than offering nothing.
+         */
+        if (BuildConfig.BUILD_FOR_VENDOR) {
+            scan.setVisibility(View.GONE);
+            // "or type it" with nothing above it to be an alternative to.
+            findViewById(R.id.or_divider).setVisibility(View.GONE);
+        }
 
         // A kitchen screen that sleeps is a kitchen screen that misses a
         // ticket, and a table's menu that sleeps mid-order loses the order.
@@ -186,6 +205,14 @@ public class TerminalActivity extends ComponentActivity {
             open(url);
         });
 
+        // Nothing behind the lock is drawn until it is answered.
+        if (LockActivity.guard(this, UNLOCK_REQUEST)) return;
+
+        openWhatWeKnow();
+    }
+
+    /** Once past the lock, if there is one: a scanned code, or what was saved. */
+    private void openWhatWeKnow() {
         // A scanned code wins over anything remembered: somebody pointing a
         // camera at a station's code is telling this device where it belongs.
         if (openFromIntent(getIntent())) return;
@@ -313,6 +340,82 @@ public class TerminalActivity extends ComponentActivity {
             });
             menu.show();
         });
+    }
+
+    /**
+     * The app lock row: what it is now, and the three things you can do to it.
+     */
+    private void wireLock() {
+        TextView row = findViewById(R.id.lock);
+        paintLock(row);
+
+        row.setOnClickListener(v -> {
+            PopupMenu menu = new PopupMenu(this, row);
+            boolean set = AppLock.isSet(this);
+            menu.getMenu().add(0, 0, 0, getString(set ? R.string.app_lock_change : R.string.app_lock_set));
+            if (set) menu.getMenu().add(0, 1, 1, getString(R.string.app_lock_remove));
+
+            menu.setOnMenuItemClickListener(item -> {
+                if (item.getItemId() == 1) {
+                    AppLock.set(this, null);
+                    paintLock(row);
+                    Toast.makeText(this, R.string.app_lock_removed, Toast.LENGTH_SHORT).show();
+                } else {
+                    askForNewCode(row);
+                }
+                return true;
+            });
+            menu.show();
+        });
+    }
+
+    private void paintLock(TextView row) {
+        row.setText(AppLock.isSet(this) ? R.string.app_lock_on : R.string.app_lock_off);
+    }
+
+    /**
+     * A dialog with one box in it.
+     *
+     * Deliberately not a "confirm the code" second box: a code short enough to
+     * type one-handed is short enough to read back, and the person setting it is
+     * the person who will type it next.
+     */
+    private void askForNewCode(TextView row) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setHint(R.string.lock_hint);
+        input.setFilters(new InputFilter[] { new InputFilter.LengthFilter(AppLock.MAX_LENGTH) });
+
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        FrameLayout frame = new FrameLayout(this);
+        frame.setPadding(pad, pad / 2, pad, 0);
+        frame.addView(input);
+
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.app_lock)
+            .setMessage(R.string.app_lock_hint)
+            .setView(frame)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.save, (dialog, which) -> {
+                String code = input.getText().toString();
+                if (code.length() < AppLock.MIN_LENGTH) {
+                    Toast.makeText(this, R.string.app_lock_too_short, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                AppLock.set(this, code);
+                paintLock(row);
+                Toast.makeText(this, R.string.app_lock_saved, Toast.LENGTH_SHORT).show();
+            })
+            .show();
+    }
+
+    /** The lock screen answered — or backed out of, which closes the app. */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != UNLOCK_REQUEST) return;
+        if (resultCode == RESULT_OK) openWhatWeKnow();
+        else finishAffinity();
     }
 
     /** Draw this screen again under the new language or theme. */

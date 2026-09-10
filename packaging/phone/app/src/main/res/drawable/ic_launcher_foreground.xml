@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The same QR-square mark the console wears, drawn as a vector so it is one
-     file at every density. -->
+<!-- The same cover-and-menu mark as `ic_brand`, on the 108dp adaptive grid with
+     the 18dp safe margin the launcher masks into a circle or a squircle. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -9,8 +9,14 @@
 
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M32,32h14v14h-14z M62,32h14v14h-14z M32,62h14v14h-14z" />
+        android:fillAlpha="0.95"
+        android:pathData="M38,36h32a5,5 0 0 1 5,5v8H33v-8a5,5 0 0 1 5,-5z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M62,62h6v6h-6z M72,62h4v4h-4z M62,72h4v4h-4z M70,70h6v6h-6z" />
+        android:fillAlpha="0.7"
+        android:pathData="M36,56h36a2.5,2.5 0 0 1 0,5h-36a2.5,2.5 0 0 1 0,-5z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.48"
+        android:pathData="M36,67h24a2.5,2.5 0 0 1 0,5h-24a2.5,2.5 0 0 1 0,-5z" />
 </vector>

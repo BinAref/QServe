@@ -103,7 +103,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    name: Android terminal
+    name: Android apps
     needs: check
     runs-on: ubuntu-latest
     steps:
@@ -122,22 +122,30 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Build the APK
+      # One build, two flavours: the restaurant's terminal and the vendor's
+      # console. Same source — what differs is the name, which server it points
+      # at, and that the vendor's asks for a code before it opens.
+      - name: Build both apps
         working-directory: packaging/phone
         run: gradle --no-daemon assembleRelease
 
-      - name: Name it after the version
+      - name: Name them after the version
         shell: bash
         run: |
           version=$(node -p "require('./package.json').version")
-          mkdir -p dist/phone
-          cp packaging/phone/app/build/outputs/apk/release/app-release.apk \
+          mkdir -p dist/phone dist/developer
+          cp packaging/phone/app/build/outputs/apk/restaurant/release/app-restaurant-release.apk \
              "dist/phone/QServe-Terminal-${version}.apk"
+          # With the vendor's other things, because that is who it is for.
+          cp packaging/phone/app/build/outputs/apk/developer/release/app-developer-release.apk \
+             "dist/developer/QServe-Vendor-Terminal-${version}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: dist/phone/*.apk
+          path: |
+            dist/phone/*.apk
+            dist/developer/*.apk
           if-no-files-found: error
 
   publish:

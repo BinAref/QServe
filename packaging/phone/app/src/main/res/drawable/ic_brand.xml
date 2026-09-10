@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The product's mark, and the same one the console wears.
+
+  The app had been showing its launcher icon here — a plain circle of QR squares
+  — while every web screen the same restaurant opens shows this: a serving cover
+  over two lines of a menu. Two marks for one product is one too many, and the
+  setup screen is the one place a person sees both within a minute of each other.
+
+  Drawn on the tile rather than beside it, so it needs no background of its own
+  and reads at 56dp without a container.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+
+    <path
+        android:fillColor="@color/primary"
+        android:pathData="M14,0h36a14,14 0 0 1 14,14v36a14,14 0 0 1 -14,14h-36a14,14 0 0 1 -14,-14v-36a14,14 0 0 1 14,-14z" />
+
+    <!-- The cover. -->
+    <path
+        android:fillColor="@color/primary_contrast"
+        android:fillAlpha="0.92"
+        android:pathData="M20,18h24a4,4 0 0 1 4,4v6H16v-6a4,4 0 0 1 4,-4z" />
+    <!-- Two lines of a menu under it, the second shorter, as a list is. -->
+    <path
+        android:fillColor="@color/primary_contrast"
+        android:fillAlpha="0.66"
+        android:pathData="M18,33h28a2,2 0 0 1 0,4h-28a2,2 0 0 1 0,-4z" />
+    <path
+        android:fillColor="@color/primary_contrast"
+        android:fillAlpha="0.44"
+        android:pathData="M18,41h18a2,2 0 0 1 0,4h-18a2,2 0 0 1 0,-4z" />
+</vector>

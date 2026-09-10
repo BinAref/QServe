@@ -34,4 +34,21 @@
     <string name="follow_device">حسب الجهاز</string>
     <string name="theme_light">فاتح</string>
     <string name="theme_dark">داكن</string>
+    <string name="lock_title">أدخل رمزك</string>
+    <string name="lock_hint">الرمز</string>
+    <string name="lock_unlock">فتح</string>
+    <string name="lock_wrong">الرمز غير صحيح</string>
+    <string name="lock_too_many">محاولات كثيرة. انتظر قليلاً.</string>
+    <string name="app_lock">قفل التطبيق</string>
+    <string name="app_lock_off">مُطفأ</string>
+    <string name="app_lock_on">مُفعَّل</string>
+    <string name="app_lock_set">ضع رمزاً</string>
+    <string name="app_lock_change">غيّر الرمز</string>
+    <string name="app_lock_remove">أزل القفل</string>
+    <string name="app_lock_hint">يُطلب في كل مرة يُفتح فيها التطبيق.</string>
+    <string name="app_lock_too_short">استخدم ٤ خانات على الأقل</string>
+    <string name="app_lock_saved">قفل التطبيق مُفعَّل</string>
+    <string name="app_lock_removed">قفل التطبيق مُطفأ</string>
+    <string name="cancel">إلغاء</string>
+    <string name="save">حفظ</string>
 </resources>

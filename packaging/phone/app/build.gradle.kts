@@ -7,14 +7,47 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.qserve.terminal"
         // Android 8 and up: the adaptive launcher icon is one vector rather
         // than five bitmaps, and every tablet a restaurant is likely to buy
         // second-hand today is past it.
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.0.8"
+        versionCode = 10
+        versionName = "1.0.9"
+    }
+
+    buildFeatures {
+        // For BUILD_FOR_VENDOR below. Off by default since AGP 8.
+        buildConfig = true
+    }
+
+    /*
+     * Two apps, one source.
+     *
+     * A restaurant's phone and the vendor's phone do the same job — a window
+     * onto a QServe server, remembered, with a QR scanner and a clipboard the
+     * page cannot have for itself. What differs is which server, what it is
+     * called, and that the vendor's holds the power to issue licences and so
+     * asks for a code before it opens.
+     *
+     * Flavours rather than a second project: everything that is the same stays
+     * the same file, and the differences are a handful of strings and one
+     * boolean. Two separate codebases would have drifted by the second change.
+     */
+    flavorDimensions += "audience"
+    productFlavors {
+        create("restaurant") {
+            dimension = "audience"
+            applicationId = "com.qserve.terminal"
+            buildConfigField("boolean", "BUILD_FOR_VENDOR", "false")
+        }
+        create("developer") {
+            dimension = "audience"
+            // A different id on purpose: a vendor testing against a restaurant
+            // installs both, and one must not replace the other.
+            applicationId = "com.qserve.vendor"
+            buildConfigField("boolean", "BUILD_FOR_VENDOR", "true")
+        }
     }
 
     buildTypes {
@@ -50,8 +83,7 @@ android {
  * on: a restaurant with its router unplugged still opens for lunch.
  */
 dependencies {
-    // A lifecycle owner, which is what CameraX binds a camera to. The activity
-    // was a bare android.app.Activity and had no lifecycle to offer.
+    // A lifecycle owner, which is what CameraX binds a camera to.
     implementation("androidx.activity:activity:1.9.3")
 
     // The camera. `camera-view` carries PreviewView, which handles the parts of

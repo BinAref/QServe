@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">كيوسيرف — المطوّر</string>
+    <string name="address_title">وجّه هذا الجهاز إلى خادم التراخيص</string>
+    <string name="address_intro">عنوان خادم التراخيص الخاص بك — الذي يُصدر مفاتيح الترخيص. سيتذكره هذا الجهاز.</string>
+    <string name="address_hint">licences.example.com:8090</string>
+    <string name="address_needed">أدخل عنوان خادم التراخيص.</string>
+    <string name="unreachable_title">تعذّر الوصول إلى خادم التراخيص</string>
+    <string name="unreachable_body">هذا الجهاز ليس على شبكة خادم التراخيص، أو أن الخادم متوقّف.</string>
+    <string name="address_needs">يجب أن يكون خادم التراخيص يعمل ويمكن الوصول إليه من هذا الجهاز. وهو الجزء الوحيد من كيوسيرف الذي يحتاج الإنترنت.</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">QServe Vendor</string>
+    <string name="address_title">Bu cihazı lisans sunucunuza yönlendirin</string>
+    <string name="address_intro">Lisans anahtarlarını veren QServe Vendor sunucunuzun adresi. Bu cihaz adresi hatırlar.</string>
+    <string name="address_hint">licences.example.com:8090</string>
+    <string name="address_needed">Lisans sunucunuzun adresini girin.</string>
+    <string name="unreachable_title">Lisans sunucusuna ulaşılamıyor</string>
+    <string name="unreachable_body">Bu cihaz lisans sunucusuyla aynı ağda değil ya da sunucu çalışmıyor.</string>
+    <string name="address_needs">Lisans sunucunuz çalışıyor ve bu cihazdan erişilebilir olmalıdır. QServe içinde internete ihtiyaç duyan tek parça budur.</string>
+</resources>

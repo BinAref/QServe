@@ -1,10 +1,10 @@
-# phone — the Android app
+# phone — the Android apps
 
 A window onto the restaurant's own server, for the restaurant's own devices: a
 kitchen tablet, a waiter's phone, a tablet propped on a table.
 
 ```
-npm run build:phone     # -> packaging/phone/app/build/outputs/apk/release/
+npm run build:phone     # both flavours -> app/build/outputs/apk/{restaurant,developer}/
 ```
 
 Needs the Android SDK and JDK 17. It holds no restaurant data at all — no

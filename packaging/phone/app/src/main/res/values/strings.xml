@@ -52,4 +52,22 @@
     <string name="follow_device">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="brand_name" translatable="false">QServe</string>
+    <string name="lock_title">Enter your code</string>
+    <string name="lock_hint">Code</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_wrong">That code is not right</string>
+    <string name="lock_too_many">Too many tries. Wait a moment.</string>
+    <string name="app_lock">App lock</string>
+    <string name="app_lock_off">Off</string>
+    <string name="app_lock_on">On</string>
+    <string name="app_lock_set">Set a code</string>
+    <string name="app_lock_change">Change the code</string>
+    <string name="app_lock_remove">Remove the lock</string>
+    <string name="app_lock_hint">Asked for every time this app opens.</string>
+    <string name="app_lock_too_short">Use at least 4 characters</string>
+    <string name="app_lock_saved">App lock is on</string>
+    <string name="app_lock_removed">App lock is off</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
 </resources>

@@ -80,6 +80,19 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The code, asked for before anything else is drawn.
+
+          `excludeFromRecents` is false on purpose — it is the terminal that
+          appears in the task switcher, and this screen carries FLAG_SECURE so
+          the switcher shows a blank card rather than the console behind it.
+        -->
+        <activity
+            android:name=".LockActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
+            android:windowSoftInputMode="adjustResize|stateVisible" />
+
         <!-- The camera, borrowed for as long as it takes to read one code. -->
         <activity
             android:name=".ScannerActivity"

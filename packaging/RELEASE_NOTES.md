@@ -224,3 +224,32 @@ offering Arabic and English, with Arabic as its own default:
 It never widens what the restaurant offers: a device asking for a language that
 has been switched off gets the restaurant's default, and a language chosen by
 hand on a device still wins over all of it.
+
+## What changed in 1.0.9
+
+**The setup screen was redrawn.** It wore the product's own mark for the first
+time — the serving cover over two lines of a menu that every web screen shows —
+instead of a circle of QR squares that agreed with nothing. The mark now sits
+beside the name rather than floating alone, because a logo with nothing next to
+it is decoration and a logo with its name is identification.
+
+The screen was three stacked rectangles of equal weight, and an eye had to read
+all three to find the one that mattered. There is one now: **Scan** is a filled
+pill, nothing else on the screen is that shape, and Connect is plain text under
+the box. The card lost its border and gained a shadow — it had been an outline
+inside an outline inside an outline — and the only border left is on the one
+thing that has to say "type here".
+
+**The vendor has a phone app.** `QServe-Vendor-Terminal-<version>.apk`: the same
+window onto a QServe server, pointed at your licence server. Built from the same
+source as the restaurant's, with its own package id so you can install both, its
+own name and words, and no QR scanner — your server issues keys, it does not
+print cards.
+
+**And that app can be locked with a code.** Asked for every time it opens, before
+anything behind it is drawn. It matters most there: that app can issue licences,
+and a phone gets left on a counter. The code is never stored — what is stored is
+a salted SHA-256 of it — and the lock screen carries `FLAG_SECURE`, so the task
+switcher shows a blank card rather than the console behind it. Five wrong tries
+and it stops answering for half a minute. The restaurant's app has the same lock,
+switched off by default.
