@@ -3,9 +3,9 @@ package com.qserve.terminal;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.RadialGradient;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -49,8 +49,6 @@ public class Viewfinder extends View {
         super(context, attrs);
         density = getResources().getDisplayMetrics().density;
 
-        dim.setColor(Color.parseColor("#A6000000"));
-
         corner.setStyle(Paint.Style.STROKE);
         corner.setStrokeWidth(4f * density);
         corner.setStrokeCap(Paint.Cap.ROUND);
@@ -71,6 +69,28 @@ public class Viewfinder extends View {
         float left = (width - side) / 2f;
         float top = (height - side) / 2f - height * 0.06f;
         window.set(left, top, left + side, top + side);
+
+        /*
+         * The surround darkens outwards rather than switching at the window.
+         *
+         * A flat dim with a hard edge draws a second rectangle on the screen, in
+         * competition with the frame that is meant to be the only one. Grading
+         * it — clear at the window, deepest at the edges of the picture — does
+         * the same job of saying "look here" while leaving the frame as the only
+         * line on the screen. It also stops the corner of a table card that
+         * strays outside the square from vanishing into a flat black.
+         */
+        float centreX = window.centerX();
+        float centreY = window.centerY();
+        float inner = side * 0.62f;
+        float outer = (float) Math.hypot(Math.max(centreX, width - centreX),
+                                         Math.max(centreY, height - centreY));
+
+        dim.setShader(new RadialGradient(
+            centreX, centreY, Math.max(outer, inner + 1f),
+            new int[] { 0x00000000, 0x59000000, 0xB8000000, 0xD9000000 },
+            new float[] { inner / outer, 0.62f, 0.86f, 1f },
+            Shader.TileMode.CLAMP));
 
         sweep.setShader(new LinearGradient(
             0, 0, 0, 40f * density,

@@ -2,17 +2,22 @@
 <!--
   What the vendor's build calls itself and what it says.
 
-  Everything else — the layout, the scanner, the clipboard, the lock, both
-  themes, all three languages — is the same source as the restaurant's build.
-  Only the words that would be wrong for this audience are replaced here.
+  Everything else — the layout, the clipboard, the lock, both themes, all three
+  languages — is the same source as the restaurant's build. Only the words that
+  would be wrong for this audience are replaced here.
 -->
 <resources>
     <string name="app_name">QServe Vendor</string>
+
     <string name="address_title">Point this device at your licence server</string>
-    <string name="address_intro">The address of your QServe Vendor server — the one that issues licence keys. This device remembers it.</string>
-    <string name="address_hint">licences.example.com:8090</string>
+    <!-- The two questions somebody has in front of this box, answered in the
+         order they have them: what do I type, and how do I get in. -->
+    <string name="address_intro">Type the address of the computer running QServe Vendor — its name or its IP, and the port, like 192.168.1.5:8090. This device remembers it, so you type it once.</string>
+    <string name="address_hint">192.168.1.5:8090</string>
     <string name="address_needed">Enter the address of your licence server.</string>
+
     <string name="unreachable_title">Cannot reach the licence server</string>
     <string name="unreachable_body">This device is not on the same network as the licence server, or it is not running.</string>
-    <string name="address_needs">Your licence server has to be running and reachable from this device. It is the only part of QServe that needs the internet.</string>
+
+    <string name="address_needs">You sign in on the next screen with the developer account your licence server created the first time it ran. Its password was written once to the log on that computer: QServe Vendor → logs → vendor.log. Signing in lasts twelve hours and survives closing this app.</string>
 </resources>

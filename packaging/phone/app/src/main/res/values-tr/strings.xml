@@ -51,4 +51,9 @@
     <string name="app_lock_removed">Uygulama kilidi kapalı</string>
     <string name="cancel">İptal</string>
     <string name="save">Kaydet</string>
+    <string name="station_menu">Bu cihaz</string>
+    <string name="sign_out">Çıkış yap</string>
+    <string name="change_address">Başka bir sunucuya yönlendir</string>
+    <string name="stay_here">Burada kal</string>
+    <string name="signed_out">Çıkış yapıldı</string>
 </resources>

@@ -268,25 +268,6 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!--
-              A code asked for every time this app opens.
-
-              Optional on a restaurant's phone and the point of the vendor's:
-              that build can issue licences, and a phone gets left on a counter.
-            -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="vertical">
-
-                <TextView style="@style/FieldLabel" android:text="@string/app_lock" />
-
-                <TextView
-                    android:id="@+id/lock"
-                    style="@style/Dropdown"
-                    android:drawableEnd="@drawable/ic_chevron" />
-            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 </FrameLayout>

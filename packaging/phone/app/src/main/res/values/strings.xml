@@ -70,4 +70,9 @@
     <string name="app_lock_removed">App lock is off</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
+    <string name="station_menu">This device</string>
+    <string name="sign_out">Sign out</string>
+    <string name="change_address">Point at a different server</string>
+    <string name="stay_here">Stay here</string>
+    <string name="signed_out">Signed out</string>
 </resources>

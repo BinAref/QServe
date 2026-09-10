@@ -284,3 +284,31 @@ than slide, because the language switch and the lock are the same screen
 differently, not somewhere else. All of it is scaled by the device's own
 animation setting, so a phone with animation turned off in accessibility gets
 none of it and needs no switch here.
+
+## What changed in 1.0.11
+
+**The scanner darkens gradually.** The dim outside the frame had a hard edge,
+which drew a second rectangle on the screen competing with the one that was
+meant to be the only one. It now grades outwards — clear at the frame, deepest
+at the edges of the picture — which says "look here" just as well and leaves the
+corner brackets as the only line on screen. A table card that strays outside the
+square no longer vanishes into flat black either.
+
+**The vendor app now says what to type and how to sign in.** It asked for an
+address and left the two obvious questions unanswered. It says both now: type
+the name or IP of the computer running QServe Vendor and its port, then sign in
+on the next screen with the developer account that server made the first time it
+ran — whose password it wrote once to its own log. It also opens the console
+outright rather than relying on the server's redirect.
+
+**Signing in survives closing the app.** The vendor console issues a session
+that lasts twelve hours, but a WebView keeps cookies in memory and only writes
+them out when told, so every return to the app meant signing in again. It is
+written to disk now, which is what the server intended all along.
+
+**And there is a way to sign out** — with the rest of this device's settings,
+which have moved inside the app. Press back at the first page of a station and
+you get its own menu: set or change the code, the language, the theme, sign out,
+or point the device somewhere else. The lock code in particular used to live on
+the address screen, which a device passes through once and never sees again — so
+setting a lock meant leaving the thing you wanted to lock.

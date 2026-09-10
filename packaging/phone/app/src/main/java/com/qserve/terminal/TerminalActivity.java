@@ -38,6 +38,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
+import androidx.annotation.Nullable;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
@@ -109,7 +110,6 @@ public class TerminalActivity extends ComponentActivity {
 
         wireFieldActions();
         wireAppearance();
-        wireLock();
         arrive();
 
         /*
@@ -153,6 +153,20 @@ public class TerminalActivity extends ComponentActivity {
          * re-checks the page asking. Android also shows its own "pasted from
          * clipboard" notice, which is right — the person should see it.
          */
+        /*
+         * Keep the sign-in across a close.
+         *
+         * The vendor console hands out a session cookie with a twelve-hour life
+         * — a real expiry, not a session cookie — so it is meant to outlive the
+         * window it was issued in. A WebView holds cookies in memory and only
+         * writes them out when asked, so without the flush below a vendor would
+         * be signing in again every time they came back to the app, which is
+         * not what the server intended and not what anybody wants.
+         */
+        android.webkit.CookieManager cookies = android.webkit.CookieManager.getInstance();
+        cookies.setAcceptCookie(true);
+        cookies.setAcceptThirdPartyCookies(web, false);
+
         web.addJavascriptInterface(new ClipboardBridge(), "QServeNative");
 
         web.setWebViewClient(new WebViewClient() {
@@ -376,47 +390,13 @@ public class TerminalActivity extends ComponentActivity {
     }
 
     /**
-     * The app lock row: what it is now, and the three things you can do to it.
-     */
-    private void wireLock() {
-        TextView row = findViewById(R.id.lock);
-        ownChevron(row);
-        paintLock(row);
-
-        row.setOnClickListener(v -> {
-            turnChevron(row, true);
-            PopupMenu menu = new PopupMenu(this, row);
-            menu.setOnDismissListener(m -> turnChevron(row, false));
-            boolean set = AppLock.isSet(this);
-            menu.getMenu().add(0, 0, 0, getString(set ? R.string.app_lock_change : R.string.app_lock_set));
-            if (set) menu.getMenu().add(0, 1, 1, getString(R.string.app_lock_remove));
-
-            menu.setOnMenuItemClickListener(item -> {
-                if (item.getItemId() == 1) {
-                    AppLock.set(this, null);
-                    paintLock(row);
-                    Toast.makeText(this, R.string.app_lock_removed, Toast.LENGTH_SHORT).show();
-                } else {
-                    askForNewCode(row);
-                }
-                return true;
-            });
-            menu.show();
-        });
-    }
-
-    private void paintLock(TextView row) {
-        row.setText(AppLock.isSet(this) ? R.string.app_lock_on : R.string.app_lock_off);
-    }
-
-    /**
      * A dialog with one box in it.
      *
      * Deliberately not a "confirm the code" second box: a code short enough to
      * type one-handed is short enough to read back, and the person setting it is
      * the person who will type it next.
      */
-    private void askForNewCode(TextView row) {
+    private void askForNewCode() {
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         input.setHint(R.string.lock_hint);
@@ -439,7 +419,6 @@ public class TerminalActivity extends ComponentActivity {
                     return;
                 }
                 AppLock.set(this, code);
-                paintLock(row);
                 Toast.makeText(this, R.string.app_lock_saved, Toast.LENGTH_SHORT).show();
             })
             .show();
@@ -562,11 +541,25 @@ public class TerminalActivity extends ComponentActivity {
         return here != null && here.equals(there);
     }
 
+    /**
+     * Where a typed address actually leads.
+     *
+     * The licence server answers its console at /admin and redirects / to it,
+     * so a bare address works — but only by a redirect, and only for the root.
+     * Asking for the console outright means a vendor who typed an address with
+     * a path on the end still lands on the console rather than on whatever
+     * they typed.
+     */
+    private String consoleUrl(String base) {
+        if (!BuildConfig.BUILD_FOR_VENDOR) return base;
+        return base.endsWith("/admin") ? base : base + "/admin";
+    }
+
     private void open(String url) {
         setup.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
         loadedHost = hostOf(url);
-        web.loadUrl(url);
+        web.loadUrl(consoleUrl(url));
 
         /*
          * From here the device is a station, and a station has to keep
@@ -600,20 +593,123 @@ public class TerminalActivity extends ComponentActivity {
         TerminalService.stop(this);
     }
 
+    /** Written to disk here, because a process can be killed without warning. */
+    @Override
+    protected void onPause() {
+        super.onPause();
+        android.webkit.CookieManager.getInstance().flush();
+    }
+
     @Override
     public void onBackPressed() {
         // Back inside the restaurant's own pages behaves as it does in a
-        // browser; back at the first page returns to the address form rather
+        // browser; back at the first page opens this station's own menu rather
         // than dropping a member of staff onto their home screen mid-service.
         if (web.getVisibility() == View.VISIBLE && web.canGoBack()) {
             web.goBack();
             return;
         }
         if (web.getVisibility() == View.VISIBLE) {
-            showSetup(false);
+            openStationMenu();
             return;
         }
         super.onBackPressed();
+    }
+
+    /**
+     * The app's own settings, from inside the app.
+     *
+     * These used to live only on the address screen, which is a screen a device
+     * passes through once and then never sees again — so setting a lock code
+     * meant signing out of the thing you wanted to lock. They are on the back
+     * press now, which is the one gesture everybody already knows, and nothing
+     * floats over the restaurant's own pages to get at them.
+     */
+    private void openStationMenu() {
+        boolean locked = AppLock.isSet(this);
+
+        CharSequence[] choices = {
+            getString(locked ? R.string.app_lock_change : R.string.app_lock_set),
+            getString(R.string.app_lock_remove),
+            getString(R.string.language),
+            getString(R.string.theme),
+            getString(R.string.sign_out),
+            getString(R.string.change_address),
+        };
+        // Removing a lock that is not set is not an option worth offering.
+        boolean[] shown = { true, locked, true, true, true, true };
+
+        java.util.List<CharSequence> visible = new java.util.ArrayList<>();
+        java.util.List<Integer> actions = new java.util.ArrayList<>();
+        for (int i = 0; i < choices.length; i += 1) {
+            if (!shown[i]) continue;
+            visible.add(choices[i]);
+            actions.add(i);
+        }
+
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.station_menu)
+            .setItems(visible.toArray(new CharSequence[0]), (dialog, which) -> {
+                switch (actions.get(which)) {
+                    case 0 -> askForNewCode();
+                    case 1 -> {
+                        AppLock.set(this, null);
+                        Toast.makeText(this, R.string.app_lock_removed, Toast.LENGTH_SHORT).show();
+                    }
+                    case 2 -> pickFrom(Appearance.LANGUAGES, Appearance.language(this),
+                        this::languageName, chosen -> {
+                            Appearance.setLanguage(this, chosen);
+                            restart();
+                        });
+                    case 3 -> pickFrom(Appearance.THEMES, Appearance.theme(this),
+                        this::themeName, chosen -> {
+                            Appearance.setTheme(this, chosen);
+                            restart();
+                        });
+                    case 4 -> signOut();
+                    case 5 -> showSetup(false);
+                    default -> { }
+                }
+            })
+            .setNegativeButton(R.string.stay_here, null)
+            .show();
+    }
+
+    /** The same list a dropdown offers, as a dialog, for use away from one. */
+    private void pickFrom(
+        String[] values, String current,
+        java.util.function.Function<String, String> naming,
+        java.util.function.Consumer<String> onPick) {
+
+        CharSequence[] names = new CharSequence[values.length];
+        int checked = 0;
+        for (int i = 0; i < values.length; i += 1) {
+            names[i] = naming.apply(values[i]);
+            if (values[i].equals(current)) checked = i;
+        }
+        new AlertDialog.Builder(this)
+            .setSingleChoiceItems(names, checked, (dialog, which) -> {
+                dialog.dismiss();
+                if (!values[which].equals(current)) onPick.accept(values[which]);
+            })
+            .show();
+    }
+
+    /**
+     * Forget who this device was signed in as, and go back to the address.
+     *
+     * The session lives in a cookie the server set, so signing out means
+     * clearing cookies rather than telling the page to — a page that has already
+     * failed to load cannot be asked to sign anything out. The address itself is
+     * kept: signing out of a station is not the same as forgetting where it is.
+     */
+    private void signOut() {
+        android.webkit.CookieManager cookies = android.webkit.CookieManager.getInstance();
+        cookies.removeAllCookies(ignored -> cookies.flush());
+        web.clearHistory();
+        web.loadUrl("about:blank");
+        showSetup(false);
+        Toast.makeText(this, R.string.signed_out, Toast.LENGTH_SHORT).show();
     }
 
     /**

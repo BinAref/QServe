@@ -51,4 +51,9 @@
     <string name="app_lock_removed">قفل التطبيق مُطفأ</string>
     <string name="cancel">إلغاء</string>
     <string name="save">حفظ</string>
+    <string name="station_menu">هذا الجهاز</string>
+    <string name="sign_out">تسجيل الخروج</string>
+    <string name="change_address">وجّهه إلى خادم آخر</string>
+    <string name="stay_here">ابقَ هنا</string>
+    <string name="signed_out">تم تسجيل الخروج</string>
 </resources>

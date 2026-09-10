@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">QServe Vendor</string>
+
     <string name="address_title">Bu cihazı lisans sunucunuza yönlendirin</string>
-    <string name="address_intro">Lisans anahtarlarını veren QServe Vendor sunucunuzun adresi. Bu cihaz adresi hatırlar.</string>
-    <string name="address_hint">licences.example.com:8090</string>
+    <string name="address_intro">QServe Vendor çalıştıran bilgisayarın adresini yazın: adı ya da IP adresi ve port, örneğin 192.168.1.5:8090. Bu cihaz adresi hatırlar, bir kez yazmanız yeter.</string>
+    <string name="address_hint">192.168.1.5:8090</string>
     <string name="address_needed">Lisans sunucunuzun adresini girin.</string>
+
     <string name="unreachable_title">Lisans sunucusuna ulaşılamıyor</string>
     <string name="unreachable_body">Bu cihaz lisans sunucusuyla aynı ağda değil ya da sunucu çalışmıyor.</string>
-    <string name="address_needs">Lisans sunucunuz çalışıyor ve bu cihazdan erişilebilir olmalıdır. QServe içinde internete ihtiyaç duyan tek parça budur.</string>
+
+    <string name="address_needs">Sonraki ekranda, lisans sunucunuzun ilk çalıştığında oluşturduğu geliştirici hesabıyla oturum açarsınız. Parolası o bilgisayarda şu günlüğe bir kez yazıldı: QServe Vendor → logs → vendor.log. Oturum on iki saat sürer ve uygulamayı kapatsanız da kalır.</string>
 </resources>
