@@ -355,10 +355,15 @@ function serviceButtons() {
   const callLabel = named ? t('notify.call_role', { role }) : t('notify.call_waiter');
   const onTheWay = named ? t('notify.called_role', { role }) : t('notify.called');
 
-  const call = h('button', { class: 'qs-btn qs-btn-lg' }, '🔔 ', callLabel);
+  // Both of these reach a person through the restaurant's computer, so both
+  // stop with it. A bell that rings nowhere is worse than one that is plainly
+  // out of order.
+  const offline = linkIsDown();
+
+  const call = h('button', { class: 'qs-btn qs-btn-lg', disabled: offline }, '🔔 ', callLabel);
   call.addEventListener('click', () => void ask('WAITER_CALLED', call, onTheWay));
 
-  const bill = h('button', { class: 'qs-btn qs-btn-lg' }, '🧾 ', t('notify.ask_for_bill'));
+  const bill = h('button', { class: 'qs-btn qs-btn-lg', disabled: offline }, '🧾 ', t('notify.ask_for_bill'));
   bill.addEventListener('click', () => void ask('BILL_REQUESTED', bill, onTheWay));
 
   return h('div', { class: 'menu-service' }, call, bill);
@@ -599,9 +604,16 @@ function cancellable(order) {
 /* ---------------------------------------------------------------- render */
 
 function render() {
+  const down = linkIsDown();
   mount(root,
-    offlineNotice(),
-    offlineBanner(realtime),
+    /*
+     * One notice at a time. The strip says what has stopped and what still
+     * works; the banner staff screens carry says only "connection lost", which
+     * on a diner's phone reads as "this restaurant is broken" and is the less
+     * useful of the two. A brief wobble that has not yet become an outage
+     * still gets the banner, because nothing else would be said at all.
+     */
+    down ? offlineNotice() : offlineBanner(realtime),
     header(),
     categoryStrip(),
     productSection(),

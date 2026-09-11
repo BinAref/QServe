@@ -132,6 +132,9 @@ function takeOver() {
       again));
 
   document.body.append(screen);
+  // Nothing behind this moves either: a till that still scrolls under the
+  // notice is a till somebody will try to use through it.
+  document.documentElement.dataset.linkLost = 'true';
 
   /*
    * Keep looking. The session is ended the moment the restaurant answers

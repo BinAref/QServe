@@ -1358,7 +1358,19 @@ button.qs-amount-currency {
   padding: var(--qs-spacing-lg);
   padding-block-start: calc(var(--qs-spacing-lg) + var(--qs-safe-top));
   background: var(--qs-color-background);
-  animation: qs-fade var(--qs-motion-slow) var(--qs-motion-ease-standard) both;
+  /*
+   * The cover itself does not fade.
+   *
+   * A screen that can be read through while it arrives is a till somebody can
+   * still read, and the whole point of this is that they cannot. The card
+   * inside rises into place; the thing hiding the stale queue is opaque from
+   * the first frame, and stays opaque if the animation never runs at all.
+   */
+}
+
+:root[data-link-lost="true"],
+:root[data-link-lost="true"] body {
+  overflow: hidden;
 }
 
 .qs-link-card {
