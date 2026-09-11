@@ -449,7 +449,9 @@ function field(label, name, value) {
  * back to its own name spaced out, which is ugly enough to get noticed and
  * caught by `npm run validate:audit`'s sibling check.
  */
-const HIDDEN_SETTINGS = ['backup.passphrase', 'security.', 'license.'];
+// `setup.` holds first-run bookkeeping — answered questions, not choices
+// anybody should meet again in a settings list.
+const HIDDEN_SETTINGS = ['backup.passphrase', 'security.', 'license.', 'setup.'];
 
 /** `orders.autoAcceptFromCustomer` → `setting.orders.auto_accept_from_customer`. */
 const settingKey = (key) => {
@@ -611,7 +613,8 @@ export async function renderUsers(container) {
             h('th', {}, t('common.username')),
             h('th', {}, t('users.roles')),
             h('th', {}, t('common.status')),
-            h('th', {}, t('users.last_login')))),
+            h('th', {}, t('users.last_login')),
+            h('th', {}, ''))),
           h('tbody', {}, users.map((user) =>
             h('tr', { onClick: () => canManage && openUserForm(container, user, roles) },
               h('td', {}, user.displayName),
@@ -622,7 +625,23 @@ export async function renderUsers(container) {
                 h('span', { class: `qs-badge ${user.active ? 'qs-badge-success' : ''}` },
                   user.active ? t('common.enabled') : t('common.disabled'))),
               h('td', { class: 'qs-muted qs-small' },
-                user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '—'))))))),
+                user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '—'),
+              /*
+               * Straight from the person to what the person did.
+               *
+               * Every action in this product already records who took it; the
+               * distance between that record and the owner asking about one
+               * cashier was three screens and a dropdown, which is far enough
+               * that the log went unread. It is one tap from their row now.
+               */
+              h('td', {},
+                h('button', {
+                  class: 'qs-btn qs-btn-ghost qs-btn-sm',
+                  onClick: (event) => {
+                    event.stopPropagation();
+                    navigate('activity', { actor: user.id });
+                  },
+                }, t('audit.title'))))))))),
 
     h('div', { class: 'qs-card qs-narrow', style: { marginBlockStart: 'var(--qs-spacing-lg)' } },
       h('div', { class: 'qs-row qs-row-between' },
@@ -1153,7 +1172,7 @@ export async function renderBackup(container) {
  * is inspected first (which needs no passphrase), and the operator must retype
  * the Restaurant ID the backup actually contains.
  */
-function restorePanel(container) {
+export function restorePanel(container) {
   let file = null;
   let header = null;
   const info = h('div', { class: 'qs-small qs-muted' }, '');

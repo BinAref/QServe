@@ -160,6 +160,32 @@ export class QServeApp {
       );
     }
 
+    /*
+     * Nobody is signed in to a server that has just started.
+     *
+     * When this process went away, every screen in the building lost it at
+     * once and signed its person out — that is what a staff terminal does
+     * when the restaurant stops answering. Carrying the old sessions across a
+     * restart would quietly undo that: a till abandoned during the outage
+     * would come back signed in, and the activity log would go on attributing
+     * to a cashier who went home an hour ago.
+     */
+    const ended = this.services.access.endEveryUserSession();
+    if (ended > 0) {
+      this.services.audit.record({
+        action: 'user.sessions_ended_by_restart',
+        actor: {
+          kind: 'SYSTEM', userId: null, userName: null,
+          terminalId: null, terminalName: null,
+        },
+        entityType: 'user',
+        entityId: 'all',
+        detail: { sessions: ended },
+        clientIp: null,
+      });
+      console.log(`[qserve] ${ended} staff session(s) ended: this server restarted.`);
+    }
+
     // Subscribe the gateway to the bus before any socket can attach to it.
     this.services.realtime.start();
     this.startMaintenance();

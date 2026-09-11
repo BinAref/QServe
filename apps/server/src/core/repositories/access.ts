@@ -276,8 +276,47 @@ export class AccessRepository {
   }
 
   /** Sign a person out everywhere — used when an account is disabled. */
+  /**
+   * The sessions this person currently holds, anywhere.
+   *
+   * One account signed in on two devices is how a cashier's till ends up
+   * being operated from the back office, and how an audit trail stops meaning
+   * anything: two people, one name, one log. So a second sign-in has to ask
+   * the first, and this is what tells the sign-in route there is a first to
+   * ask. Expired rows are excluded here rather than swept, because a sign-in
+   * should not be blocked by a session that has already run out.
+   */
+  liveSessionsForUser(userId: string): UserSessionRow[] {
+    return this.db
+      .prepare(`SELECT * FROM user_sessions
+                WHERE user_id = ? AND expires_at > ?
+                ORDER BY created_at DESC`)
+      .all(userId, nowIso()) as UserSessionRow[];
+  }
+
   deleteSessionsForUser(userId: string): void {
     this.db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(userId);
+  }
+
+  /**
+   * End every staff session. Used when the server starts.
+   *
+   * A restaurant whose server went down had every screen in the building lose
+   * it at once, and each of those screens signs its person out rather than sit
+   * there looking alive. Leaving the sessions behind would undo that the moment
+   * the machine came back: a till that was abandoned mid-outage would be signed
+   * in again by nothing more than a reload. So the sessions go with the
+   * process, and the first thing each screen asks for after a restart is a
+   * password.
+   *
+   * Station enrolments are deliberately untouched. A terminal session says
+   * "this tablet is the pass", not "this person is here", and making somebody
+   * walk the building rescanning QR codes after a power cut would be a punishment
+   * for the outage rather than a protection against it.
+   */
+  endEveryUserSession(): number {
+    const result = this.db.prepare('DELETE FROM user_sessions').run();
+    return result.changes;
   }
 
   purgeExpiredSessions(): void {

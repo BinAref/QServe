@@ -456,6 +456,11 @@ export function createManagementRoutes(services: Services): Router<AppState> {
     // be re-checked against it. A backup from another machine leaves the
     // installation in SETUP until it is activated here (spec §6).
     services.gate.evaluate(services.settings.profile()?.restaurantId as never);
+
+    // Written after the restore, not before: the restore replaces the settings
+    // table wholesale. Bringing a menu in is one of the two answers to the
+    // first-run question, so the question is now settled.
+    services.settings.set('setup.menuStarted', true);
     return result;
   }, [loopbackOnly, canManageBackup]);
 

@@ -20,9 +20,10 @@ import { migrations } from './core/schema.js';
 import { EventBus } from './core/event-bus.js';
 import { LicenseGate, loadTrustStore } from './core/license-gate.js';
 import { SecurityService } from './core/security.js';
-import { RealtimeGateway } from './core/realtime.js';
+import { RealtimeGateway, type AudienceMember } from './core/realtime.js';
 import { LocalDiscovery, lanAddresses, mdnsNameFor, publicBaseUrl } from './core/network.js';
 import { AppLockService } from './core/app-lock.js';
+import { LoginRequests } from './core/login-requests.js';
 import { ServicePlanner } from './core/service-plan.js';
 
 import { AccessRepository } from './core/repositories/access.js';
@@ -63,6 +64,7 @@ export interface Services {
   readonly discovery: LocalDiscovery;
   readonly fingerprint: FingerprintResult;
   readonly appLock: AppLockService;
+  readonly loginRequests: LoginRequests;
   readonly servicePlan: ServicePlanner;
 
   readonly access: AccessRepository;
@@ -151,6 +153,8 @@ export function buildServices(options: BuildOptions = {}): Services {
 
   const security = new SecurityService(access, terminalRepository, gate, defaultLocale);
   const appLock = new AppLockService(settings, audit);
+  // In memory: a request is a question somebody is waiting in front of.
+  const loginRequests = new LoginRequests();
   const notifications = new NotificationService(db, bus);
   // What this restaurant actually has, and therefore how an order flows.
   const servicePlan = new ServicePlanner(terminalRepository);
@@ -159,6 +163,20 @@ export function buildServices(options: BuildOptions = {}): Services {
   // browser instead would still mean the payload reached the wrong screen.
   realtime.setAudience(EventName.NOTIFICATION, (payload, member) =>
     notifications.isAddressedTo(payload as never, member));
+
+  /*
+   * Two events that concern exactly one person.
+   *
+   * "Somebody wants your account, from this address" and "you have been signed
+   * out" are addressed to the account named in them, and to nothing else. Sent
+   * to every screen and filtered in the browser, they would tell the whole
+   * restaurant when each person signs in and from where — true, unread, and
+   * nobody else's business.
+   */
+  const onlyThatPerson = (payload: unknown, member: AudienceMember): boolean =>
+    member.userId !== null && (payload as { userId?: string }).userId === member.userId;
+  realtime.setAudience(EventName.SYSTEM_LOGIN_REQUESTED, onlyThatPerson);
+  realtime.setAudience(EventName.SYSTEM_SESSION_ENDED, onlyThatPerson);
   const discovery = new LocalDiscovery();
 
   const menu = new MenuRepository(db);
@@ -240,6 +258,7 @@ export function buildServices(options: BuildOptions = {}): Services {
 
   return {
     config, paths, db, bus, gate, security, realtime, discovery, fingerprint, appLock,
+    loginRequests,
     servicePlan,
     access, audit, licenseRepository, settings, terminalRepository,
     currencies, packs, contentTranslations, menu, tables, orderRepository,
@@ -275,6 +294,21 @@ export function systemStatus(services: Services, lanRunning: boolean): Record<st
     capabilities: snapshot.capabilities,
     setupComplete: profile !== null,
     ownerExists: services.access.countUsers() > 0,
+    /*
+     * Has this restaurant decided where its menu comes from?
+     *
+     * A restaurant opening QServe for the first time either has a menu
+     * already — on the old machine, in a backup, with its photographs — or is
+     * about to type one in. Asking once is the difference between restoring
+     * it in a minute and rebuilding it over an evening, and it can only be
+     * asked before somebody has started typing.
+     *
+     * An installation that already has categories has plainly answered, which
+     * is what keeps this from appearing in front of a restaurant that has been
+     * running since before the question existed.
+     */
+    menuStarted: services.settings.get<boolean>('setup.menuStarted') === true
+      || services.menu.listCategories().length > 0,
     license: {
       present: snapshot.payload !== null,
       licenseId: snapshot.payload?.licenseId ?? licenseState.license_id,

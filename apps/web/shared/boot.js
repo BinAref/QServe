@@ -16,6 +16,8 @@ import { NotificationCentre } from './notifications.js';
 import { setRoleNames } from './roles.js';
 import { EventName } from './events.js';
 import { fieldActions } from './field-actions.js';
+import { watchSessions } from './sessions.js';
+import { watchLink } from './link.js';
 import { h, mount, toast } from './dom.js';
 
 export { api, ApiError, t, describeError, sound, toast };
@@ -26,6 +28,11 @@ export async function boot({
   topics = null,
   onResync = null,
   requireTerminal = false,
+  /**
+   * What this screen does when the restaurant stops answering: 'staff' signs
+   * out and holds the screen, 'diner' keeps the menu and stops ordering.
+   */
+  link = 'staff',
   /** A terminal that wants to react to a notice itself, beyond the centre. */
   onNotification = null,
 } = {}) {
@@ -107,6 +114,19 @@ export async function boot({
     ...(onNotification ? { onArrive: onNotification } : {}),
   });
   if (signedIn) void notifications.refresh();
+
+  /*
+   * One account, one place. From here this screen will be asked before
+   * anybody else can take the account it is signed in as, and told if it
+   * ever loses it.
+   */
+  watchSessions({ realtime, session });
+
+  /*
+   * And what happens when the restaurant itself goes away. A screen that keeps
+   * pretending is the expensive failure here, not the outage.
+   */
+  watchLink({ realtime, mode: link, signedIn });
 
   // A role renamed in the console is a word on this screen's heading. Rather
   // than make every station wait for its next reload, take the new names as

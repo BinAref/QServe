@@ -344,6 +344,36 @@
 }
 .wizard-steps span[data-done="true"] { background: var(--qs-color-primary); }
 
+/*
+ * The two ways a restaurant's menu can arrive, side by side.
+ *
+ * Deliberately equal in weight. One of them is right for this restaurant and
+ * the other is wrong, and which is which is not ours to imply — only the
+ * suggested action inside the first is lit, because somebody with no backup
+ * needs a way forward that does not look like a mistake.
+ */
+.origin-grid {
+  display: grid;
+  gap: var(--qs-spacing-md);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  margin-block-start: var(--qs-spacing-lg);
+}
+.origin-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qs-spacing-sm);
+  padding: var(--qs-spacing-md);
+  border: 1px solid var(--qs-color-border);
+  border-radius: var(--qs-radius-md);
+  background: var(--qs-color-surface-alt);
+  transition: border-color var(--qs-motion-fast) var(--qs-motion-ease-standard),
+              transform var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+.origin-card:hover { border-color: var(--qs-color-border-strong); transform: translateY(-2px); }
+.origin-card h2 { margin: 0; font-size: var(--qs-typography-size-md); }
+.origin-card p { margin: 0; flex: 1; font-size: var(--qs-typography-size-sm); }
+.origin-card button { margin-block-start: auto; }
+
 /* ------------------------------------------------- languages and themes */
 
 .pack-editor { display: grid; gap: var(--qs-spacing-lg); }
@@ -487,3 +517,22 @@
 .settings-switch input { margin-block-start: 3px; }
 .settings-hint { display: block; line-height: var(--qs-typography-line-height-normal); }
 .settings-value input { max-inline-size: 160px; }
+
+/*
+ * "This is one person's log" — said once, at the top, with the way out beside
+ * it. A narrowed list that does not announce itself is how somebody concludes
+ * a cashier did nothing all day.
+ */
+.log-subject {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qs-spacing-md);
+  flex-wrap: wrap;
+  padding: var(--qs-spacing-md);
+  margin-block-end: var(--qs-spacing-md);
+  border-inline-start: 3px solid var(--qs-color-primary);
+  border-radius: var(--qs-radius-md);
+  background: var(--qs-color-surface-alt);
+}
+.log-subject p { margin: 0; }

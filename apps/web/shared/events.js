@@ -43,6 +43,10 @@ export const EventName = {
   SYSTEM_MODE_CHANGED: 'system.mode_changed',
   SYSTEM_LICENSE_CHANGED: 'system.license_changed',
   SYSTEM_SETTINGS_CHANGED: 'system.settings_changed',
+  /** Somebody is trying to sign in as an account that is already signed in. */
+  SYSTEM_LOGIN_REQUESTED: 'system.login_requested',
+  /** This session has been ended — by the person who let somebody else in. */
+  SYSTEM_SESSION_ENDED: 'system.session_ended',
   NOTIFICATION: 'notification',
 };
 

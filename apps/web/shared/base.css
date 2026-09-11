@@ -1339,3 +1339,102 @@ button.qs-amount-currency {
   border-style: dashed;
 }
 .qs-brand-actions { flex: 1 1 260px; min-inline-size: 0; }
+
+/* ------------------------------------------------- the restaurant is gone */
+
+/**
+ * What a staff screen becomes when it loses the restaurant.
+ *
+ * It covers everything on purpose. The screen underneath is a till whose
+ * server is not there, and a person glancing at it would read a stale queue as
+ * a live one; the whole point is that this cannot be looked past or dismissed.
+ */
+.qs-link-lost {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: var(--qs-spacing-lg);
+  padding-block-start: calc(var(--qs-spacing-lg) + var(--qs-safe-top));
+  background: var(--qs-color-background);
+  animation: qs-fade var(--qs-motion-slow) var(--qs-motion-ease-standard) both;
+}
+
+.qs-link-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--qs-spacing-md);
+  max-width: 26rem;
+  text-align: center;
+  animation: qs-rise var(--qs-motion-slow) var(--qs-motion-ease-entrance) both;
+}
+
+.qs-link-card h1 {
+  margin: 0;
+  font-size: var(--qs-typography-size-xl);
+}
+
+.qs-link-card p { margin: 0; }
+
+/* A slow, patient beat — the screen is waiting, not failing. */
+.qs-link-mark {
+  position: relative;
+  inline-size: 4.5rem;
+  block-size: 4.5rem;
+  border-radius: 50%;
+  border: 2px solid var(--qs-color-border-strong);
+  display: grid;
+  place-items: center;
+}
+
+.qs-link-pulse {
+  inline-size: 0.9rem;
+  block-size: 0.9rem;
+  border-radius: 50%;
+  background: var(--qs-color-warning);
+}
+
+.qs-link-mark::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--qs-color-warning);
+  animation: qs-link-seek 2.4s var(--qs-motion-ease-standard) infinite;
+}
+
+@keyframes qs-link-seek {
+  0%   { transform: scale(1); opacity: 0.7; }
+  70%  { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.qs-link-status {
+  color: var(--qs-color-text-muted);
+  font-size: var(--qs-typography-size-sm);
+  min-block-size: 1.4em;
+}
+
+/**
+ * The diner's version: a strip, not a takeover.
+ *
+ * A guest reading the menu keeps the menu. Only ordering stopped, so only
+ * ordering is spoken about.
+ */
+.qs-menu-offline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--qs-spacing-xs) var(--qs-spacing-sm);
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+  background: var(--qs-color-warning-soft, var(--qs-color-surface-alt));
+  color: var(--qs-color-text);
+  border-block-end: 1px solid var(--qs-color-border);
+  font-size: var(--qs-typography-size-sm);
+  animation: qs-slide-down var(--qs-motion-normal) var(--qs-motion-ease-entrance);
+}
+
+.qs-menu-offline[hidden] { display: none; }
+.qs-menu-offline span { color: var(--qs-color-text-muted); }

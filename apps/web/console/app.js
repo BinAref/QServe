@@ -14,6 +14,7 @@
 
 import { boot, api, guard, t, toast } from '../shared/boot.js';
 import { h, mount, modal, entered } from '../shared/dom.js';
+import { signIn } from '../shared/sessions.js';
 import { pick, availableLocales, setLocale, locale as currentLocale } from '../shared/i18n.js';
 import { applyTheme } from '../shared/theme.js';
 import { Capability, grants, Permission } from '../shared/events.js';
@@ -21,7 +22,9 @@ import { Capability, grants, Permission } from '../shared/events.js';
 import { renderMenuBuilder } from './views/menu.js';
 import { renderTables, renderTerminals } from './views/service.js';
 import { renderOrders, renderReports, renderActivityLog } from './views/orders.js';
-import { renderSettings, renderUsers, renderPrinting, renderBackup, renderLicense } from './views/system.js';
+import {
+  renderSettings, renderUsers, renderPrinting, renderBackup, renderLicense, restorePanel,
+} from './views/system.js';
 import { renderLanguages, renderThemes } from './views/packs.js';
 import { renderCurrencies } from './views/currencies.js';
 import { renderLockScreen } from './views/lock.js';
@@ -31,6 +34,8 @@ export const state = {
   status: null,
   session: null,
   route: 'dashboard',
+  /** What the current route was asked for, e.g. one person's activity. */
+  routeArgs: null,
   realtime: null,
   notifications: null,
   /** Phone only: whether the navigation drawer is showing. */
@@ -129,13 +134,30 @@ const VIEWS = {
   developer: renderDeveloper,
 };
 
-export function navigate(route) {
+/**
+ * Go somewhere, optionally with an argument.
+ *
+ * The argument is in the address, not in a variable: "what did cashier1 do"
+ * is a thing an owner reloads, bookmarks, and sends to somebody else, and a
+ * filter that lived only in memory would evaporate on the first refresh.
+ */
+export function navigate(route, args = null) {
   state.route = VIEWS[route] ? route : 'dashboard';
+  state.routeArgs = args;
   // Following a link closes the drawer; leaving it open over the page the
   // person just asked for would be the wrong answer to their tap.
   state.drawer = false;
-  location.hash = `#/${state.route}`;
+  const query = args ? `?${new URLSearchParams(args)}` : '';
+  location.hash = `#/${state.route}${query}`;
   renderShell();
+}
+
+/** `#/activity?actor=USR-1` → `{ route: 'activity', args: { actor: 'USR-1' } }`. */
+function readHash() {
+  const raw = location.hash.replace(/^#\/?/, '');
+  const [route, query] = raw.split('?');
+  const args = query ? Object.fromEntries(new URLSearchParams(query)) : null;
+  return { route, args };
 }
 
 /**
@@ -346,7 +368,7 @@ function renderShell() {
   // Views render asynchronously; the page frame is already on screen so the
   // console never flashes empty between routes.
   mount(body, h('div', { class: 'qs-empty' }, h('div', { class: 'qs-spinner', style: { margin: '0 auto' } })));
-  void Promise.resolve(view(body)).then(() => entered(body)).catch((error) => {
+  void Promise.resolve(view(body, state.routeArgs)).then(() => entered(body)).catch((error) => {
     console.error('[console]', error);
     mount(body, h('div', { class: 'qs-card' }, h('p', { class: 'qs-muted' }, String(error.message ?? error))));
   });
@@ -544,7 +566,8 @@ async function renderLogin() {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
-    const ok = await guard(() => api.post('/api/auth/login', {
+    // Waits for the other device if this account is already signed in there.
+    const ok = await guard(() => signIn({
       username: String(data.username).trim(),
       password: String(data.password),
     }));
@@ -563,6 +586,60 @@ async function renderLogin() {
     h('button', { class: 'qs-btn qs-btn-primary qs-btn-block', type: 'submit' }, t('common.signin')));
 
   mount(root, h('div', { class: 'wizard' }, form));
+}
+
+/**
+ * Where the menu comes from — the last question of the first run.
+ *
+ * A restaurant installing QServe is rarely starting from nothing. It has a
+ * menu: on the machine this one replaces, in a backup, with its photographs
+ * and its prices and the wording somebody spent a week getting right. Asked
+ * here, restoring it takes a minute. Not asked, the same person spends an
+ * evening retyping it and never learns the file would have done.
+ *
+ * Asked exactly once, and only before anything has been typed — an answer is
+ * recorded either way, so this screen is never met twice.
+ */
+function renderMenuOrigin() {
+  const panel = h('div', {});
+
+  const choice = (titleKey, bodyKey, actionKey, primary, onPick) =>
+    h('div', { class: 'origin-card' },
+      h('h2', {}, t(titleKey)),
+      h('p', { class: 'qs-muted' }, t(bodyKey)),
+      h('button', {
+        class: primary ? 'qs-btn qs-btn-primary qs-btn-block' : 'qs-btn qs-btn-block',
+        onClick: onPick,
+      }, t(actionKey)));
+
+  const fresh = choice(
+    'setup.menu_fresh_title', 'setup.menu_fresh_body', 'setup.menu_fresh_action', true,
+    async () => {
+      const ok = await guard(() => api.post('/api/setup/menu', {}));
+      if (ok) location.reload();
+    });
+
+  const bring = choice(
+    'setup.menu_import_title', 'setup.menu_import_body', 'setup.menu_import_action', false,
+    () => {
+      // The restore form is the one from the settings screen, not a second
+      // implementation of it: the same two frictions, the same passphrase, the
+      // same demand that the operator retype the id inside the file.
+      mount(panel, restorePanel(panel));
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+  mount(root,
+    h('div', { class: 'wizard' },
+      h('div', { class: 'qs-card' },
+        h('div', { class: 'wizard-steps' },
+          h('span', { 'data-done': 'true' }),
+          h('span', { 'data-done': 'true' }),
+          h('span', { 'data-done': 'true' })),
+        h('h1', {}, t('setup.menu_origin_title')),
+        h('p', { class: 'qs-muted' }, t('setup.menu_origin_intro')),
+        h('div', { class: 'origin-grid' }, fresh, bring),
+        panel)));
 }
 
 /* ------------------------------------------------------------------ boot */
@@ -591,14 +668,22 @@ async function main() {
     await renderLogin();
     return;
   }
+  if (!state.status.menuStarted) {
+    renderMenuOrigin();
+    return;
+  }
 
-  const initial = location.hash.replace(/^#\/?/, '');
-  state.route = VIEWS[initial] ? initial : 'dashboard';
+  const initial = readHash();
+  state.route = VIEWS[initial.route] ? initial.route : 'dashboard';
+  state.routeArgs = initial.args;
   renderShell();
 
   window.addEventListener('hashchange', () => {
-    const route = location.hash.replace(/^#\/?/, '');
-    if (route && route !== state.route) navigate(route);
+    const next = readHash();
+    if (!next.route) return;
+    const sameArgs = JSON.stringify(next.args) === JSON.stringify(state.routeArgs);
+    if (next.route === state.route && sameArgs) return;
+    navigate(next.route, next.args);
   });
 
   // Activating a licence changes what the whole console can do, so the frame

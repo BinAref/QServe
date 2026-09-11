@@ -7,8 +7,9 @@
  */
 
 import {
-  asObject, conflict, DEFAULT_CURRENCY, LOCALE_CODE_PATTERN, optionalString,
-  requireLocalised, requireString, SystemRole, unauthenticated, validationError,
+  asObject, conflict, DEFAULT_CURRENCY, EventName, LOCALE_CODE_PATTERN, notFound,
+  optionalBoolean, optionalString, requireLocalised, requireString, SystemRole,
+  unauthenticated, validationError,
 } from '@qserve/shared';
 import { HttpResponse, RateLimiter, Router } from '@qserve/http';
 import type { Services } from '../../container.js';
@@ -116,6 +117,32 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
     return { id: user.id, username: user.username, displayName: user.display_name };
   }, [security.adminListenerOnly()]);
 
+  /**
+   * Where this restaurant's menu comes from.
+   *
+   * Asked once, on the first run, before anybody has typed anything: bring the
+   * menu you already have, or start a new one. Only the second needs a route —
+   * bringing one is a backup restore, which sets the same flag on its way
+   * through — and all this records is that the question has been answered, so
+   * it is never asked again.
+   */
+  router.post('/setup/menu', (ctx) => {
+    if (services.settings.get<boolean>('setup.menuStarted') === true) {
+      throw conflict('this restaurant has already started its menu');
+    }
+    services.settings.set('setup.menuStarted', true);
+
+    services.audit.record({
+      action: 'menu.started_fresh',
+      actor: ctx.state.auth!.actor,
+      entityType: 'restaurant',
+      entityId: services.settings.profile()?.restaurantId ?? 'unknown',
+      clientIp: ctx.ip,
+    });
+
+    return { menuStarted: true };
+  }, [security.adminListenerOnly(), security.requireUser()]);
+
   /* ---------------------------------------------------------------- auth */
 
   router.post('/auth/login', (ctx) => {
@@ -153,6 +180,52 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
     // A staff sign-in on a terminal is bound to that terminal, so later actions
     // record both the person and the station (spec §15).
     const auth = ctx.state.auth ?? security.resolve(ctx);
+
+    /*
+     * One account, one place at a time.
+     *
+     * If this person is already signed in somewhere, the password is not enough
+     * — the device that has the session is asked first. That device is shown
+     * who is asking and from where, and told that saying yes signs it out.
+     *
+     * The point is the audit trail. Every action in this product records who
+     * did it, and that record only means something while "who" is one person;
+     * a cashier's account open at the counter and in the back office makes the
+     * log a record of an account rather than of a person.
+     */
+    if (services.access.liveSessionsForUser(user.id).length > 0) {
+      const request = services.loginRequests.open({
+        userId: user.id,
+        userName: user.display_name,
+        fromIp: ctx.ip,
+        fromTerminalName: auth.actor.terminalName,
+      });
+
+      services.bus.publish({
+        name: EventName.SYSTEM_LOGIN_REQUESTED,
+        payload: {
+          userId: user.id,
+          request: services.loginRequests.publicView(request),
+        },
+      });
+
+      services.audit.record({
+        action: 'user.login_requested',
+        actor: { kind: 'SYSTEM', userId: null, userName: null, terminalId: null, terminalName: null },
+        entityType: 'user',
+        entityId: user.id,
+        detail: { username, fromTerminal: auth.actor.terminalName },
+        clientIp: ctx.ip,
+      });
+
+      // 202: the credentials were right, and the answer is somebody else's.
+      return new HttpResponse(202, JSON.stringify({
+        pending: true,
+        requestId: request.id,
+        expiresInSeconds: services.loginRequests.publicView(request).expiresInSeconds,
+      }), { 'content-type': 'application/json; charset=utf-8' });
+    }
+
     const token = services.access.createUserSession({
       userId: user.id,
       terminalId: auth.terminal?.id ?? null,
@@ -183,6 +256,110 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
       'set-cookie': userCookie(token, services.config.userSessionTtlSeconds),
     });
   });
+
+  /**
+   * The second device, waiting.
+   *
+   * Polled rather than pushed, because the device asking has no session yet and
+   * so no socket to be pushed down — it is not signed in, which is the whole
+   * point. When the answer is yes this is also where the sign-in completes: the
+   * approval is claimed once, the sessions it displaces are ended, and the
+   * cookie is issued in the same reply. An approval that could be spent twice
+   * would be an approval for anybody.
+   */
+  router.get('/auth/login/:requestId', (ctx) => {
+    const id = ctx.params['requestId']!;
+    const state = services.loginRequests.state(id);
+
+    if (state !== 'approved') {
+      return new HttpResponse(200, JSON.stringify({ state }), {
+        'content-type': 'application/json; charset=utf-8',
+      });
+    }
+
+    const claimed = services.loginRequests.claim(id);
+    if (!claimed) {
+      return new HttpResponse(200, JSON.stringify({ state: 'expired' }), {
+        'content-type': 'application/json; charset=utf-8',
+      });
+    }
+
+    const user = services.access.getUser(claimed.userId);
+    if (!user || user.active !== 1) throw unauthenticated('that account is no longer active');
+
+    /*
+     * The displaced sessions end here rather than when the answer was given.
+     *
+     * Ending them at the moment of approval would sign somebody out and then,
+     * if the second device never came back, leave the account signed in
+     * nowhere — an approval that cost a session and delivered none.
+     */
+    services.access.deleteSessionsForUser(user.id);
+    services.bus.publish({
+      name: EventName.SYSTEM_SESSION_ENDED,
+      payload: { userId: user.id, reason: 'signed_in_elsewhere' },
+    });
+
+    const auth = ctx.state.auth ?? security.resolve(ctx);
+    const token = services.access.createUserSession({
+      userId: user.id,
+      terminalId: auth.terminal?.id ?? null,
+      ttlSeconds: services.config.userSessionTtlSeconds,
+      clientIp: ctx.ip,
+    });
+    services.access.touchLogin(user.id);
+
+    services.audit.record({
+      action: 'user.login',
+      actor: {
+        kind: 'USER', userId: user.id, userName: user.display_name,
+        terminalId: auth.terminal?.id ?? null, terminalName: auth.actor.terminalName,
+      },
+      entityType: 'user',
+      entityId: user.id,
+      detail: { approvedFromAnotherDevice: true },
+      clientIp: ctx.ip,
+    });
+
+    return new HttpResponse(200, JSON.stringify({
+      state: 'approved',
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      roles: services.access.roleKeysForUser(user.id),
+      permissions: services.access.permissionsForUser(user.id),
+    }), {
+      'content-type': 'application/json; charset=utf-8',
+      'set-cookie': userCookie(token, services.config.userSessionTtlSeconds),
+    });
+  });
+
+  /**
+   * The answer, given by the device that already holds the account.
+   *
+   * `requireUser` with no permission: this is not something a role grants. The
+   * only person who may answer is the one being asked, and the service checks
+   * that the request belongs to them before it takes the answer.
+   */
+  router.post('/auth/login-requests/:requestId', (ctx) => {
+    const auth = ctx.state.auth!;
+    const body = asObject(ctx.body);
+    const approve = optionalBoolean(body, 'approve', false);
+
+    const settled = services.loginRequests.answer(
+      ctx.params['requestId']!, auth.user!.id, approve);
+    if (settled === null) throw notFound('login request', ctx.params['requestId']!);
+
+    services.audit.record({
+      action: approve ? 'user.login_approved' : 'user.login_denied',
+      actor: auth.actor,
+      entityType: 'user',
+      entityId: auth.user!.id,
+      clientIp: ctx.ip,
+    });
+
+    return { state: settled };
+  }, [security.requireUser()]);
 
   router.post('/auth/logout', (ctx) => {
     const token = readUserToken(ctx);
@@ -236,6 +413,16 @@ export function createSystemRoutes(deps: RouteDeps): Router<AppState> {
         : null,
       mode: services.gate.mode,
       capabilities: services.gate.current.capabilities,
+      /*
+       * Somebody asking to take this account, if anybody is.
+       *
+       * The question also arrives as a realtime event, which is how a screen
+       * that is already open hears it. This is for the screen that was not:
+       * a tablet woken from sleep mid-question would otherwise never be asked,
+       * and the person at the other device would wait out the minute for
+       * nothing.
+       */
+      pendingLogins: auth.user ? services.loginRequests.pendingFor(auth.user.id) : [],
       locale: profile?.defaultLocale ?? 'en',
       themeId: profile?.themeId ?? 'light',
       // What this restaurant calls its people. Sent to every screen at boot,

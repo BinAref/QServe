@@ -48,6 +48,10 @@ export const EventName = {
   SYSTEM_MODE_CHANGED: 'system.mode_changed',
   SYSTEM_LICENSE_CHANGED: 'system.license_changed',
   SYSTEM_SETTINGS_CHANGED: 'system.settings_changed',
+  /** Somebody is trying to sign in as an account that is already signed in. */
+  SYSTEM_LOGIN_REQUESTED: 'system.login_requested',
+  /** This session has been ended — by the person who let somebody else in. */
+  SYSTEM_SESSION_ENDED: 'system.session_ended',
   /** Server-initiated attention request, e.g. "table 5 is calling a waiter". */
   NOTIFICATION: 'notification',
 } as const;
@@ -89,6 +93,10 @@ export const EVENT_CATALOGUE: readonly EventDescriptor[] = [
   { name: E.SYSTEM_MODE_CHANGED, topic: Topic.SYSTEM, permission: null },
   { name: E.SYSTEM_LICENSE_CHANGED, topic: Topic.SYSTEM, permission: P.LICENSE_MANAGE },
   { name: E.SYSTEM_SETTINGS_CHANGED, topic: Topic.SYSTEM, permission: null },
+  // Both go to every signed-in screen: the one being asked has to see the
+  // question, and the one being ended has to find out why.
+  { name: E.SYSTEM_LOGIN_REQUESTED, topic: Topic.SYSTEM, permission: null },
+  { name: E.SYSTEM_SESSION_ENDED, topic: Topic.SYSTEM, permission: null },
   { name: E.NOTIFICATION, topic: Topic.SYSTEM, permission: null },
 ];
 

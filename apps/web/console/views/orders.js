@@ -12,7 +12,7 @@ import { h, mount, modal, debounce } from '../../shared/dom.js';
 import { formatMoney, pick, te, formatDateTime, formatTime } from '../../shared/i18n.js';
 import { moneyField } from '../../shared/fields.js';
 import { Capability, Permission } from '../../shared/events.js';
-import { state, has, can, pageHeader, lockedPanel } from '../app.js';
+import { state, has, can, pageHeader, lockedPanel, navigate } from '../app.js';
 
 /* --------------------------------------------------------------- orders */
 
@@ -308,12 +308,28 @@ function actionLabel(action) {
  * by somebody looking for a single event; six open dropdowns above a wall of
  * machine names is the fastest way to hide it.
  */
-export async function renderActivityLog(container) {
-  const filters = { search: '', actorUserId: '', action: '', entityType: '', since: '', until: '' };
+export async function renderActivityLog(container, args = null) {
+  /*
+   * One person's activity is the question an owner actually asks.
+   *
+   * Not "what happened on Tuesday" but "what did cashier2 do" — because the
+   * till was short, or a discount looks odd, or somebody has to be told
+   * something. So the screen opens already narrowed when it is reached from a
+   * person's row, and says whose log this is rather than leaving a dropdown
+   * quietly set three sections down.
+   */
+  const filters = {
+    search: '', actorUserId: args?.actor ?? '', action: '', entityType: '', since: '', until: '',
+  };
   const page = { limit: 25, offset: 0 };
 
   const facets = await api.get('/api/audit/facets').catch(
     () => ({ actions: [], entityTypes: [], actors: [] }));
+
+  /** Whose log this is, when it is one person's. */
+  const subject = filters.actorUserId
+    ? facets.actors.find((actor) => actor.userId === filters.actorUserId) ?? null
+    : null;
 
   const results = h('div', {});
   let rows = [];
@@ -470,9 +486,23 @@ export async function renderActivityLog(container) {
         filterRow(t('audit.filter_to'), filterInput('until', h('input', { type: 'date' }))))));
 
   paintApplied();
+
+  // A banner rather than a heading: it has to be obvious that this is not the
+  // whole log, and there has to be one click back to the whole log.
+  const whose = subject
+    ? h('div', { class: 'log-subject' },
+        h('div', {},
+          h('div', { class: 'qs-row-label' }, t('audit.only_person', { name: subject.userName })),
+          h('p', { class: 'qs-muted qs-small' }, t('audit.only_person_hint'))),
+        h('button', {
+          class: 'qs-btn qs-btn-sm',
+          onClick: () => navigate('activity'),
+        }, t('audit.everyone')))
+    : null;
+
   // The log reads at the width of a page of text; three short columns stretched
   // across a desk monitor put the time and the person a hand's width apart.
   mount(container, pageHeader(t('audit.title')),
-    h('div', { class: 'log-page' }, controls, results));
+    h('div', { class: 'log-page' }, whose, controls, results));
   await load();
 }

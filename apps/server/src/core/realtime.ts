@@ -33,6 +33,8 @@ const ALL_TOPICS = Object.values(Topic);
 export interface AudienceMember {
   readonly terminalType: string | null;
   readonly terminalId: string | null;
+  /** Which person is signed in on this socket, when one is. */
+  readonly userId: string | null;
   readonly permissions: readonly string[];
 }
 
@@ -204,6 +206,7 @@ export class RealtimeGateway {
       if (audience && !audience(event.payload, {
         terminalType: client.auth.terminal?.terminal_type ?? null,
         terminalId: client.auth.terminal?.id ?? null,
+        userId: client.auth.user?.id ?? null,
         permissions: client.auth.permissions,
       })) {
         continue;

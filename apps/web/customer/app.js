@@ -13,6 +13,7 @@ import {
   boot, connectionIndicator, offlineBanner, guard, api, sound, toast, t, roleLabel, isRenamed,
 } from '../shared/boot.js';
 import { h, mount, modal, confirmDialog } from '../shared/dom.js';
+import { linkIsDown, offlineNotice, onLinkChange } from '../shared/link.js';
 import { formatMoney, pick, formatTime, availableLocales, setLocale, te } from '../shared/i18n.js';
 import { SoundEvent } from '../shared/events.js';
 import { displayed } from '../shared/money.js';
@@ -423,15 +424,22 @@ function openCart() {
   };
   draw();
 
-  // The one lit thing on this screen: the button that sends the order.
+  /*
+   * The one lit thing on this screen: the button that sends the order — unless
+   * the restaurant is unreachable, in which case it is plainly dead and says
+   * what it is waiting for. A lit button that fails when pressed teaches a
+   * diner to press it again.
+   */
+  const offline = linkIsDown();
   const send = h('button', {
-    class: 'qs-btn qs-btn-primary qs-lit',
+    class: offline ? 'qs-btn' : 'qs-btn qs-btn-primary qs-lit',
     value: 'send',
+    disabled: offline,
     onClick: (event) => {
       event.preventDefault();
       void submitOrder(document.getElementById('order-notes')?.value ?? null, dialog);
     },
-  }, t('menu.send_order'));
+  }, offline ? t('menu.offline_order') : t('menu.send_order'));
 
   const dialog = modal({
     title: t('menu.your_order'),
@@ -445,6 +453,20 @@ function openCart() {
 }
 
 async function submitOrder(notes, dialog) {
+  /*
+   * Nothing is sent into a void.
+   *
+   * A diner pressing send at the moment the restaurant's computer is off would
+   * otherwise watch a spinner and then a generic failure, and would reasonably
+   * press it again. They are told the truth instead — the kitchen cannot hear
+   * this — and the basket is kept, because the outage is not their mistake and
+   * they should not have to rebuild it.
+   */
+  if (linkIsDown()) {
+    toast(t('menu.offline_order'), 'error');
+    return;
+  }
+
   const payload = {
     notes: notes || null,
     items: state.cart.map((line) => ({
@@ -578,6 +600,7 @@ function cancellable(order) {
 
 function render() {
   mount(root,
+    offlineNotice(),
     offlineBanner(realtime),
     header(),
     categoryStrip(),
@@ -597,6 +620,9 @@ async function main() {
   const started = await boot({
     topics: ['menu', 'orders', 'system'],
     onResync: () => void reload().then(render),
+    // A guest is never thrown out of the menu they are reading. Losing the
+    // restaurant stops ordering and says so; it does not close the page.
+    link: 'diner',
   });
   state.session = started.session;
   realtime = started.realtime;
@@ -609,6 +635,10 @@ async function main() {
 
   // A price or availability change reaches every table without a refresh.
   realtime.on('menu.updated', () => void reload().then(render));
+
+  // Losing or regaining the restaurant changes what this screen may offer, so
+  // it is painted again rather than left saying something that is no longer so.
+  onLinkChange(() => render());
 
   // Only this table's own orders matter to this phone.
   const mine = (order) => state.myOrders.some((entry) => entry.id === order.id);
