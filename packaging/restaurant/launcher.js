@@ -340,6 +340,24 @@ async function main() {
   env.QSERVE_TRUSTED_KEYS_FILE ??= join(appRoot, 'app', 'server', 'config', 'trusted-keys.json');
   env.QSERVE_VENDOR_INFO_FILE ??= join(appRoot, 'app', 'server', 'config', 'vendor.json');
 
+  /*
+   * And where to ask for a licence, baked in at build time.
+   *
+   * `??=` on purpose: an operator who sets the variable — to point at a staging
+   * licence server, or at a replacement after the vendor moves — keeps winning
+   * over what was shipped.
+   */
+  if (!env.QSERVE_LICENSE_SERVER_URL) {
+    const where = join(appRoot, 'app', 'server', 'config', 'license-server.json');
+    try {
+      const { url } = JSON.parse(readFileSync(where, 'utf8'));
+      if (typeof url === 'string' && url) env.QSERVE_LICENSE_SERVER_URL = url;
+    } catch {
+      // A build made without the address. The licence screen will say it cannot
+      // reach the vendor, which is true and is the best it can do.
+    }
+  }
+
   mkdirSync(dataDir, { recursive: true });
   record(`QServe starting — data ${dataDir}, runtime ${appRoot}`);
 

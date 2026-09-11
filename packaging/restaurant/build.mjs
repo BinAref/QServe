@@ -109,6 +109,33 @@ if (existsSync(vendorFile)) {
   );
 }
 
+/*
+ * Where this build asks for a licence.
+ *
+ * The licence server is no longer a machine the vendor keeps switched on; it is
+ * a URL that never changes. Shipping it here is the difference between a
+ * restaurant that can activate by typing its key and one that must first be
+ * told to set an environment variable — which is not a thing a restaurant will
+ * ever do, and would be our fault for asking.
+ *
+ * It stays overridable: a real `QSERVE_LICENSE_SERVER_URL` in the environment
+ * still wins, which is what makes a staging server possible at all.
+ */
+const vendorUrl = (process.env.QSERVE_VENDOR_URL ?? '').trim().replace(/\/+$/, '');
+if (vendorUrl) {
+  writeFileSync(join(app, 'server/config/license-server.json'),
+    `${JSON.stringify({ url: vendorUrl }, null, 2)}
+`);
+} else {
+  process.stdout.write(
+    '
+  ! no QSERVE_VENDOR_URL — this build does not know where to ask for a
+'
+    + '    licence, and a restaurant running it will not be able to activate.
+',
+  );
+}
+
 cpSync(join(repo, 'apps/web'), join(app, 'web'), { recursive: true });
 cpSync(join(repo, 'locales'), join(stage, 'locales'), { recursive: true });
 cpSync(join(repo, 'themes'), join(stage, 'themes'), { recursive: true });

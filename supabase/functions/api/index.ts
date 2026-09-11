@@ -33,8 +33,52 @@
 import { hashToken, issueCertificate } from './crypto.ts';
 import { normaliseLicenseKey } from './license-key.ts';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+/*
+ * Where this project's PostgREST lives.
+ *
+ * `SUPABASE_URL` is documented as being injected into every function and is
+ * not injected into this one, which cost an afternoon: every route answered
+ * "the licence server could not complete this request" because the base of
+ * every query was the string "undefined". The request already carries the
+ * answer — a function served at https://<project>.supabase.co/functions/v1/api
+ * is a request whose origin is the project — so it is taken from there, with
+ * the environment variable as an override for anyone running this behind
+ * something else.
+ */
+/*
+ * The key this function presents to PostgREST.
+ *
+ * Two generations of key live side by side. Older projects inject a
+ * `service_role` JWT; newer ones — this one — issue `sb_secret_…` keys and
+ * hand them over as `SUPABASE_SECRET_KEYS`, with the legacy JWT still present
+ * in the environment but refused at the door with a 403. Preferring the new
+ * shape and falling back to the old one keeps this function working on either,
+ * which matters because the failure is silent: every route answers "could not
+ * complete this request" and nothing says the key was the problem.
+ */
+function serviceKey(): string {
+  const modern = Deno.env.get('SUPABASE_SECRET_KEYS') ?? '';
+  if (modern) {
+    try {
+      const parsed = JSON.parse(modern);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const first = parsed[0];
+        if (typeof first === 'string') return first;
+        if (first && typeof first === 'object' && typeof first.api_key === 'string') {
+          return first.api_key;
+        }
+      }
+    } catch {
+      // Not JSON: a bare key, or a comma-separated list of them.
+      return modern.split(',')[0]!.trim();
+    }
+  }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+}
+
+const SERVICE_KEY = serviceKey();
+const ENV_URL = Deno.env.get('SUPABASE_URL') ?? '';
+let projectUrl = ENV_URL;
 /** The vendor's private signing key. Set with `supabase secrets set`. */
 const SIGNING_PRIVATE = Deno.env.get('QSERVE_SIGNING_PRIVATE_KEY') ?? '';
 const SIGNING_PUBLIC = Deno.env.get('QSERVE_SIGNING_PUBLIC_KEY') ?? '';
@@ -113,7 +157,7 @@ function rateLimited(ip: string): boolean {
 /* ------------------------------------------------------------ database */
 
 async function rpc(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+  const res = await fetch(`${projectUrl}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers: {
       apikey: SERVICE_KEY,
@@ -128,11 +172,14 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<Record<
 }
 
 async function selectRows(path: string): Promise<unknown[]> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await fetch(`${projectUrl}/rest/v1/${path}`, {
     headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}` },
   });
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
-  return await res.json();
+  const text = await res.text();
+  // The status alone does not say whether this was a policy, a missing grant
+  // or a typo in a column name, and those look identical from here.
+  if (!res.ok) throw new Error(`${path} -> ${res.status} ${text.slice(0, 200)}`);
+  return text ? JSON.parse(text) : [];
 }
 
 /* -------------------------------------------------------------- routes */
@@ -271,9 +318,21 @@ Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return json(204, {});
 
   const url = new URL(request.url);
-  // Supabase routes /functions/v1/api/* here; what follows the function name is
-  // the path the restaurant's client built.
-  const path = url.pathname.replace(/^\/functions\/v1\/api/, '').replace(/\/+$/, '') || '/';
+  if (!projectUrl) projectUrl = url.origin;
+  /*
+   * What is left after the function's own name is the path the restaurant's
+   * client built — `/v1/activate` and so on.
+   *
+   * Both prefixes are stripped because the platform has already removed
+   * `/functions/v1` by the time this runs, leaving `/api/v1/activate`, while a
+   * request that arrives through a proxy or a local `supabase functions serve`
+   * still carries the whole thing. Assuming one shape gave a live function that
+   * answered every route with "no route".
+   */
+  const path = url.pathname
+    .replace(/^\/functions\/v1/, '')
+    .replace(/^\/api/, '')
+    .replace(/\/+$/, '') || '/';
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
 
   try {
@@ -295,6 +354,14 @@ Deno.serve(async (request) => {
 
     return fail(404, 'NOT_FOUND', `no route for ${request.method} ${path}`);
   } catch (error) {
+    /*
+     * The reason goes to the function's log, not to the caller.
+     *
+     * What went wrong here is a database grant, a missing column or an
+     * unreachable PostgREST — vendor infrastructure, described in the vendor's
+     * own vocabulary. A restaurant owner can do nothing with any of it, and a
+     * stranger probing this endpoint should learn nothing from it.
+     */
     console.error('[license]', error);
     return fail(500, 'INTERNAL', 'the licence server could not complete this request');
   }
