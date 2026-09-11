@@ -33,8 +33,25 @@ export interface SigningMaterial {
   readonly keyId: string;
 }
 
+/*
+ * The `LICENSE_` prefix is dropped on the way to a translation key.
+ *
+ * The codes read `LICENSE_REVOKED`; the sentences are filed under
+ * `license.error.revoked`. Interpolating the code as it stands asks for
+ * `license.error.license_revoked`, which does not exist — so the front end
+ * fell through to the English detail string and an Arabic restaurant was told
+ * "this licence has been revoked" in English. Nothing broke, which is why it
+ * survived this long.
+ */
 const licenseError = (code: string, status: number, detail: string): AppError =>
-  new AppError(code, detail, { status, messageKey: `license.error.${code.toLowerCase()}` });
+  new AppError(code, detail, { status, messageKey: licenseMessageKey(code) });
+
+/** `LICENSE_REVOKED` → `license.error.revoked`; `NOT_FOUND` → `error.not_found`. */
+export function licenseMessageKey(code: string): string {
+  return code.startsWith('LICENSE_')
+    ? `license.error.${code.slice('LICENSE_'.length).toLowerCase()}`
+    : `error.${code.toLowerCase()}`;
+}
 
 export interface IssueLicenseInput {
   readonly restaurantId?: string;

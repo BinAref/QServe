@@ -24,3 +24,7 @@ apps/server/config/vendor.json
 packaging/*/build/
 packaging/phone/.gradle/
 packaging/phone/app/build/
+
+# The Supabase CLI's scratch directory: a project ref, a pooler URL and
+# whatever else it caches between commands. None of it belongs to the product.
+supabase/.temp/
