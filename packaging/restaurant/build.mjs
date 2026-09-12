@@ -123,16 +123,14 @@ if (existsSync(vendorFile)) {
  */
 const vendorUrl = (process.env.QSERVE_VENDOR_URL ?? '').trim().replace(/\/+$/, '');
 if (vendorUrl) {
-  writeFileSync(join(app, 'server/config/license-server.json'),
-    `${JSON.stringify({ url: vendorUrl }, null, 2)}
-`);
+  writeFileSync(
+    join(app, 'server/config/license-server.json'),
+    `${JSON.stringify({ url: vendorUrl }, null, 2)}\n`,
+  );
 } else {
   process.stdout.write(
-    '
-  ! no QSERVE_VENDOR_URL — this build does not know where to ask for a
-'
-    + '    licence, and a restaurant running it will not be able to activate.
-',
+    '\n  ! no QSERVE_VENDOR_URL — this build does not know where to ask for a\n'
+    + '    licence, and a restaurant running it will not be able to activate.\n',
   );
 }
 
