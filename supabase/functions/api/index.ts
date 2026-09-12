@@ -34,18 +34,6 @@ import { hashToken, issueCertificate } from './crypto.ts';
 import { normaliseLicenseKey } from './license-key.ts';
 
 /*
- * Where this project's PostgREST lives.
- *
- * `SUPABASE_URL` is documented as being injected into every function and is
- * not injected into this one, which cost an afternoon: every route answered
- * "the licence server could not complete this request" because the base of
- * every query was the string "undefined". The request already carries the
- * answer — a function served at https://<project>.supabase.co/functions/v1/api
- * is a request whose origin is the project — so it is taken from there, with
- * the environment variable as an override for anyone running this behind
- * something else.
- */
-/*
  * The key this function presents to PostgREST.
  *
  * Two generations of key live side by side. Older projects inject a
@@ -76,9 +64,44 @@ function serviceKey(): string {
   return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
+/*
+ * Where this project's PostgREST lives.
+ *
+ * From the environment, never from the request. Every call to it carries the
+ * service key in an Authorization header, and taking the origin from
+ * `request.url` — which is built from the Host header — meant that anybody who
+ * could set that header could point this function at their own server and be
+ * handed the key that reads and writes every licence in the database. The
+ * gateway in front of this would most likely have stopped that. "Most likely"
+ * is not a thing to hang a vendor's entire licence database on.
+ *
+ * `SUPABASE_URL` is documented as injected into every function and is not
+ * injected into this project, which cost an afternoon of every route answering
+ * "could not complete this request" with the base of every query being the
+ * string "undefined". The database connection string *is* injected, so the
+ * project reference is read out of that instead. Both are environment; neither
+ * is attacker-controlled.
+ */
+function projectUrl(): string {
+  // `QSERVE_PROJECT_URL` first: a secret this deployment sets for itself, and
+  // the only one of the three that is guaranteed to be here.
+  const declared = (Deno.env.get('QSERVE_PROJECT_URL')
+    ?? Deno.env.get('SUPABASE_URL') ?? '').trim().replace(/\/+$/, '');
+  if (declared) return declared;
+
+  // postgresql://…@db.<ref>.supabase.co:5432/postgres
+  const db = Deno.env.get('SUPABASE_DB_URL') ?? '';
+  const ref = /(?:@|\.)(?:db\.)?([a-z]{20})\.supabase\./.exec(db)?.[1]
+    ?? /pooler[^@]*@[^.]*\.([a-z]{20})\./.exec(db)?.[1];
+  if (ref) return `https://${ref}.supabase.co`;
+
+  // Nothing trustworthy to go on. Failing every request is the right outcome:
+  // the alternative is a guess, and a wrong guess here posts the key somewhere.
+  return '';
+}
+
 const SERVICE_KEY = serviceKey();
-const ENV_URL = Deno.env.get('SUPABASE_URL') ?? '';
-let projectUrl = ENV_URL;
+const PROJECT_URL = projectUrl();
 /** The vendor's private signing key. Set with `supabase secrets set`. */
 const SIGNING_PRIVATE = Deno.env.get('QSERVE_SIGNING_PRIVATE_KEY') ?? '';
 const SIGNING_PUBLIC = Deno.env.get('QSERVE_SIGNING_PUBLIC_KEY') ?? '';
@@ -157,7 +180,7 @@ function rateLimited(ip: string): boolean {
 /* ------------------------------------------------------------ database */
 
 async function rpc(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await fetch(`${projectUrl}/rest/v1/rpc/${name}`, {
+  const res = await fetch(`${PROJECT_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers: {
       apikey: SERVICE_KEY,
@@ -172,7 +195,7 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<Record<
 }
 
 async function selectRows(path: string): Promise<unknown[]> {
-  const res = await fetch(`${projectUrl}/rest/v1/${path}`, {
+  const res = await fetch(`${PROJECT_URL}/rest/v1/${path}`, {
     headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}` },
   });
   const text = await res.text();
@@ -318,7 +341,6 @@ Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return json(204, {});
 
   const url = new URL(request.url);
-  if (!projectUrl) projectUrl = url.origin;
   /*
    * What is left after the function's own name is the path the restaurant's
    * client built — `/v1/activate` and so on.
@@ -334,6 +356,12 @@ Deno.serve(async (request) => {
     .replace(/^\/api/, '')
     .replace(/\/+$/, '') || '/';
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+
+  if (!PROJECT_URL) {
+    // Refusing outright rather than sending the service key to a guess.
+    console.error('[license] no project URL in the environment');
+    return fail(503, 'INTERNAL', 'the licence server is not configured');
+  }
 
   try {
     if (request.method === 'GET' && path === '/v1/public-keys') return await publicKeys();
