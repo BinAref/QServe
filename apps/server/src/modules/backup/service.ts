@@ -34,10 +34,47 @@ import type { Paths } from '../../core/paths.js';
 import { RESTAURANT_SCHEMA_VERSION } from '../../core/schema.js';
 
 /**
- * Tables carried by a backup, in dependency order so a restore can insert them
- * back without disabling foreign keys.
+ * What a backup carries, and there are two answers.
  *
- * `user_sessions` and `terminal_sessions` are deliberately absent.
+ * **The menu alone.** A restaurant can take this before it has a licence,
+ * because building the menu is what it does first and losing that work to a
+ * reinstall would be the worst hour of its week. It is also what an owner
+ * hands to a second branch.
+ *
+ * **Everything.** Available once the installation has been activated, because
+ * "everything" only starts to mean something after there are tables, staff and
+ * takings — and it stays available afterwards even if the licence is later
+ * cancelled, since that is exactly when somebody needs their data out.
+ *
+ * Restoring the menu alone is safe against order history on purpose: an order
+ * item captures its name and price at the time and holds no foreign key to a
+ * product (see `schema.ts`), so replacing every product leaves last month's
+ * receipts reading exactly as they did.
+ */
+export const BackupScope = { MENU: 'menu', FULL: 'full' } as const;
+export type BackupScope = (typeof BackupScope)[keyof typeof BackupScope];
+
+/** The menu, the things it is priced and drawn with, and its photographs. */
+const MENU_TABLES: readonly string[] = [
+  'restaurant',
+  'currencies',
+  'categories',
+  'products',
+  'product_options',
+  'option_choices',
+  'addons',
+  'product_addons',
+  'assets',
+  'custom_locales',
+  'custom_themes',
+];
+
+/**
+ * Everything the restaurant owns, in dependency order so a restore can insert
+ * it back without disabling foreign keys.
+ *
+ * `user_sessions` and `terminal_sessions` are deliberately absent: a restore
+ * must not resurrect a signed-in tablet.
  */
 const BACKED_UP_TABLES: readonly string[] = [
   'restaurant',
@@ -69,8 +106,11 @@ const BACKED_UP_TABLES: readonly string[] = [
   'custom_themes',
 ];
 
+const tablesFor = (scope: BackupScope): readonly string[] =>
+  (scope === BackupScope.MENU ? MENU_TABLES : BACKED_UP_TABLES);
+
 /** Cleared before a restore, in reverse dependency order. */
-const RESTORE_CLEAR_ORDER: readonly string[] = [...BACKED_UP_TABLES].reverse();
+const clearOrderFor = (scope: BackupScope): readonly string[] => [...tablesFor(scope)].reverse();
 
 interface BackupPayload {
   readonly kind: 'qserve.restaurant.backup';
@@ -78,6 +118,8 @@ interface BackupPayload {
   readonly schemaVersion: number;
   readonly appVersion: string;
   readonly createdAt: string;
+  /** Absent in files written before scopes existed; those are full backups. */
+  readonly scope?: BackupScope;
   readonly tables: Record<string, Record<string, unknown>[]>;
   /** Menu and logo images, base64-encoded and keyed by asset id. */
   readonly assets: Record<string, { fileName: string; contentType: string; base64: string }>;
@@ -96,6 +138,7 @@ export class BackupService {
   async create(input: {
     passphrase: string;
     note: string | null;
+    scope?: BackupScope;
     actor: Actor;
     clientIp: string | null;
   }): Promise<BackupDescriptor> {
@@ -107,8 +150,9 @@ export class BackupService {
       });
     }
 
+    const scope = input.scope ?? BackupScope.FULL;
     const tables: Record<string, Record<string, unknown>[]> = {};
-    for (const table of BACKED_UP_TABLES) {
+    for (const table of tablesFor(scope)) {
       tables[table] = this.db.prepare(`SELECT * FROM ${table}`).all() as Record<string, unknown>[];
     }
 
@@ -118,7 +162,9 @@ export class BackupService {
       schemaVersion: RESTAURANT_SCHEMA_VERSION,
       appVersion: APP_VERSION,
       createdAt: nowIso(),
+      scope,
       tables,
+      // Both scopes carry the photographs: a menu without them is not a menu.
       assets: await this.collectAssets(),
     };
 
@@ -132,7 +178,9 @@ export class BackupService {
     });
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `${profile.restaurantId}-${stamp}.qsbk`;
+    // The scope is in the name so a folder of these can be told apart at a
+    // glance, months later, by somebody looking for "the menu one".
+    const fileName = `${profile.restaurantId}-${scope}-${stamp}.qsbk`;
     await writeFile(join(this.paths.backupsDir, fileName), file);
 
     const checksum = createHash('sha256').update(file).digest('hex');
@@ -152,7 +200,7 @@ export class BackupService {
       actor: input.actor,
       entityType: 'backup',
       entityId: fileName,
-      detail: { byteSize: file.length, note: input.note },
+      detail: { byteSize: file.length, note: input.note, scope },
       clientIp: input.clientIp,
     });
 
@@ -216,6 +264,8 @@ export class BackupService {
       );
     }
 
+    const scope = payload.scope ?? BackupScope.FULL;
+
     let rowCount = 0;
     const restore = this.db.transaction(() => {
       // Foreign keys are suspended only for the swap. `defer_foreign_keys`
@@ -223,11 +273,17 @@ export class BackupService {
       // references is rejected rather than silently imported.
       this.db.pragma('defer_foreign_keys = ON');
 
-      for (const table of RESTORE_CLEAR_ORDER) {
+      /*
+       * Only what this backup is about. A menu file replaces the menu and
+       * leaves the tables, the staff and the takings where they are — which is
+       * what somebody importing "the menu" expects, and the opposite of what
+       * clearing every table would do to them.
+       */
+      for (const table of clearOrderFor(scope)) {
         this.db.prepare(`DELETE FROM ${table}`).run();
       }
 
-      for (const table of BACKED_UP_TABLES) {
+      for (const table of tablesFor(scope)) {
         const rows = payload.tables[table] ?? [];
         if (rows.length === 0) continue;
 
@@ -261,7 +317,7 @@ export class BackupService {
 
     return {
       restaurantId: payload.restaurantId,
-      tables: BACKED_UP_TABLES.length,
+      tables: tablesFor(scope).length,
       rows: rowCount,
     };
   }
@@ -330,6 +386,91 @@ export class BackupService {
       if (error instanceof BackupError) throw conflict(error.message, { code: error.code });
       throw error;
     }
+  }
+
+  /**
+   * Read a backup and say what is in it, without touching anything.
+   *
+   * Restoring replaces what is here, and "are you sure" is a question nobody
+   * can answer without knowing what they are agreeing to. So the file is opened
+   * first and counted, and the person is shown the actual contents — 3
+   * categories, 24 dishes, 61 photographs — before the button that does it.
+   *
+   * Decrypting twice, once here and once to apply, is the cost. A backup is a
+   * few megabytes and this happens when somebody presses a button, so the cost
+   * is nothing and the alternative is holding a decrypted copy of a
+   * restaurant's entire database in memory between two requests.
+   */
+  async preview(file: Buffer, passphrase: string): Promise<{
+    scope: BackupScope;
+    restaurantId: string;
+    createdAt: string;
+    appVersion: string;
+    note: string | null;
+    counts: Record<string, number>;
+    replaces: Record<string, number>;
+  }> {
+    let payload: BackupPayload;
+    let note: string | null = null;
+    try {
+      const opened = readBackup<BackupPayload>(file, passphrase);
+      payload = opened.payload;
+      note = (opened as { note?: string | null }).note ?? null;
+    } catch (error) {
+      if (error instanceof BackupError) throw conflict(error.message, { code: error.code });
+      throw error;
+    }
+
+    if (payload.kind !== 'qserve.restaurant.backup') {
+      throw conflict('this file is not a QServe restaurant backup');
+    }
+
+    const scope = payload.scope ?? BackupScope.FULL;
+    const count = (table: string) => (payload.tables[table] ?? []).length;
+
+    /*
+     * Counted in the words a restaurant uses, not in table names. "products:
+     * 24" is a schema; "24 dishes" is a menu. Only the rows worth mentioning
+     * appear — nobody needs to be told how many role_permissions there are.
+     */
+    const named: Record<string, number> = {
+      categories: count('categories'),
+      products: count('products'),
+      options: count('product_options') + count('addons'),
+      images: Object.keys(payload.assets ?? {}).length,
+      languages: count('custom_locales'),
+      themes: count('custom_themes'),
+    };
+    if (scope === BackupScope.FULL) {
+      named['tables'] = count('dining_tables');
+      named['terminals'] = count('terminals');
+      named['people'] = count('users');
+      named['orders'] = count('orders');
+      named['payments'] = count('payments');
+    }
+
+    // And what would go. Being told what arrives without being told what leaves
+    // is half an answer.
+    const replaces: Record<string, number> = {};
+    for (const [name, table] of Object.entries({
+      categories: 'categories', products: 'products', images: 'assets',
+      ...(scope === BackupScope.FULL
+        ? { tables: 'dining_tables', people: 'users', orders: 'orders' }
+        : {}),
+    })) {
+      const row = this.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number };
+      replaces[name] = row.n;
+    }
+
+    return {
+      scope,
+      restaurantId: payload.restaurantId,
+      createdAt: payload.createdAt,
+      appVersion: payload.appVersion,
+      note,
+      counts: Object.fromEntries(Object.entries(named).filter(([, n]) => n > 0)),
+      replaces: Object.fromEntries(Object.entries(replaces).filter(([, n]) => n > 0)),
+    };
   }
 
   /** Keep the newest `backup.keepCount` files; delete the rest from disk. */

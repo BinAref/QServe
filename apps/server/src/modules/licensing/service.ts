@@ -246,6 +246,19 @@ export class LicensingService {
     if (input.rememberKey) this.repository.rememberKey(normalised);
     else this.repository.setKeyHint(normalised.slice(-5));
 
+    /*
+     * Remembered for good, and deliberately not cleared when a licence is
+     * cancelled.
+     *
+     * It decides one thing: whether this installation may take a backup of
+     * everything rather than of the menu alone. Before a first activation
+     * there is nothing but a menu, so a full backup would be a file of empty
+     * tables calling itself a backup of the restaurant. After one, there is
+     * history worth keeping — and the moment a restaurant most needs its data
+     * out is the moment after its licence has gone.
+     */
+    this.settings.set('setup.everActivated', true);
+
     this.audit.record({
       action: 'license.activated',
       actor: input.actor,

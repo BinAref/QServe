@@ -16,6 +16,7 @@ import {
 import { HttpResponse, Router } from '@qserve/http';
 import type { Services } from '../../container.js';
 import type { AppState } from '../../core/security.js';
+import { BackupScope } from '../../modules/backup/service.js';
 import { SECRET_PLACEHOLDER, SECRET_SETTING_KEYS } from '../../core/repositories/settings.js';
 
 export function createManagementRoutes(services: Services): Router<AppState> {
@@ -393,11 +394,42 @@ export function createManagementRoutes(services: Services): Router<AppState> {
   router.get('/backups', async () => ({ backups: await services.backup.list() }),
     [loopbackOnly, security.requirePermission(Permission.BACKUP_MANAGE)]);
 
+  /*
+   * Which backups this installation may take.
+   *
+   * The menu alone, always — building the menu is what a restaurant does
+   * first, and losing it to a reinstall before the licence arrives would be
+   * the worst hour of its week. Everything, once it has been activated: the
+   * rest of the data only starts to exist then. It stays available after a
+   * licence is cancelled, because that is exactly when somebody needs their
+   * data out.
+   */
+  router.get('/backups/scopes', () => ({
+    menu: true,
+    full: services.settings.get<boolean>('setup.everActivated') === true,
+  }), [loopbackOnly, canManageBackup]);
+
   router.post('/backups', async (ctx) => {
     const body = asObject(ctx.body);
+    const scope = optionalString(body, 'scope', { max: 8 }) === BackupScope.MENU
+      ? BackupScope.MENU
+      : BackupScope.FULL;
+
+    /*
+     * Asking for everything before this installation has ever been activated
+     * would produce a file of empty tables and call it a backup of the
+     * restaurant. The menu is what exists at that point, so that is what can
+     * be taken.
+     */
+    if (scope === BackupScope.FULL
+        && services.settings.get<boolean>('setup.everActivated') !== true) {
+      throw conflict('a full backup is available once this installation has been activated');
+    }
+
     return services.backup.create({
       passphrase: requireString(body, 'passphrase', { min: 8, max: 200, trim: false }),
       note: optionalString(body, 'note', { max: 300 }),
+      scope,
       actor: ctx.state.auth!.actor,
       clientIp: ctx.ip,
     });
@@ -415,6 +447,24 @@ export function createManagementRoutes(services: Services): Router<AppState> {
   }, [loopbackOnly, security.requirePermission(Permission.BACKUP_MANAGE)]);
 
   /** Header-only inspection before an operator commits to restoring. */
+  /**
+   * What is in this file, and what it would replace — without doing it.
+   *
+   * The last thing between a person and losing what they have. `inspect` reads
+   * the unencrypted header; this opens the file properly and counts, so the
+   * confirmation can say "24 dishes and 61 photographs will replace the 12
+   * dishes here" instead of "are you sure".
+   */
+  router.post('/backups/preview', async (ctx) => {
+    const file = ctx.body;
+    if (!Buffer.isBuffer(file)) {
+      throw validationError('send the backup file as application/octet-stream');
+    }
+    const passphrase = ctx.query.get('passphrase');
+    if (!passphrase) throw validationError('a passphrase is required', { field: 'passphrase' });
+    return services.backup.preview(file, passphrase);
+  }, [loopbackOnly, canManageBackup]);
+
   router.post('/backups/inspect', async (ctx) => {
     const file = ctx.body;
     if (!Buffer.isBuffer(file)) {
