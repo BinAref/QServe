@@ -37,7 +37,31 @@ export interface RestaurantRow {
  * Defaults for every setting the product ships with. A missing row reads as the
  * default, so upgrades that introduce a setting need no data migration.
  */
+/*
+ * Remote access, which this release does not serve.
+ *
+ * Reaching a restaurant's menu from outside its own Wi-Fi will be a separate
+ * subscription, sold separately from the lifetime licence, and these are the
+ * three facts an installation would need to hold about one. They are here, off,
+ * for a reason that is easy to state and easy to get wrong later: whatever
+ * arrives must be *bookkeeping*, not a dependency.
+ *
+ * An expired remote subscription is not a reason for a till to stop taking
+ * money. The licence gate decides what a restaurant may do and has never heard
+ * of these keys; nothing in the operational path reads them. The test in
+ * `access-surfaces.test.ts` is what keeps that true.
+ */
+const REMOTE_ACCESS_DEFAULTS = {
+  /** DISABLED · TRIAL · ACTIVE · EXPIRED · SUSPENDED. */
+  'remote.status': 'DISABLED',
+  /** e.g. r001.menu.binaref.com, assigned when a subscription starts. */
+  'remote.hostname': null,
+  'remote.expiresAt': null,
+} as const;
+
 export const DEFAULT_SETTINGS: Readonly<Record<string, unknown>> = {
+  ...REMOTE_ACCESS_DEFAULTS,
+
   'orders.autoAcceptFromCustomer': false,
   'orders.requireGuestCount': false,
   'orders.allowCustomerNotes': true,

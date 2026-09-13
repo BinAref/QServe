@@ -71,6 +71,26 @@ export class Router<S = Record<string, unknown>> {
     return this;
   }
 
+  /**
+   * Every route this router carries, for code that has to reason about the
+   * whole surface rather than serve one request.
+   *
+   * Two callers, both about what is reachable rather than about routing: the
+   * public menu surface is built by taking a router and keeping only its reads,
+   * and a test walks each listener asserting nothing dangerous is mounted where
+   * a stranger could reach it. A route added to the wrong router is the kind of
+   * mistake that is invisible in review and obvious in a breach.
+   */
+  list(): readonly { method: HttpMethod; path: string;
+    handler: Handler<S>; middleware: readonly Middleware<S>[] }[] {
+    return this.routes.map((route) => ({
+      method: route.method,
+      path: `/${route.segments.join('/')}`,
+      handler: route.handler,
+      middleware: route.middleware,
+    }));
+  }
+
   /** Methods allowed for a path, so 405 replies can advertise `Allow`. */
   allowedMethods(path: string): HttpMethod[] {
     const segments = splitPath(path);

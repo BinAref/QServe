@@ -451,7 +451,7 @@ function field(label, name, value) {
  */
 // `setup.` holds first-run bookkeeping — answered questions, not choices
 // anybody should meet again in a settings list.
-const HIDDEN_SETTINGS = ['backup.passphrase', 'security.', 'license.', 'setup.'];
+const HIDDEN_SETTINGS = ['backup.passphrase', 'security.', 'license.', 'setup.', 'remote.'];
 
 /** `orders.autoAcceptFromCustomer` → `setting.orders.auto_accept_from_customer`. */
 const settingKey = (key) => {
