@@ -539,7 +539,16 @@ function drawArchive() {
  */
 function toCsv(rows) {
   const escape = (value) => {
-    const text = value === null || value === undefined ? '' : String(value);
+    let text = value === null || value === undefined ? '' : String(value);
+    /*
+     * A leading =, +, - or @ makes a spreadsheet treat the cell as a formula,
+     * and one of these columns is not ours: the device label arrives from a
+     * restaurant's own computer when it activates. A customer who named their
+     * machine \`=cmd|'/c calc'!A1\` would be running it on the vendor's desktop
+     * the moment they opened their own customer list. A leading apostrophe is
+     * what tells every spreadsheet "this is text"; it is not shown in the cell.
+     */
+    if (/^[=+\\-@\\t\\r]/.test(text)) text = "'" + text;
     return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
   };
   return '\\uFEFF' + rows.map((row) => row.map(escape).join(',')).join('\\r\\n');
