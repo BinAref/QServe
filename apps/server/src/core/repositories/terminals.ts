@@ -100,6 +100,21 @@ export class TerminalRepository {
       | undefined;
   }
 
+  /**
+   * The terminal a scanned code belongs to.
+   *
+   * The token is the whole of the link, so this is the lookup a scan performs.
+   * An exact match on a 32-character random string is not a comparison anybody
+   * can walk: there is nothing to guess and nothing in the URL that says which
+   * table it opens.
+   */
+  getByEnrolToken(token: string): TerminalRow | undefined {
+    if (token.length < 16) return undefined;
+    return this.db.prepare('SELECT * FROM terminals WHERE enrol_token = ?').get(token) as
+      | TerminalRow
+      | undefined;
+  }
+
   list(type?: TerminalType): TerminalRow[] {
     return type
       ? (this.db

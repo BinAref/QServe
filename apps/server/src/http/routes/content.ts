@@ -296,6 +296,51 @@ function localisedName(profile: { name: unknown; defaultLocale?: string } | null
 export function createEnrolmentRoutes(services: Services): Router<AppState> {
   const router = new Router<AppState>();
 
+  /**
+   * The opaque link a printed card carries.
+   *
+   * `/t/<token>` and nothing else: no restaurant, no table number, no hint of
+   * whether this opens a menu or the pass. The token is the whole of it, which
+   * is why there is nothing here to guess at and nothing to walk.
+   */
+  router.get('/t/:token', (ctx) => {
+    services.gate.assert(Capability.LAN_SERVER);
+
+    const resolved = services.terminals.resolveToken(ctx.params['token']!);
+    // One indistinguishable failure for an unknown code, a disabled station and
+    // a rotated one: a scanner should learn nothing by trying.
+    if (!resolved) throw forbidden('this QR code is not valid for this restaurant');
+
+    const sessionToken = services.terminals.enrol({
+      row: resolved.row,
+      ttlSeconds: services.config.terminalSessionTtlSeconds,
+      clientIp: ctx.ip,
+      userAgent: optionalString(
+        { ua: ctx.req.headers['user-agent'] ?? '' }, 'ua', { max: 300 },
+      ),
+    });
+
+    services.audit.record({
+      action: 'terminal.enrolled',
+      actor: {
+        kind: 'TERMINAL',
+        userId: null,
+        userName: null,
+        terminalId: resolved.row.id,
+        terminalName: resolved.row.public_code,
+      },
+      entityType: 'terminal',
+      entityId: resolved.row.id,
+      detail: { type: resolved.row.terminal_type },
+      clientIp: ctx.ip,
+    });
+
+    return new HttpResponse(302, null, {
+      location: resolved.landingPath,
+      'set-cookie': terminalCookie(sessionToken, services.config.terminalSessionTtlSeconds),
+    });
+  });
+
   router.get('/r/:restaurantId/:target', (ctx) => {
     // Before activation there is no live service to enrol into, and the LAN
     // listener is not even bound — this is belt and braces for the case where

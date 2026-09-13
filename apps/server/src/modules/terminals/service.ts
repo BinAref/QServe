@@ -65,9 +65,20 @@ export class TerminalService {
     const profile = this.settings.profile();
     if (!base || !profile) return null;
 
-    const table = this.tables.getByTerminal(row.id);
-    const target = table?.id ?? row.id;
-    return `${base}/r/${profile.restaurantId}/${target}?k=${encodeURIComponent(row.enrol_token)}`;
+    /*
+     * One opaque segment, and nothing else.
+     *
+     * The link used to read `/r/REST-000001/TABLE-7?k=…`, which told anybody
+     * holding a card that this restaurant has a table 7 — and invited them to
+     * try table 8. The token always gated it, so nothing was ever reachable
+     * that way, but a link whose shape is an invitation is a link people
+     * accept. Now the card says nothing at all: not the restaurant, not the
+     * table, not whether it is a table or the pass.
+     *
+     * Rotating a station's code, which the console already offers, changes the
+     * whole link — there is no stable part left to remember.
+     */
+    return `${base}/t/${encodeURIComponent(row.enrol_token)}`;
   }
 
   async qrFor(terminalId: string): Promise<QrDescriptor> {
@@ -313,6 +324,20 @@ export class TerminalService {
    * Resolve a scanned QR to a terminal. Returns null for anything that does not
    * match exactly — a wrong restaurant, an unknown target, a bad secret — so the
    * caller can answer with one indistinguishable failure.
+   */
+  /** A scan of the opaque link: the token is the whole of it. */
+  resolveToken(token: string): { row: TerminalRow; landingPath: string } | null {
+    const row = this.terminals.getByEnrolToken(token);
+    if (!row || row.status !== TerminalStatus.ACTIVE) return null;
+    return { row, landingPath: LANDING_PATH[row.terminal_type] ?? '/waiter' };
+  }
+
+  /**
+   * The older link shape, kept working.
+   *
+   * Cards printed before the change are on tables in a restaurant somewhere,
+   * and reprinting every one of them is not a thing to make somebody do for a
+   * URL. New codes are opaque; old ones keep opening what they always opened.
    */
   resolveScan(input: {
     restaurantId: string;
