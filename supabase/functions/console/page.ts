@@ -1,15 +1,16 @@
 /**
  * The vendor console, as one page.
  *
- * Served by an Edge Function so it needs nothing installed and nothing running:
- * the vendor opens a URL on a laptop, or the vendor phone app opens the same
- * URL in its WebView, and both are looking at the same live database. There is
- * no local server any more, which was the point.
+ * Three verbs and nothing else: issue a licence, look at it, delete it. A
+ * restaurant moving to a new computer is issued another licence like anybody
+ * else — there is no transfer, and issuing one does not touch the old one. The
+ * vendor decides when a licence goes.
  *
- * Written as a string rather than as files because an Edge Function deploys a
- * module, not a directory of assets, and one page with its styles and its
- * behaviour inside it is honest about what this is: a few hundred lines that
- * put four database functions in front of a person.
+ * It ships inside the vendor's own download rather than being hosted, because
+ * Supabase deliberately answers HTML from its own domain as plain text inside a
+ * sandbox, so that a page served there cannot run same-origin with the API.
+ * That turns out to be the better arrangement: nothing to keep online, and the
+ * console works the moment it is installed.
  */
 
 export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doctype html>
@@ -89,7 +90,6 @@ export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doc
   }
   .pill.ok { color: var(--ok); }
   .pill.pending { color: var(--warn); }
-  .pill.gone { color: var(--muted); }
   .restaurant { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
   .restaurant > summary {
     padding: 12px var(--pad); cursor: pointer; background: var(--surface);
@@ -102,11 +102,14 @@ export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doc
     border: 1px solid var(--border); border-radius: 10px; padding: 12px;
     margin-bottom: 10px; background: var(--surface-2);
   }
-  .licence.gone { opacity: 0.62; }
-  .keyout {
-    font-family: var(--mono); font-size: 19px; letter-spacing: 0.06em;
-    padding: 14px; border-radius: 10px; text-align: center; word-break: break-all;
-    border: 1px solid var(--border-strong);
+  .keyline {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0;
+  }
+  .keyline code {
+    font-family: var(--mono); font-size: 15px; letter-spacing: 0.04em;
+    padding: 8px 12px; border-radius: 8px; background: var(--surface);
+    border: 1px solid var(--border-strong); flex: 1 1 auto; word-break: break-all;
+    user-select: all;
   }
   dialog {
     border: 1px solid var(--border); border-radius: 14px; padding: 0;
@@ -148,14 +151,14 @@ export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doc
     <div class="mark">QS</div>
     <h1>Licences</h1>
     <span class="grow"></span>
+    <button id="export" class="ghost">Download everything</button>
     <span id="who" class="muted small"></span>
     <button id="signout" class="ghost">Sign out</button>
   </header>
   <main>
     <div class="card">
       <h2>New restaurant</h2>
-      <p class="muted small">Creates the restaurant and issues its first licence. The key is
-        shown once and never stored — only its fingerprint is kept.</p>
+      <p class="muted small">Creates the restaurant and issues its first licence.</p>
       <form id="new-form">
         <label><span>Restaurant name</span><input name="restaurantName" required maxlength="200" /></label>
         <div class="row">
@@ -166,32 +169,26 @@ export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doc
           <label><span>Email</span><input name="contactEmail" type="email" maxlength="200" /></label>
           <label><span>Country</span><input name="country" maxlength="80" /></label>
         </div>
-        <label><span>Notes</span><textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+        <label><span>Notes about this licence</span><textarea name="notes" rows="2" maxlength="2000"></textarea></label>
         <button class="primary" type="submit">Create and issue a licence</button>
       </form>
     </div>
     <div id="list"></div>
+    <details class="card" id="archive-box">
+      <summary><strong>Deleted licences</strong>
+        <span class="muted small" id="archive-count"></span></summary>
+      <p class="muted small" style="margin-top:10px">Kept on this computer only. Deleting a
+        licence removes it from the database; this is the copy that stays with you.</p>
+      <div id="archive"></div>
+    </details>
   </main>
 </div>
-
-<dialog id="keydialog">
-  <div class="inner">
-    <h2 id="keytitle">The licence key</h2>
-    <p class="small muted">Copy it now. It is shown once — the database keeps only its
-      fingerprint, so nobody, including us, can read it back.</p>
-    <div class="keyout" id="keyvalue"></div>
-  </div>
-  <footer>
-    <button id="keycopy">Copy</button>
-    <button class="primary" id="keydone">Done</button>
-  </footer>
-</dialog>
 
 <dialog id="askdialog">
   <div class="inner">
     <h2 id="asktitle"></h2>
     <p id="askbody" class="small muted"></p>
-    <label><span>Reason (kept in the log)</span><input id="askreason" maxlength="200" /></label>
+    <label id="askreasonbox"><span>Reason (kept in the log)</span><input id="askreason" maxlength="200" /></label>
   </div>
   <footer>
     <button id="askno">Cancel</button>
@@ -207,9 +204,9 @@ const ANON = ${JSON.stringify(config.anonKey)};
 
 /*
  * A copy of packages/shared/src/license-key.ts, because this page runs in a
- * browser with no access to the repository. \`validate:supabase\` checks this
- * copy against the original on every build — a key generated here that the
- * restaurant's checksum rejects would be a key somebody has paid for.
+ * browser with no access to the repository. \`validate:supabase\` lifts this
+ * copy back out of the built page and checks it against the original — a key
+ * issued here that the restaurant's checksum rejects is a key somebody paid for.
  */
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const BODY_LENGTH = 19;
@@ -248,8 +245,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
  * Most of what is shown here was typed by the vendor, but not all of it: a
  * device label arrives from a restaurant's own computer during activation, and
  * a customer who named their machine with a script tag would be running it
- * inside the console that can revoke every licence in the database. One
- * innerHTML on that line is a stolen vendor session.
+ * inside the console that can delete every licence in the database.
  */
 function node(tag, attrs, ...children) {
   const element = document.createElement(tag);
@@ -273,6 +269,15 @@ function toast(message) {
   setTimeout(() => box.remove(), 3200);
 }
 
+async function copy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Copied');
+  } catch {
+    toast('Select it and copy by hand');
+  }
+}
+
 async function rpc(name, args) {
   const res = await fetch(URL_BASE + '/rest/v1/rpc/' + name, {
     method: 'POST',
@@ -288,6 +293,32 @@ async function rpc(name, args) {
   const parsed = text ? JSON.parse(text) : null;
   if (parsed && parsed.error) throw new Error(parsed.detail || parsed.error);
   return parsed;
+}
+
+/* ---------------------------------------------- what stays on this computer */
+
+/*
+ * The vendor's own copy of what they deleted.
+ *
+ * Deleting a licence takes it out of the database, which is what deleting is
+ * meant to mean. But the vendor still has to be able to answer "what did we
+ * sell that restaurant in March", so the row is written here first. It never
+ * leaves this machine and it is included in the download.
+ */
+const ARCHIVE = 'qserve.deleted';
+
+function archived() {
+  try { return JSON.parse(localStorage.getItem(ARCHIVE) || '[]'); } catch { return []; }
+}
+
+function archive(entry) {
+  try {
+    const all = archived();
+    all.unshift(entry);
+    localStorage.setItem(ARCHIVE, JSON.stringify(all.slice(0, 2000)));
+  } catch {
+    toast('Could not keep a local copy — this browser is blocking storage');
+  }
 }
 
 /* --------------------------------------------------------------- sign in */
@@ -335,6 +366,7 @@ function ask(options) {
     el('asktitle').textContent = options.title;
     el('askbody').textContent = options.body;
     el('askreason').value = '';
+    el('askreasonbox').hidden = options.reason === false;
     el('askyes').textContent = options.confirmLabel;
     let answered = false;
     // Answered on the button, not on the dialog's close event: a browser that
@@ -346,113 +378,86 @@ function ask(options) {
   });
 }
 
-function showKey(key, title) {
-  el('keytitle').textContent = title;
-  el('keyvalue').textContent = key;
-  el('keycopy').onclick = async () => {
-    try { await navigator.clipboard.writeText(key); toast('Copied'); }
-    catch { toast('Select it and copy by hand'); }
-  };
-  el('keydone').onclick = () => el('keydialog').close();
-  el('keydialog').showModal();
-}
-
 /* ------------------------------------------------------------------ views */
 
 function licenceCard(licence, restaurant) {
-  const gone = Boolean(licence.deletedAt);
-  const box = node('div', { class: 'licence' + (gone ? ' gone' : '') });
-
-  const state = gone
-    ? node('span', { class: 'pill gone' }, licence.status === 'TRANSFERRED' ? 'moved' : 'withdrawn')
-    : licence.status === 'ACTIVE'
-      ? node('span', { class: 'pill ok' }, 'in use')
-      : node('span', { class: 'pill pending' }, 'not activated yet');
+  const box = node('div', { class: 'licence' });
 
   box.append(node('div', { style: 'display:flex;gap:8px;align-items:baseline;flex-wrap:wrap' },
     node('strong', { class: 'mono' }, licence.licenseId),
-    state,
+    licence.status === 'ACTIVE'
+      ? node('span', { class: 'pill ok' }, 'in use')
+      : node('span', { class: 'pill pending' }, 'not activated yet'),
     node('span', { style: 'flex:1' }),
-    node('span', { class: 'muted small' }, 'ends ' + licence.keyHint)));
+    node('span', { class: 'muted small' }, 'issued ' + when(licence.createdAt))));
 
-  const facts = ['issued ' + when(licence.createdAt)];
+  // The key, readable. A customer who has lost theirs rings up, and the vendor
+  // has to be able to read it back rather than issue a replacement.
+  box.append(node('div', { class: 'keyline' },
+    node('code', {}, licence.key || '(key not recorded)'),
+    node('button', {
+      onclick: () => copy(licence.key || ''),
+    }, 'Copy')));
+
+  const facts = [];
   if (licence.activatedAt) facts.push('activated ' + when(licence.activatedAt));
-  if (licence.device) {
-    facts.push('on ' + (licence.device.label || licence.device.fingerprint.slice(0, 12)));
+  if (licence.deviceLabel || licence.device) {
+    facts.push('on ' + (licence.deviceLabel || licence.device.slice(0, 12)));
   }
-  if (licence.transferOf) facts.push('replaces ' + licence.transferOf);
-  if (licence.deletedReason) facts.push(licence.deletedReason);
-  box.append(node('div', { class: 'small muted' }, facts.join(' · ')));
-
-  if (gone) return box;
-
-  const move = node('button', {
-    onclick: async () => {
-      const reason = await ask({
-        title: 'Move this licence',
-        body: 'The current key stops working and a new one is issued to ' + restaurant.name
-          + '. The machine holding it is released. Both halves are logged.',
-        confirmLabel: 'Move it',
-      });
-      if (reason === null) return;
-      const key = generateLicenseKey();
-      const out = await rpc('transfer_license', {
-        p_license_id: licence.licenseId,
-        p_new_key_hash: await sha256Hex(key),
-        p_new_key_hint: key.slice(-5),
-        p_reason: reason,
-        p_actor: session.user.email,
-      }).catch((e) => { toast(e.message); return null; });
-      if (!out) return;
-      showKey(key, 'The replacement key');
-      await refresh();
-    },
-  }, 'Move to a new key');
-
-  const drop = node('button', {
-    class: 'danger',
-    onclick: async () => {
-      const reason = await ask({
-        title: 'Withdraw this licence',
-        body: 'The key stops working and the machine holding it is released. Nothing is '
-          + 'erased: the licence, its activations and its history stay in the record.',
-        confirmLabel: 'Withdraw it',
-      });
-      if (reason === null) return;
-      const out = await rpc('delete_license', {
-        p_license_id: licence.licenseId, p_reason: reason, p_actor: session.user.email,
-      }).catch((e) => { toast(e.message); return null; });
-      if (!out) return;
-      toast('Withdrawn');
-      await refresh();
-    },
-  }, 'Withdraw');
-
-  const history = node('button', {
-    class: 'ghost',
-    onclick: async () => {
-      const out = await rpc('license_history', { p_license_id: licence.licenseId })
-        .catch((e) => { toast(e.message); return null; });
-      if (!out) return;
-      const lines = out.log.map((l) => when(l.at) + ' · ' + l.action + ' · ' + l.actor)
-        .concat(out.activations.map((a) => when(a.activatedAt) + ' · activated on '
-          + (a.label || a.device.slice(0, 12))
-          + (a.releasedAt ? ' (released ' + when(a.releasedAt) + ')' : '')));
-      history.replaceWith(node('pre', {
-        class: 'small mono', style: 'white-space:pre-wrap;margin-top:10px',
-      }, lines.join('\\n') || 'nothing recorded yet'));
-    },
-  }, 'History');
+  if (licence.appVersion) facts.push('v' + licence.appVersion);
+  if (facts.length) box.append(node('div', { class: 'small muted' }, facts.join(' · ')));
+  if (licence.notes) box.append(node('p', { class: 'small', style: 'margin:8px 0 0' }, licence.notes));
 
   box.append(node('div', { style: 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap' },
-    move, drop, history));
+    node('button', {
+      class: 'danger',
+      onclick: async () => {
+        const reason = await ask({
+          title: 'Delete this licence',
+          body: 'It leaves the database and the key stops working. A copy is kept on this '
+            + 'computer, under "Deleted licences", and appears in the download.',
+          confirmLabel: 'Delete it',
+        });
+        if (reason === null) return;
+        archive({
+          deletedAt: new Date().toISOString(), reason,
+          restaurantId: restaurant.restaurantId, restaurantName: restaurant.name,
+          licenseId: licence.licenseId, key: licence.key, notes: licence.notes,
+          status: licence.status, activatedAt: licence.activatedAt,
+          deviceLabel: licence.deviceLabel,
+        });
+        const out = await rpc('delete_license', {
+          p_license_id: licence.licenseId, p_reason: reason, p_actor: session.user.email,
+        }).catch((e) => { toast(e.message); return null; });
+        if (!out) return;
+        toast('Deleted');
+        await refresh();
+      },
+    }, 'Delete')));
+
   return box;
 }
 
+async function issueFor(restaurant, notes) {
+  const key = generateLicenseKey();
+  const out = await rpc('issue_license', {
+    p_restaurant_id: restaurant.restaurantId, p_restaurant_name: null,
+    p_contact_name: null, p_contact_phone: null, p_contact_email: null,
+    p_country: null, p_notes: notes || null, p_license_type: 'PERPETUAL',
+    p_key: key, p_key_hash: await sha256Hex(key), p_key_hint: key.slice(-5),
+    p_actor: session.user.email,
+  }).catch((e) => { toast(e.message); return null; });
+  if (!out) return;
+  toast('Issued ' + out.licenseId);
+  await refresh();
+}
+
 async function refresh() {
+  drawArchive();
   const list = el('list');
   list.replaceChildren();
   const data = await rpc('vendor_overview').catch((e) => { toast(e.message); return []; });
+  window.__data = data;
 
   if (!data || data.length === 0) {
     list.append(node('div', { class: 'card empty' }, 'No restaurants yet.'));
@@ -460,14 +465,11 @@ async function refresh() {
   }
 
   for (const restaurant of data) {
-    const live = restaurant.licenses.filter((l) => !l.deletedAt);
-
     const summary = node('summary', {},
       node('strong', {}, restaurant.name),
       node('span', { class: 'mono small muted' }, restaurant.restaurantId),
       node('span', { style: 'flex:1' }),
-      node('span', { class: 'small muted' },
-        live.length + ' live · ' + restaurant.licenses.length + ' total'));
+      node('span', { class: 'small muted' }, restaurant.licenses.length + ' licence(s)'));
 
     const body = node('div', { class: 'body' });
 
@@ -484,27 +486,108 @@ async function refresh() {
 
     for (const licence of restaurant.licenses) body.append(licenceCard(licence, restaurant));
 
-    body.append(node('button', {
-      onclick: async () => {
-        const key = generateLicenseKey();
-        const out = await rpc('issue_license', {
-          p_restaurant_id: restaurant.restaurantId, p_restaurant_name: null,
-          p_contact_name: null, p_contact_phone: null, p_contact_email: null,
-          p_country: null, p_notes: null, p_license_type: 'PERPETUAL',
-          p_key_hash: await sha256Hex(key), p_key_hint: key.slice(-5),
-          p_actor: session.user.email,
-        }).catch((e) => { toast(e.message); return null; });
-        if (!out) return;
-        showKey(key, 'The licence key for ' + restaurant.name);
-        await refresh();
-      },
-    }, 'Issue another licence'));
+    /*
+     * Another licence for the same restaurant — which is how a move to a new
+     * computer is handled. The old one is not touched: the restaurant may still
+     * be trading on it until the new machine is ready, and deciding when it
+     * goes is the vendor's call, not a side effect of this button.
+     */
+    const notes = node('input', { placeholder: 'Notes for the new licence', maxlength: '2000' });
+    body.append(node('div', { class: 'row', style: 'margin-top:6px' },
+      notes,
+      node('button', {
+        style: 'flex:0 0 auto',
+        onclick: () => issueFor(restaurant, notes.value.trim()),
+      }, 'Issue another licence')));
 
     const box = node('details', { class: 'restaurant' }, summary, body);
-    if (live.length > 0) box.open = true;
+    if (restaurant.licenses.length > 0) box.open = true;
     list.append(box);
   }
 }
+
+function drawArchive() {
+  const all = archived();
+  el('archive-count').textContent = all.length ? ' · ' + all.length : ' · none';
+  const target = el('archive');
+  target.replaceChildren();
+  for (const entry of all.slice(0, 100)) {
+    const box = node('div', { class: 'licence' });
+    box.append(node('div', { class: 'small' },
+      node('strong', { class: 'mono' }, entry.licenseId || '—'),
+      ' · ' + (entry.restaurantName || entry.restaurantId || '')));
+    box.append(node('div', { class: 'keyline' },
+      node('code', {}, entry.key || '(not recorded)'),
+      node('button', { onclick: () => copy(entry.key || '') }, 'Copy')));
+    box.append(node('div', { class: 'small muted' },
+      'deleted ' + when(entry.deletedAt) + (entry.reason ? ' · ' + entry.reason : '')));
+    if (entry.notes) box.append(node('p', { class: 'small', style: 'margin:6px 0 0' }, entry.notes));
+    target.append(box);
+  }
+}
+
+/* ------------------------------------------------------------- the download */
+
+/*
+ * A spreadsheet, as CSV.
+ *
+ * CSV rather than a real .xlsx because Excel opens it directly, so does every
+ * other spreadsheet, and it needs no library — and a vendor who wants their
+ * customer list is not helped by waiting for a 400 KB dependency to load. The
+ * byte-order mark is what makes Excel read the Arabic correctly instead of
+ * showing mojibake.
+ */
+function toCsv(rows) {
+  const escape = (value) => {
+    const text = value === null || value === undefined ? '' : String(value);
+    return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+  };
+  return '\\uFEFF' + rows.map((row) => row.map(escape).join(',')).join('\\r\\n');
+}
+
+el('export').addEventListener('click', () => {
+  const data = window.__data || [];
+  const rows = [[
+    'Restaurant ID', 'Restaurant', 'Contact', 'Phone', 'Email', 'Country',
+    'Licence ID', 'Key', 'Status', 'Notes', 'Activated', 'Device', 'Version',
+    'Issued', 'Deleted', 'Delete reason',
+  ]];
+
+  for (const restaurant of data) {
+    if (restaurant.licenses.length === 0) {
+      rows.push([restaurant.restaurantId, restaurant.name, restaurant.contactName,
+        restaurant.contactPhone, restaurant.contactEmail, restaurant.country,
+        '', '', '', '', '', '', '', '', '', '']);
+      continue;
+    }
+    for (const licence of restaurant.licenses) {
+      rows.push([restaurant.restaurantId, restaurant.name, restaurant.contactName,
+        restaurant.contactPhone, restaurant.contactEmail, restaurant.country,
+        licence.licenseId, licence.key, licence.status, licence.notes,
+        licence.activatedAt, licence.deviceLabel || licence.device, licence.appVersion,
+        licence.createdAt, '', '']);
+    }
+  }
+
+  // The deleted ones too: they are gone from the database and this file is the
+  // only place both halves of the record appear together.
+  for (const entry of archived()) {
+    rows.push([entry.restaurantId, entry.restaurantName, '', '', '', '',
+      entry.licenseId, entry.key, entry.status, entry.notes, entry.activatedAt,
+      entry.deviceLabel, '', '', entry.deletedAt, entry.reason]);
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' });
+  const link = node('a', {
+    href: URL.createObjectURL(blob),
+    download: 'qserve-licences-' + stamp + '.csv',
+  });
+  document.body.append(link);
+  link.click();
+  setTimeout(() => { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+  toast('Downloaded ' + (rows.length - 1) + ' row(s)');
+});
 
 el('new-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -519,13 +602,14 @@ el('new-form').addEventListener('submit', async (event) => {
     p_country: form.get('country') || null,
     p_notes: form.get('notes') || null,
     p_license_type: 'PERPETUAL',
+    p_key: key,
     p_key_hash: await sha256Hex(key),
     p_key_hint: key.slice(-5),
     p_actor: session.user.email,
   }).catch((e) => { toast(e.message); return null; });
   if (!out) return;
   event.target.reset();
-  showKey(key, 'The licence key for ' + out.restaurantId);
+  toast('Created ' + out.restaurantId);
   await refresh();
 });
 
@@ -539,6 +623,8 @@ try {
     // proves it either way, and failing lands on the sign-in form.
     await rpc('vendor_overview');
     await start();
+  } else {
+    drawArchive();
   }
 } catch (error) {
   session = null;

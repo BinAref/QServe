@@ -245,7 +245,17 @@ async function activate(body: Body, ip: string): Promise<Response> {
   });
 
   if (decided.error) {
-    return fail(Number(decided.status ?? 400), String(decided.error), String(decided.detail ?? ''));
+    /*
+     * The details travel with the refusal. "That key is wrong" is a different
+     * sentence from "that key is wrong and you have two tries left before this
+     * computer waits a day", and the second one is the only one that lets
+     * somebody stop and go and find the right key.
+     */
+    return fail(Number(decided.status ?? 400), String(decided.error), String(decided.detail ?? ''), {
+      ...(decided.attemptsLeft !== undefined ? { attemptsLeft: decided.attemptsLeft } : {}),
+      ...(decided.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: decided.retryAfterSeconds } : {}),
+    });
   }
 
   const certificate = await issueCertificate({
@@ -272,6 +282,15 @@ async function activate(body: Body, ip: string): Promise<Response> {
   });
 }
 
+/**
+ * The restaurant giving its licence back.
+ *
+ * Kept at the path the installation already calls, because what changed is
+ * what the word means rather than who says it: releasing a binding used to
+ * leave the licence sitting there spent, and now the licence leaves the
+ * database. After this the vendor's console shows nothing and the restaurant
+ * asks for a new one.
+ */
 async function deactivate(body: Body, ip: string): Promise<Response> {
   const key = requireKey(body);
   if (!key) {
@@ -283,10 +302,9 @@ async function deactivate(body: Body, ip: string): Promise<Response> {
     return fail(400, 'VALIDATION', 'deviceFingerprint must be 64 hex characters');
   }
 
-  const decided = await rpc('deactivate_license', {
+  const decided = await rpc('cancel_license', {
     p_key_hash: await hashToken(key),
     p_fingerprint: fingerprint,
-    p_reason: typeof body.reason === 'string' ? body.reason : 'moving to another device',
     p_client_ip: ip,
   });
 
@@ -294,8 +312,9 @@ async function deactivate(body: Body, ip: string): Promise<Response> {
     return fail(Number(decided.status ?? 400), String(decided.error), String(decided.detail ?? ''));
   }
   return json(200, {
-    licenseId: decided.licenseId,
-    status: decided.status,
+    licenseId: decided.licenseId ?? null,
+    status: 'DEACTIVATED',
+    alreadyGone: decided.alreadyGone === true,
     nonce: typeof body.nonce === 'string' ? body.nonce : '',
   });
 }
