@@ -12,7 +12,7 @@
 import test, { after, before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BackupScope } from '../modules/backup/service.js';
+import { BackupScope, IMPORT_GROUPS } from '../modules/backup/service.js';
 import { createInstallation, seedRestaurant, seedUser, type Installation } from './harness.js';
 import { SystemRole } from '@qserve/shared';
 
@@ -136,5 +136,80 @@ describe('the preview says what would happen', () => {
       (db.prepare('SELECT COUNT(*) AS n FROM products').get() as { n: number }).n, before.n,
       'and looking must never change anything',
     );
+  });
+});
+
+describe('taking some of a backup and not the rest', () => {
+
+  test('the preview offers only what the file holds', async () => {
+    const { services } = installation;
+    const created = await services.backup.create({
+      passphrase: PASSPHRASE, note: null, scope: BackupScope.MENU,
+      actor: installation.systemActor, clientIp: null,
+    });
+    const preview = await services.backup.preview(
+      await services.backup.read(created.fileName), PASSPHRASE);
+
+    const offered = preview.groups.map((group) => group.name);
+    assert.ok(offered.includes('menu'), 'a menu file offers the menu');
+    assert.equal(offered.includes('orders'), false,
+      'and never offers what it does not contain — a greyed-out list is a worse list');
+  });
+
+  test('ticking the dishes and not the photographs leaves the photographs alone', async () => {
+    const { services } = installation;
+    const db = installation.services.db;
+
+    const created = await services.backup.create({
+      passphrase: PASSPHRASE, note: null, scope: BackupScope.MENU,
+      actor: installation.systemActor, clientIp: null,
+    });
+
+    const productsBefore = (db.prepare('SELECT COUNT(*) AS n FROM products')
+      .get() as { n: number }).n;
+    db.prepare('DELETE FROM products').run();
+    const assetsBefore = (db.prepare('SELECT COUNT(*) AS n FROM assets').get() as { n: number }).n;
+
+    const done = await services.backup.restore({
+      file: await services.backup.read(created.fileName),
+      passphrase: PASSPHRASE,
+      groups: ['menu'],
+      actor: installation.systemActor,
+      clientIp: null,
+    });
+
+    assert.deepEqual(done.groups, ['menu'], 'only what was asked for');
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM products').get() as { n: number }).n,
+      productsBefore, 'the dishes came back');
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM assets').get() as { n: number }).n,
+      assetsBefore, 'and the photographs were never touched');
+  });
+
+  test('choosing orders brings the people who took them', () => {
+    // Stated as data rather than discovered at COMMIT: an order names the
+    // table, the terminal and the person, and importing it without them
+    // produces rows pointing at nobody.
+    assert.deepEqual([...IMPORT_GROUPS['orders']!.requires].sort(),
+      ['people', 'tables', 'terminals']);
+    assert.deepEqual([...IMPORT_GROUPS['tables']!.requires], ['terminals']);
+  });
+
+  test('asking for something the file does not have is refused', async () => {
+    const { services } = installation;
+    const created = await services.backup.create({
+      passphrase: PASSPHRASE, note: null, scope: BackupScope.MENU,
+      actor: installation.systemActor, clientIp: null,
+    });
+    const file = await services.backup.read(created.fileName);
+
+    await assert.rejects(() => services.backup.restore({
+      file, passphrase: PASSPHRASE, groups: ['orders'],
+      actor: installation.systemActor, clientIp: null,
+    }), /does not contain/);
+
+    await assert.rejects(() => services.backup.restore({
+      file, passphrase: PASSPHRASE, groups: ['everything-please'],
+      actor: installation.systemActor, clientIp: null,
+    }), /nothing called/);
   });
 });

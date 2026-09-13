@@ -106,8 +106,99 @@ const BACKED_UP_TABLES: readonly string[] = [
   'custom_themes',
 ];
 
+/**
+ * What a person can choose to bring in, and what they cannot choose apart.
+ *
+ * Importing is not all-or-nothing: somebody moving to a new computer wants
+ * everything, and somebody borrowing a menu from their other branch wants the
+ * dishes and not that branch's staff. So the confirmation offers the contents
+ * as a list of things to tick.
+ *
+ * The groups are not free choices of table, because the tables are not
+ * independent. An order names the table it was served at, the person who took
+ * it and the terminal it came from; importing last year's orders without the
+ * staff who took them produces rows pointing at people who do not exist, and
+ * SQLite rejects the whole restore at COMMIT with a message about a foreign
+ * key that means nothing to a restaurant owner.
+ *
+ * So each group carries every table that must move together, and names what it
+ * cannot arrive without. The console ticks the prerequisites for you; the
+ * server checks anyway, because the console is not the only thing that can
+ * call it.
+ */
+export interface ImportGroup {
+  readonly tables: readonly string[];
+  readonly requires: readonly string[];
+}
+
+export const IMPORT_GROUPS: Readonly<Record<string, ImportGroup>> = {
+  /** The dishes themselves, and everything priced or chosen with them. */
+  menu: {
+    tables: ['categories', 'products', 'product_options', 'option_choices',
+      'addons', 'product_addons'],
+    requires: [],
+  },
+  /*
+   * Photographs stand alone: a dish holds its image id as plain text with no
+   * foreign key, so a menu imported without its pictures loses the pictures
+   * and nothing else. That is a real choice somebody might make — a menu file
+   * with sixty photographs is large, and the other branch may want its own.
+   */
+  images: { tables: ['assets'], requires: [] },
+  profile: { tables: ['restaurant'], requires: [] },
+  currencies: { tables: ['currencies'], requires: [] },
+  languages: { tables: ['custom_locales'], requires: [] },
+  themes: { tables: ['custom_themes'], requires: [] },
+  settings: { tables: ['settings', 'counters'], requires: [] },
+  people: { tables: ['roles', 'role_permissions', 'users', 'user_roles'], requires: [] },
+  terminals: { tables: ['terminals'], requires: [] },
+  tables: { tables: ['dining_tables'], requires: ['terminals'] },
+  orders: {
+    tables: ['orders', 'order_items', 'order_item_selections', 'order_item_addons', 'payments'],
+    requires: ['tables', 'terminals', 'people'],
+  },
+  printing: { tables: ['printers', 'print_jobs'], requires: ['orders'] },
+  log: { tables: ['audit_log'], requires: [] },
+};
+
+/** Insert order matters: a product cannot land before its category. */
+const GROUP_ORDER: readonly string[] = [
+  'profile', 'settings', 'currencies', 'people', 'terminals', 'tables',
+  'menu', 'images', 'orders', 'printing', 'languages', 'themes', 'log',
+];
+
 const tablesFor = (scope: BackupScope): readonly string[] =>
   (scope === BackupScope.MENU ? MENU_TABLES : BACKED_UP_TABLES);
+
+/**
+ * The groups this file actually contains, in the order they must be written.
+ *
+ * A menu backup has no `orders` group at all, so it is never offered — the
+ * list a person is shown is the list of what is really in the file, not a
+ * catalogue with most of it greyed out.
+ */
+function groupsIn(payload: BackupPayload): string[] {
+  const scopeTables = new Set(tablesFor(payload.scope ?? BackupScope.FULL));
+  return GROUP_ORDER.filter((name) => {
+    const group = IMPORT_GROUPS[name]!;
+    return group.tables.some((table) => scopeTables.has(table));
+  });
+}
+
+/** Every prerequisite of everything chosen, which is what "some" has to mean. */
+function withRequirements(chosen: readonly string[]): string[] {
+  const wanted = new Set(chosen);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const name of [...wanted]) {
+      for (const needed of IMPORT_GROUPS[name]?.requires ?? []) {
+        if (!wanted.has(needed)) { wanted.add(needed); grew = true; }
+      }
+    }
+  }
+  return GROUP_ORDER.filter((name) => wanted.has(name));
+}
 
 /** Cleared before a restore, in reverse dependency order. */
 const clearOrderFor = (scope: BackupScope): readonly string[] => [...tablesFor(scope)].reverse();
@@ -241,9 +332,11 @@ export class BackupService {
   async restore(input: {
     file: Buffer;
     passphrase: string;
+    /** What to bring in. Omitted means everything the file holds. */
+    groups?: readonly string[];
     actor: Actor;
     clientIp: string | null;
-  }): Promise<{ restaurantId: string; tables: number; rows: number }> {
+  }): Promise<{ restaurantId: string; tables: number; rows: number; groups: string[] }> {
     let payload: BackupPayload;
     try {
       payload = readBackup<BackupPayload>(input.file, input.passphrase).payload;
@@ -265,6 +358,25 @@ export class BackupService {
     }
 
     const scope = payload.scope ?? BackupScope.FULL;
+    const available = groupsIn(payload);
+
+    /*
+     * What was asked for, plus whatever it cannot arrive without. Choosing the
+     * orders and not the staff who took them would produce rows pointing at
+     * people who do not exist, and SQLite would reject the whole restore with
+     * a message about a foreign key that means nothing to a restaurant owner.
+     */
+    const asked = input.groups && input.groups.length > 0 ? input.groups : available;
+    for (const name of asked) {
+      if (!IMPORT_GROUPS[name]) {
+        throw validationError(`there is nothing called "${name}" in a backup`, { field: 'groups' });
+      }
+      if (!available.includes(name)) {
+        throw conflict(`this file does not contain ${name}`, { available });
+      }
+    }
+    const chosen = withRequirements(asked).filter((name) => available.includes(name));
+    const chosenTables = new Set(chosen.flatMap((name) => IMPORT_GROUPS[name]!.tables));
 
     let rowCount = 0;
     const restore = this.db.transaction(() => {
@@ -274,16 +386,19 @@ export class BackupService {
       this.db.pragma('defer_foreign_keys = ON');
 
       /*
-       * Only what this backup is about. A menu file replaces the menu and
-       * leaves the tables, the staff and the takings where they are — which is
-       * what somebody importing "the menu" expects, and the opposite of what
-       * clearing every table would do to them.
+       * Only what was chosen. A menu file replaces the menu and leaves the
+       * tables, the staff and the takings where they are; a person who ticked
+       * three of nine boxes keeps the other six exactly as they were. Clearing
+       * everything and calling it a restore is the kind of helpfulness nobody
+       * recovers from.
        */
       for (const table of clearOrderFor(scope)) {
+        if (!chosenTables.has(table)) continue;
         this.db.prepare(`DELETE FROM ${table}`).run();
       }
 
       for (const table of tablesFor(scope)) {
+        if (!chosenTables.has(table)) continue;
         const rows = payload.tables[table] ?? [];
         if (rows.length === 0) continue;
 
@@ -317,8 +432,9 @@ export class BackupService {
 
     return {
       restaurantId: payload.restaurantId,
-      tables: tablesFor(scope).length,
+      tables: chosenTables.size,
       rows: rowCount,
+      groups: chosen,
     };
   }
 
@@ -409,6 +525,7 @@ export class BackupService {
     note: string | null;
     counts: Record<string, number>;
     replaces: Record<string, number>;
+    groups: { name: string; rows: number; requires: readonly string[] }[];
   }> {
     let payload: BackupPayload;
     let note: string | null = null;
@@ -462,6 +579,21 @@ export class BackupService {
       replaces[name] = row.n;
     }
 
+    /*
+     * The tick list. Only groups this file actually holds, and only ones with
+     * something in them — a checkbox next to "0 orders" is a decision nobody
+     * needs to make.
+     */
+    const groups = groupsIn(payload)
+      .map((name) => ({
+        name,
+        rows: name === 'images'
+          ? Object.keys(payload.assets ?? {}).length
+          : IMPORT_GROUPS[name]!.tables.reduce((total, table) => total + count(table), 0),
+        requires: IMPORT_GROUPS[name]!.requires,
+      }))
+      .filter((group) => group.rows > 0);
+
     return {
       scope,
       restaurantId: payload.restaurantId,
@@ -470,6 +602,7 @@ export class BackupService {
       note,
       counts: Object.fromEntries(Object.entries(named).filter(([, n]) => n > 0)),
       replaces: Object.fromEntries(Object.entries(replaces).filter(([, n]) => n > 0)),
+      groups,
     };
   }
 

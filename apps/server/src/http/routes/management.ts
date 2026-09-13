@@ -495,9 +495,17 @@ export function createManagementRoutes(services: Services): Router<AppState> {
       );
     }
 
+    /*
+     * `?groups=menu,images` — what the person ticked. Absent means everything
+     * in the file, which is what "restore this backup" has always meant.
+     */
+    const groups = (ctx.query.get('groups') ?? '')
+      .split(',').map((name) => name.trim()).filter(Boolean);
+
     const result = await services.backup.restore({
       file,
       passphrase,
+      ...(groups.length > 0 ? { groups } : {}),
       actor: ctx.state.auth!.actor,
       clientIp: ctx.ip,
     });
