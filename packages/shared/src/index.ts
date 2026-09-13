@@ -12,6 +12,7 @@ export * from './permissions.js';
 export * from './capabilities.js';
 export * from './order-state-machine.js';
 export * from './license-key.js';
+export * from './phone.js';
 export * from './license-protocol.js';
 export * from './events.js';
 export * from './sound.js';

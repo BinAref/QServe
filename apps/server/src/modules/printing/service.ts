@@ -20,7 +20,7 @@ import type { Db } from '@qserve/db';
 import { fromDbBool, fromDbStringList, nowIso, toDbBool, toDbJson } from '@qserve/db';
 import {
   Capability, EventName, newEntityId, notFound, PrintDocumentType, PrinterTransport,
-  formatMoney, pickLocalised,
+  formatMoney, formatPhone, pickLocalised,
   type Order, type Payment, type Printer, type PrintJob,
   type PrintDocumentType as DocType, type RestaurantProfile,
 } from '@qserve/shared';
@@ -276,7 +276,10 @@ export function renderReceipt(
     centre(pickLocalised(profile.name, locale), width),
   ];
   if (profile.address) lines.push(centre(profile.address, width));
-  if (profile.phone) lines.push(centre(profile.phone, width));
+  // `00905369130260` and `+905369130260` are the same number, and only one of
+  // them can be dialled from another country. A receipt is the copy a customer
+  // keeps, so it carries the one that works.
+  if (profile.phone) lines.push(centre(formatPhone(profile.phone), width));
   if (profile.taxNumber) lines.push(centre(`TAX ${profile.taxNumber}`, width));
 
   lines.push(

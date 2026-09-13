@@ -1450,3 +1450,16 @@ button.qs-amount-currency {
 
 .qs-menu-offline[hidden] { display: none; }
 .qs-menu-offline span { color: var(--qs-color-text-muted); }
+
+/*
+ * A telephone number, isolated from the sentence around it.
+ *
+ * The digits are the same digits in every language; only their position on the
+ * page would otherwise flip, stranding the leading + at the far end where it
+ * reads — and copies — as something nobody can dial.
+ */
+.qs-tel {
+  unicode-bidi: isolate;
+  direction: ltr;
+  font-variant-numeric: tabular-nums;
+}

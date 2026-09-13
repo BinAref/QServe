@@ -10,6 +10,7 @@
 import { api, guard, t, toast, roleLabel, setRoleNames } from '../../shared/boot.js';
 import { h, mount, modal, confirmDialog, entered } from '../../shared/dom.js';
 import { pick, te, formatDateTime, formatMoney } from '../../shared/i18n.js';
+import { phoneNode, formatPhone } from '../../shared/phone.js';
 import { localisedField, mergeLocalised, languageNote } from '../../shared/fields.js';
 import { Capability, Permission, PrintDocumentType, PrinterTransport } from '../../shared/events.js';
 import {
@@ -234,7 +235,7 @@ function restaurantPanel(restaurant, canEdit, savePatch) {
     void savePatch({
       ...(Object.keys(name).length > 0 ? { name } : {}),
       address: String(data.address ?? '').trim() || null,
-      phone: String(data.phone ?? '').trim() || null,
+      phone: formatPhone(data.phone) || null,
       email: String(data.email ?? '').trim() || null,
       taxNumber: String(data.taxNumber ?? '').trim() || null,
     });
@@ -432,10 +433,24 @@ function brandPanel(restaurant, canEdit, savePatch) {
           : null)));
 }
 
+/*
+ * `dir` is per-field, not per-page.
+ *
+ * A telephone number is typed and read left to right in every language, so its
+ * box is left to right even on an Arabic screen — otherwise the leading + lands
+ * at the wrong end while it is being typed, which is confusing in a way people
+ * blame on themselves.
+ */
+const LTR_FIELDS = new Set(['phone', 'email', 'taxNumber']);
+
 function field(label, name, value) {
   return h('label', { class: 'qs-field' },
     h('span', {}, label),
-    h('input', { name, value: value ?? '' }));
+    h('input', {
+      name,
+      value: value ?? '',
+      ...(LTR_FIELDS.has(name) ? { dir: 'ltr', class: 'qs-tel' } : {}),
+    }));
 }
 
 /**
@@ -1570,10 +1585,19 @@ function vendorPanel(vendor, container) {
       ? `${contact.url}?text=${encodeURIComponent(message)}`
       : contact.url;
 
+    /*
+     * The value is a node, not part of a template string: a phone number has
+     * to be isolated from the direction of the text around it, or an Arabic
+     * console shows `905369130260+` and somebody copies that and dials nothing.
+     */
+    const shown = contact.kind === 'PHONE' || contact.kind === 'WHATSAPP'
+      ? phoneNode(contact.value)
+      : contact.value;
+
     return href
       ? h('a', { class: 'qs-btn', href, target: '_blank', rel: 'noopener' },
-          `${label} · ${contact.value}`)
-      : h('span', { class: 'qs-badge' }, `${label} · ${contact.value}`);
+          label + ' · ', shown)
+      : h('span', { class: 'qs-badge' }, label + ' · ', shown);
   };
 
   return h('div', { class: 'qs-card qs-narrow' },
