@@ -1112,11 +1112,42 @@ function openPrinterForm(container, printer, config) {
 /* ---------------------------------------------------------------- backup */
 
 export async function renderBackup(container) {
-  const { backups } = await api.get('/api/backups');
+  const [{ backups }, scopes] = await Promise.all([
+    api.get('/api/backups'),
+    api.get('/api/backups/scopes').catch(() => ({ menu: true, full: false })),
+  ]);
+
+  /* ----------------------------------------------------------- taking one */
+
+  /*
+   * Two things to take, and only one of them exists before a licence.
+   *
+   * The menu is what a restaurant builds first, and losing it to a reinstall
+   * would be the worst hour of its week — so that one is always offered. Taking
+   * "everything" before activation would produce a file of empty tables calling
+   * itself a backup of the restaurant, so it waits.
+   */
+  const scopeChoice = (value, titleKey, hintKey, enabled) => {
+    const input = h('input', {
+      type: 'radio', name: 'scope', value,
+      checked: value === (scopes.full ? 'full' : 'menu'),
+      disabled: !enabled,
+    });
+    return h('label', { class: 'scope-choice', 'data-enabled': String(enabled) },
+      input,
+      h('div', {},
+        h('div', { class: 'qs-row-label' }, t(titleKey)),
+        h('p', { class: 'qs-row-hint' },
+          enabled ? t(hintKey) : t('backup.scope.full_locked'))));
+  };
 
   const createForm = h('form', { class: 'qs-card' },
     h('h2', {}, t('backup.create')),
-    h('p', { class: 'qs-muted' }, t('backup.passphrase_hint')),
+    h('div', { class: 'qs-section-title' }, t('backup.scope')),
+    h('div', { class: 'scope-choices' },
+      scopeChoice('menu', 'backup.scope.menu', 'backup.scope.menu_hint', true),
+      scopeChoice('full', 'backup.scope.full', 'backup.scope.full_hint', scopes.full === true)),
+    h('p', { class: 'qs-muted qs-small' }, t('backup.passphrase_hint')),
     h('label', { class: 'qs-field' },
       h('span', {}, t('backup.passphrase')),
       h('input', { name: 'passphrase', type: 'password', minlength: '8', required: true })),
@@ -1131,6 +1162,7 @@ export async function renderBackup(container) {
     const created = await guard(() => api.post('/api/backups', {
       passphrase: String(data.passphrase),
       note: String(data.note ?? '').trim() || null,
+      scope: data.scope === 'menu' ? 'menu' : 'full',
     }));
     if (!created) return;
     toast(created.fileName, 'success');
@@ -1157,29 +1189,103 @@ export async function renderBackup(container) {
                 h('tr', {},
                   h('td', { class: 'qs-small qs-muted' }, formatDateTime(backup.createdAt)),
                   h('td', { class: 'qs-mono qs-xs' }, backup.fileName),
-                  h('td', {}, `${Math.round(backup.sizeBytes / 1024)} KB`),
+                  h('td', {}, Math.round(backup.sizeBytes / 1024) + ' KB'),
                   h('td', { class: 'qs-small' }, backup.note ?? ''),
                   h('td', {},
                     h('a', {
-                      class: 'qs-btn qs-btn-ghost',
-                      href: `/api/backups/${backup.fileName}/download`,
-                      download: '',
+                      class: 'qs-btn qs-btn-sm',
+                      href: '/api/backups/' + backup.fileName + '/download',
+                      download: backup.fileName,
                     }, t('common.download'))))))))));
 }
 
 /**
- * Restore. Two deliberate frictions, because this replaces everything: the file
- * is inspected first (which needs no passphrase), and the operator must retype
- * the Restaurant ID the backup actually contains.
+ * Bringing one in.
+ *
+ * Three steps, and the middle one is the point. A restore replaces what is
+ * here, and "are you sure" is a question nobody can answer without knowing
+ * what they are agreeing to — so the file is opened and counted first, its
+ * contents are offered as a list to tick, and the confirmation says what will
+ * arrive, what it will replace and what it will leave alone.
  */
 export function restorePanel(container) {
   let file = null;
-  let header = null;
-  const info = h('div', { class: 'qs-small qs-muted' }, '');
+  let preview = null;
+  const chosen = new Set();
+
+  const info = h('div', { class: 'qs-small' }, '');
+  const picker = h('div', {});
+  const goButton = h('button', {
+    class: 'qs-btn qs-btn-danger', type: 'submit', disabled: true,
+  }, t('backup.restore'));
+
+  const passphrase = h('input', { name: 'passphrase', type: 'password', required: true });
+
+  const groupLabel = (name) => {
+    const label = t('backup.group.' + name);
+    return label.startsWith('backup.group.') ? name : label;
+  };
+
+  const drawPicker = () => {
+    if (!preview) {
+      mount(picker);
+      goButton.disabled = true;
+      return;
+    }
+
+    /*
+     * Ticking a group ticks whatever it cannot arrive without. An order names
+     * the table it was served at and the person who took it; bringing it
+     * without them would produce rows pointing at nobody, so the boxes move
+     * together rather than failing later with a message about a foreign key.
+     */
+    const pull = (name) => {
+      chosen.add(name);
+      for (const needed of preview.groups.find((g) => g.name === name)?.requires ?? []) {
+        if (!chosen.has(needed)) pull(needed);
+      }
+    };
+
+    const rows = preview.groups.map((group) => {
+      const box = h('input', {
+        type: 'checkbox',
+        checked: chosen.has(group.name),
+        onChange: (event) => {
+          if (event.target.checked) pull(group.name);
+          else {
+            chosen.delete(group.name);
+            // Anything that needed this cannot stay ticked without it.
+            for (const other of preview.groups) {
+              if (other.requires.includes(group.name)) chosen.delete(other.name);
+            }
+          }
+          drawPicker();
+        },
+      });
+      return h('label', { class: 'import-row' },
+        box,
+        h('div', {},
+          h('div', { class: 'qs-row-label' }, groupLabel(group.name)),
+          h('p', { class: 'qs-row-hint' },
+            t('backup.rows', { count: group.rows }),
+            group.requires.length > 0
+              ? ' · ' + t('backup.import_needs', {
+                  list: group.requires.map(groupLabel).join(', '),
+                })
+              : '')));
+    });
+
+    mount(picker,
+      h('div', { class: 'qs-section-title' }, t('backup.import_choose')),
+      h('p', { class: 'qs-row-hint' }, t('backup.import_hint')),
+      h('div', { class: 'import-rows' }, rows));
+
+    goButton.disabled = chosen.size === 0;
+  };
 
   const form = h('form', { class: 'qs-card' },
-    h('h2', {}, t('backup.restore')),
-    h('p', { class: 'qs-muted' }, t('backup.restore_warning')),
+    h('h2', {}, t('backup.import')),
+    h('p', { class: 'qs-muted qs-small' }, t('backup.restore_warning')),
 
     h('label', { class: 'qs-field' },
       h('span', {}, t('backup.inspect')),
@@ -1187,57 +1293,110 @@ export function restorePanel(container) {
         type: 'file', accept: '.qsbk',
         onChange: async (event) => {
           const picked = event.target.files?.[0];
+          preview = null;
+          chosen.clear();
+          drawPicker();
           if (!picked) return;
           file = await picked.arrayBuffer();
-          header = await guard(() =>
-            api.upload('/api/backups/inspect', file, 'application/octet-stream'));
-          mount(info, header
-            ? h('div', {},
-                h('div', {}, `${t('license.restaurant_id')}: `, h('strong', {}, header.restaurantId)),
-                h('div', {}, `${t('common.created')}: ${formatDateTime(header.createdAt)}`),
-                h('div', {}, `${t('app.name')} ${header.appVersion}`),
-                header.note ? h('div', {}, header.note) : null)
-            : h('span', {}, t('error.conflict')));
+          mount(info, h('span', { class: 'qs-muted' }, t('app.loading')));
         },
       })),
-    info,
 
     h('label', { class: 'qs-field' },
       h('span', {}, t('backup.passphrase')),
-      h('input', { name: 'passphrase', type: 'password', required: true })),
-    h('label', { class: 'qs-field' },
-      h('span', {}, t('backup.confirm_restaurant')),
-      h('input', { name: 'confirm', required: true, placeholder: 'REST-000000' })),
-    h('button', { class: 'qs-btn qs-btn-danger', type: 'submit' }, t('backup.restore')));
+      passphrase),
+
+    // Opening the file is its own step: it needs the passphrase, and it must
+    // happen before anybody is asked to agree to anything.
+    h('button', {
+      class: 'qs-btn', type: 'button',
+      onClick: async () => {
+        if (!file) {
+          toast(t('error.validation'), 'error');
+          return;
+        }
+        const opened = await guard(() => api.upload(
+          '/api/backups/preview', file, 'application/octet-stream',
+          { 'x-backup-passphrase': passphrase.value },
+        ));
+        if (!opened) return;
+        preview = opened;
+        for (const group of opened.groups) chosen.add(group.name);
+        mount(info,
+          h('div', {}, t('backup.from_file', {
+            restaurant: opened.restaurantId,
+            when: formatDateTime(opened.createdAt),
+          })),
+          opened.note ? h('div', { class: 'qs-muted' }, opened.note) : null);
+        drawPicker();
+      },
+    }, t('backup.inspect')),
+
+    info,
+    picker,
+    goButton);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!file || !header) {
+    if (!file || !preview || chosen.size === 0) {
       toast(t('error.validation'), 'error');
       return;
     }
-    const data = Object.fromEntries(new FormData(form).entries());
+
+    /*
+     * The last thing before the point of no return, and it is a sentence
+     * rather than a warning: what is arriving, what it replaces, and what it
+     * leaves alone. Somebody can answer that. "Are you sure?" they cannot.
+     */
+    const taking = preview.groups.filter((group) => chosen.has(group.name));
+    const leaving = preview.groups.filter((group) => !chosen.has(group.name));
+    const lines = [
+      t('backup.import_arriving') + ': '
+        + taking.map((g) => groupLabel(g.name) + ' (' + g.rows + ')').join(', '),
+    ];
+    const replacing = Object.entries(preview.replaces ?? {});
+    if (replacing.length > 0) {
+      lines.push(t('backup.import_replacing') + ': '
+        + replacing.map(([name, n]) => groupLabel(name) + ' (' + n + ')').join(', '));
+    }
+    if (leaving.length > 0) {
+      lines.push(t('backup.import_untouched') + ': '
+        + leaving.map((g) => groupLabel(g.name)).join(', '));
+    }
+
+    /*
+     * Restoring your own backup onto your own machine is the ordinary thing.
+     * Restoring somebody else's is the one worth stopping over, so it is the
+     * only one that gets an extra sentence.
+     */
+    const elsewhere = preview.restaurantId !== state.status?.restaurantId;
+    if (elsewhere) {
+      lines.push('');
+      lines.push(t('backup.import_other_restaurant', { restaurant: preview.restaurantId }));
+    }
 
     const ok = await confirmDialog({
-      title: t('backup.restore'),
-      message: t('backup.restore_warning'),
+      title: t('backup.import_confirm'),
+      message: lines.join('\n'),
       confirmLabel: t('backup.restore'),
       cancelLabel: t('common.cancel'),
     });
     if (!ok) return;
 
     const query = new URLSearchParams({
-      passphrase: String(data.passphrase),
-      confirmRestaurantId: String(data.confirm).trim(),
+      groups: [...chosen].join(','),
+      ...(elsewhere ? { acceptDifferentRestaurant: 'true' } : {}),
     });
-    const result = await guard(() =>
-      api.upload(`/api/backups/restore?${query}`, file, 'application/octet-stream'));
+    const result = await guard(() => api.upload(
+      '/api/backups/restore?' + query, file, 'application/octet-stream',
+      { 'x-backup-passphrase': passphrase.value },
+    ));
     if (!result) return;
 
-    // A restore replaces the user table, so every session is gone — including
-    // this one. Reloading lands on the sign-in screen, which is correct.
-    toast(`${result.rows} rows`, 'success');
-    setTimeout(() => location.reload(), 1200);
+    toast(t('backup.import_done', { rows: result.rows }), 'success');
+    // A restore that brought staff in replaced the user table, so this session
+    // is gone with it. Reloading lands on the sign-in screen, which is right.
+    setTimeout(() => location.reload(), 1400);
   });
 
   return form;

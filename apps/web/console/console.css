@@ -536,3 +536,32 @@
   background: var(--qs-color-surface-alt);
 }
 .log-subject p { margin: 0; }
+
+/* ------------------------------------------------------ backup and import */
+
+/*
+ * Two things a backup can be, side by side, with the reason under each. The
+ * disabled one is not hidden: knowing that "everything" exists and waits for
+ * activation is more useful than wondering why there is only one choice.
+ */
+.scope-choices { display: grid; gap: var(--qs-spacing-sm); margin-block-end: var(--qs-spacing-md); }
+.scope-choice {
+  display: flex; gap: var(--qs-spacing-sm); align-items: flex-start;
+  padding: var(--qs-spacing-sm) var(--qs-spacing-md);
+  border: 1px solid var(--qs-color-border); border-radius: var(--qs-radius-md);
+  background: var(--qs-color-surface-alt); cursor: pointer;
+}
+.scope-choice:hover { border-color: var(--qs-color-border-strong); }
+.scope-choice[data-enabled="false"] { opacity: 0.55; cursor: not-allowed; }
+.scope-choice input { margin-block-start: 3px; flex: none; }
+.scope-choice p { margin: 2px 0 0; }
+
+/* The tick list: one row per thing the file holds, with how much of it. */
+.import-rows { display: grid; gap: 2px; margin-block-end: var(--qs-spacing-md); }
+.import-row {
+  display: flex; gap: var(--qs-spacing-sm); align-items: flex-start;
+  padding: var(--qs-spacing-sm); border-radius: var(--qs-radius-md); cursor: pointer;
+}
+.import-row:hover { background: var(--qs-color-surface-alt); }
+.import-row input { margin-block-start: 3px; flex: none; }
+.import-row p { margin: 0; }

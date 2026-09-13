@@ -19,6 +19,25 @@ import type { AppState } from '../../core/security.js';
 import { BackupScope } from '../../modules/backup/service.js';
 import { SECRET_PLACEHOLDER, SECRET_SETTING_KEYS } from '../../core/repositories/settings.js';
 
+/**
+ * The passphrase that opens a backup, taken from a header.
+ *
+ * The body of these two requests is the backup file itself, so the passphrase
+ * has to travel beside it — and it used to travel in the query string, where
+ * it lands in the request line. Request lines are the most casually logged
+ * thing in computing: proxies keep them, servers keep them, crash reporters
+ * keep them. This one unlocks a file containing the restaurant's entire
+ * database, so it belongs in a header, which nothing logs by default.
+ */
+function backupPassphrase(ctx: { req: { headers: Record<string, unknown> } }): string {
+  const raw = ctx.req.headers['x-backup-passphrase'];
+  const passphrase = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof passphrase !== 'string' || passphrase.length === 0) {
+    throw validationError('a passphrase is required', { field: 'passphrase' });
+  }
+  return passphrase;
+}
+
 export function createManagementRoutes(services: Services): Router<AppState> {
   const router = new Router<AppState>();
   const security = services.security;
@@ -460,9 +479,7 @@ export function createManagementRoutes(services: Services): Router<AppState> {
     if (!Buffer.isBuffer(file)) {
       throw validationError('send the backup file as application/octet-stream');
     }
-    const passphrase = ctx.query.get('passphrase');
-    if (!passphrase) throw validationError('a passphrase is required', { field: 'passphrase' });
-    return services.backup.preview(file, passphrase);
+    return services.backup.preview(file, backupPassphrase(ctx));
   }, [loopbackOnly, canManageBackup]);
 
   router.post('/backups/inspect', async (ctx) => {
@@ -483,15 +500,31 @@ export function createManagementRoutes(services: Services): Router<AppState> {
     if (!Buffer.isBuffer(file)) {
       throw validationError('send the backup file as application/octet-stream');
     }
-    const passphrase = ctx.query.get('passphrase');
-    if (!passphrase) throw validationError('a passphrase is required', { field: 'passphrase' });
+    const passphrase = backupPassphrase(ctx);
 
-    const confirm = ctx.query.get('confirmRestaurantId');
+    /*
+     * The friction, aimed at the case that deserves it.
+     *
+     * This used to make the operator retype the Restaurant ID printed inside
+     * the file, on every restore. That is the wrong tax: restoring your own
+     * backup onto your own machine is the ordinary case and was the one being
+     * punished, while the dangerous case — somebody else's file, or another
+     * branch's — got exactly the same speed bump and no warning that it was
+     * different.
+     *
+     * The console now opens the file first and shows what is in it and whose
+     * it is, which is a better safeguard than copying a code across. What is
+     * left here is the question worth asking: if this file belongs to another
+     * restaurant, say so deliberately.
+     */
     const header = await services.backup.inspect(file);
-    if (confirm !== header['restaurantId']) {
+    const here = services.settings.profile()?.restaurantId ?? null;
+    const fromElsewhere = here !== null && header['restaurantId'] !== here;
+
+    if (fromElsewhere && ctx.query.get('acceptDifferentRestaurant') !== 'true') {
       throw conflict(
-        'confirmRestaurantId must match the restaurant id inside the backup',
-        { expected: header['restaurantId'] },
+        'this backup belongs to a different restaurant',
+        { thisRestaurant: here, backupRestaurant: header['restaurantId'] },
       );
     }
 

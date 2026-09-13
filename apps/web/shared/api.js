@@ -32,9 +32,12 @@ async function request(method, path, body, options = {}) {
   try {
     response = await fetch(path, {
       method,
-      headers: body === undefined
-        ? {}
-        : { 'content-type': options.contentType ?? 'application/json' },
+      headers: {
+        ...(body === undefined
+          ? {}
+          : { 'content-type': options.contentType ?? 'application/json' }),
+        ...(options.headers ?? {}),
+      },
       body: body === undefined
         ? undefined
         : (options.raw ? body : JSON.stringify(body)),
@@ -76,8 +79,16 @@ export const api = {
   put: (path, body) => request('PUT', path, body ?? {}),
   patch: (path, body) => request('PATCH', path, body ?? {}),
   del: (path) => request('DELETE', path),
-  /** Binary upload: images and backup files. */
-  upload: (path, bytes, contentType) =>
-    request('POST', path, bytes, { raw: true, contentType }),
+  /**
+   * Binary upload: images and backup files.
+   *
+   * `headers` exists for one thing — the passphrase that opens a backup. The
+   * body of that request is the file, so the passphrase has to travel beside
+   * it, and a query string is the wrong place: request lines are the most
+   * casually logged thing in computing, and this one unlocks the restaurant's
+   * entire database.
+   */
+  upload: (path, bytes, contentType, headers) =>
+    request('POST', path, bytes, { raw: true, contentType, ...(headers ? { headers } : {}) }),
   raw: request,
 };

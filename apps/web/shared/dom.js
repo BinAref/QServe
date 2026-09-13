@@ -119,19 +119,45 @@ export function modal({ title, body, actions = [], onClose }) {
 /** Confirmation that resolves to a boolean, for destructive actions. */
 export function confirmDialog({ title, message, confirmLabel, cancelLabel, danger = true }) {
   return new Promise((resolve) => {
-    let answered = false;
+    let settled = false;
+
+    /*
+     * The buttons answer directly, and the dialog closing is only what it looks
+     * like.
+     *
+     * This used to resolve in `onClose`, on the reasoning that a `<dialog>`
+     * whose form has `method="dialog"` fires `close` when a button in it is
+     * pressed. It usually does. When it does not — and headless Chromium
+     * demonstrably does not, under conditions nobody has pinned down — the
+     * promise never settles, and every caller of this function silently does
+     * nothing: the restore does not run, the licence is not cancelled, the
+     * person is not deleted. No error, no toast, nothing in the log. The button
+     * simply stops meaning anything.
+     *
+     * A press is a decision. `close` stays as a second route in, for Escape and
+     * for the × in the corner, which are both ways of saying no.
+     */
+    const answer = (value) => {
+      if (settled) return;
+      settled = true;
+      if (dialog.open) dialog.close();
+      dialog.remove();
+      resolve(value);
+    };
+
     const dialog = modal({
       title,
-      body: h('p', {}, message),
+      body: h('p', { style: { whiteSpace: 'pre-line' } }, message),
       actions: [
-        h('button', { class: 'qs-btn', value: 'cancel' }, cancelLabel),
+        h('button', { class: 'qs-btn', value: 'cancel', onClick: () => answer(false) },
+          cancelLabel),
         h('button', {
           class: danger ? 'qs-btn qs-btn-danger' : 'qs-btn qs-btn-primary',
           value: 'confirm',
-          onClick: () => { answered = true; },
+          onClick: () => answer(true),
         }, confirmLabel),
       ],
-      onClose: (value) => resolve(answered && value === 'confirm'),
+      onClose: () => answer(false),
     });
     dialog.querySelector('button[value="confirm"]')?.focus();
   });
