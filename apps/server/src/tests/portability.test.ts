@@ -149,7 +149,7 @@ describe('backup and restore', () => {
 });
 
 describe('QR addressing', () => {
-  test('a QR encodes Restaurant ID + Table ID, not an IP address', () => {
+  test('a QR points at a stable host and says nothing about the table', () => {
     const installation = createInstallation();
     try {
       seedRestaurant(installation);
@@ -162,9 +162,22 @@ describe('QR addressing', () => {
         installation.services.terminalRepository.get(table.terminal.id)!,
       )!;
 
-      assert.ok(url.includes('/r/REST-000123/TABLE-05'), url);
+      /*
+       * The host is the portable half: a printed card outlives the router's
+       * idea of which address this machine should have, so it names the
+       * restaurant's own hostname rather than an IP that changes on a reboot.
+       */
       assert.ok(url.startsWith('http://qserve-test.local:'), 'a stable host, not an IP');
       assert.equal(/\d+\.\d+\.\d+\.\d+/.test(url), false, 'no hard-coded address');
+
+      /*
+       * And the rest of it is the opaque half. This used to read
+       * `/r/REST-000123/TABLE-05`, which told anybody who photographed a card
+       * how many tables there are and what the next one is called.
+       */
+      assert.equal(url.includes('REST-000123'), false, 'the restaurant is not on the card');
+      assert.equal(url.includes('TABLE-05'), false, 'nor is the table');
+      assert.match(url, /\/t\/[A-Za-z0-9_-]{16,}$/, 'one opaque segment and nothing else');
     } finally {
       installation.dispose();
     }
