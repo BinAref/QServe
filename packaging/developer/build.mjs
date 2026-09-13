@@ -24,7 +24,7 @@ import { basename, join, resolve } from 'node:path';
 import { argv, platform } from 'node:process';
 
 import {
-  buildExecutable, checkPayload, run, say, shippable, stageWorkspacePackages,
+  buildExecutable, checkPayload, run, say, shippable,
 } from '../lib/windows-exe.mjs';
 
 const repo = resolve(import.meta.dirname, '../..');
@@ -42,59 +42,22 @@ const noPack = argv.includes('--no-pack');
 
 say('preparing');
 rmSync(build, { recursive: true, force: true });
-const app = join(stage, 'app');
-mkdirSync(app, { recursive: true });
+mkdirSync(stage, { recursive: true });
 
-/* -------------------------------------------- the dependencies, installed first */
+/* ------------------------------------------------------------- the console */
 
 /*
- * ORDER MATTERS — `npm install` deletes anything in node_modules its
- * package.json does not ask for, and the workspace packages are deliberately
- * not in that list. See `stageWorkspacePackages`.
- */
-const dbPackage = JSON.parse(readFileSync(join(repo, 'packages/db/package.json'), 'utf8'));
-const dependencies = Object.fromEntries(
-  Object.entries({ ...dbPackage.dependencies })
-    .filter(([name]) => !name.startsWith('@qserve/'))
-    .sort(([a], [b]) => a.localeCompare(b)),
-);
-writeFileSync(join(app, 'package.json'), `${JSON.stringify({
-  name: 'qserve-vendor', version, private: true, type: 'module', dependencies,
-}, null, 2)}\n`);
-
-say('installing runtime dependencies');
-run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'], { cwd: app });
-
-say('staging the workspace packages');
-stageWorkspacePackages(repo, app, ['shared', 'crypto', 'http', 'db']);
-
-/* ----------------------------------------------------------------- the app */
-
-say('staging the licence server');
-cpSync(join(repo, 'apps/license-server/dist'), join(app, 'license-server/dist'), {
-  recursive: true, filter: shippable,
-});
-/*
- * The vendor console, and the keygen beside it.
+ * One file, and nothing else.
  *
- * `dist/tools/keygen.js` is deliberately kept: the launcher calls it on first
- * run to make the vendor's signing key. It is the one piece of code that must
- * never reach a restaurant's build and must always be in this one.
+ * There is no server here any more, so there is no application to install, no
+ * workspace package to stage and no native SQLite to carry. What used to be an
+ * 84 MB download of a database engine is a page that talks to Supabase.
  */
-cpSync(join(repo, 'apps/license-server/public'), join(app, 'license-server/public'), {
-  recursive: true,
-});
+say('building the vendor console');
+run(process.execPath, [join(repo, 'tools/build-console.mjs'), join(stage, 'console.html')],
+  { cwd: repo });
 
-checkPayload(stage, [
-  'app/license-server/dist/main.js',
-  'app/license-server/dist/tools/keygen.js',
-  'app/license-server/public/index.html',
-  'app/node_modules/@qserve/shared/dist/index.js',
-  'app/node_modules/@qserve/crypto/dist/index.js',
-  'app/node_modules/@qserve/http/dist/index.js',
-  'app/node_modules/@qserve/db/dist/index.js',
-  'app/node_modules/better-sqlite3/package.json',
-]);
+checkPayload(stage, ['console.html']);
 
 if (platform !== 'win32') {
   process.stdout.write(
@@ -115,7 +78,9 @@ const { megabytes } = await buildExecutable({
   launcher: join(here, 'launcher.js'),
   exe,
   nodeVersion,
-  mustContain: ['better_sqlite3.node'],
+  // There is one file in this payload, and an executable that unpacks to
+  // nothing would open a browser at a page that is not there.
+  mustContain: ['console.html'],
 });
 
 say(`done: ${basename(exe)} (${megabytes} MB)`);

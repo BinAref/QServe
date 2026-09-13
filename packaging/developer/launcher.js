@@ -1,25 +1,23 @@
 /*
- * QServe Vendor.exe — the licence server, for the person who sells QServe.
+ * QServe Vendor.exe — the licence console, for the person who sells QServe.
  *
  * This is not a thing a restaurant ever runs. It is the other half of the
- * commercial arrangement: it issues the licence keys restaurants type in,
- * verifies them, and holds the record of who bought what. It runs on the
- * vendor's own machine or their own server, and it is the only part of the
- * product that needs to be reachable from the internet.
+ * commercial arrangement: it is where licence keys are issued, moved and
+ * withdrawn, and where the record of who bought what is read.
  *
- * Same shape as the restaurant's executable and for the same reasons — one
- * file, no console window, everything unpacked on first run — with two
- * deliberate differences:
+ * It used to *be* the licence server — it listened on a port, restaurants
+ * activated against it, and the vendor had to keep this machine switched on
+ * and reachable for anybody to be able to buy anything. The licences live in
+ * Supabase now, which means there is nothing here to run: this program unpacks
+ * one page and opens it in a browser. Same shape as the restaurant's
+ * executable — one file, no console window, everything unpacked on first run —
+ * and then it exits.
  *
- *   It listens on the network. The restaurant server binds its console to
- *   loopback; this one has to answer restaurants activating a licence, so it
- *   binds where it is told to.
- *
- *   It makes its own signing key on first run, and then says so in a dialog
- *   nobody can miss. From a checkout that is `npm run keygen`, which is the
- *   right shape for somebody who already has a terminal open — a vendor who
- *   downloaded one .exe has not, and a licence server with no key looks like it
- *   works right up until the first sale.
+ * The page is a local file rather than a hosted address because Supabase
+ * deliberately answers HTML from its own domain as plain text inside a sandbox,
+ * so that a page served there cannot run same-origin with the API. Shipping the
+ * console inside the download is the better answer anyway: nothing to keep
+ * online, and it works the moment it is installed.
  */
 
 'use strict';
@@ -30,7 +28,6 @@ const {
   closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync,
   rmSync, statSync, writeFileSync, writeSync,
 } = require('node:fs');
-const net = require('node:net');
 const { dirname, join, resolve } = require('node:path');
 const { format } = require('node:util');
 const { inflateRawSync } = require('node:zlib');
@@ -174,37 +171,44 @@ function unpack(payload) {
 
 function openBrowser(url) {
   try {
-    spawn(process.env.COMSPEC || 'cmd', ['/c', 'start', '""', url], {
+    const child = spawn(process.env.COMSPEC || 'cmd', ['/c', 'start', '""', url], {
       detached: true, stdio: 'ignore', windowsHide: true,
-    }).unref();
+    });
+    /*
+     * A spawn that cannot find its command fails on the 'error' event, not by
+     * throwing — so the try/catch around it never sees it, the event goes
+     * unhandled, and the program dies. On a machine with an unusual COMSPEC the
+     * vendor would meet a crash dialog instead of their console, having already
+     * had the console written to disk perfectly well.
+     */
+    child.on('error', (error) => {
+      record(`could not open a browser: ${error?.message ?? error}`);
+    });
+    child.unref();
   } catch (error) {
     record(`could not open a browser: ${error?.message ?? error}`);
   }
 }
 
-function alreadyRunning(port) {
-  return new Promise((done) => {
-    const probe = net.connect({ host: '127.0.0.1', port }, () => {
-      probe.destroy();
-      done(true);
-    });
-    probe.on('error', () => done(false));
-    probe.setTimeout(700, () => { probe.destroy(); done(false); });
-  });
-}
-
 /* ------------------------------------------------------------------------- start */
 
+/**
+ * Open the console, and that is all.
+ *
+ * This executable used to *be* the licence server: it listened on a port,
+ * restaurants activated against it, and the vendor had to keep the machine on
+ * and reachable for anybody to be able to buy anything. The licences live in
+ * Supabase now, so there is nothing here to run — the whole program is a
+ * shortcut that unpacks a page and hands it to a browser.
+ *
+ * The page is a file on disk rather than a hosted address on purpose. Supabase
+ * answers HTML from its own domain with `content-type: text/plain` and a
+ * sandbox policy, deliberately, so that a page served there cannot run
+ * same-origin with the API. Rather than find somewhere else to host it, the
+ * console ships inside this download: nothing to keep online, and it works the
+ * moment it is installed.
+ */
 async function main() {
-  const port = Number(process.env.QSERVE_LS_PORT ?? 8090);
-  const consoleUrl = `http://127.0.0.1:${port}/admin`;
-
-  if (await alreadyRunning(port)) {
-    record('the licence server is already running; bringing its console forward');
-    openBrowser(consoleUrl);
-    return;
-  }
-
   let appRoot;
   let sea = null;
   try { sea = require('node:sea'); } catch { sea = null; }
@@ -216,95 +220,44 @@ async function main() {
     record(`not a packed build; running from ${appRoot}`);
   }
 
-  const entry = join(appRoot, 'app', 'license-server', 'dist', 'main.js');
-  if (!existsSync(entry)) {
-    fatal('QServe Vendor could not find its application files.',
-      `Expected them at:\n${entry}\n\nDownload the file again.`);
+  const page = join(appRoot, 'console.html');
+  if (!existsSync(page)) {
+    fatal('QServe Vendor could not find its console.',
+      `Expected it at:\n${page}\n\nDownload the file again.`);
     process.exitCode = 1;
     return;
   }
 
   /*
-   * The signing key: the one thing this program cannot invent.
-   *
-   * Every licence a restaurant ever activates is verified against the public
-   * half of this key, baked into the restaurant's own build. Losing it means
-   * no existing installation can be given a new licence again — so it is kept
-   * outside the runtime folder, which is deleted and rewritten on every
-   * upgrade, and the first launch says where it is.
+   * A copy outside the runtime folder, because that folder is deleted and
+   * rewritten on every upgrade — and a vendor who bookmarked the console would
+   * find the bookmark broken the first time they updated.
    */
-  const keyFile = process.env.QSERVE_LS_SIGNING_KEY_FILE ?? join(secretsDir, 'signing-key.json');
-  const trustFile = join(secretsDir, 'trusted-keys.json');
-  const firstRun = !existsSync(keyFile);
-
-  if (firstRun) {
-    /*
-     * Make the key rather than ask for it.
-     *
-     * From a checkout this is `npm run keygen`, which is the right shape for
-     * somebody who already has a terminal open. A vendor who downloaded one
-     * .exe has not, and a licence server that starts without a key would look
-     * like it works right up until the first sale. `main()` refuses to
-     * overwrite an existing key, so this cannot run twice by accident.
-     */
-    const keygen = await import(pathToFileURL(
-      join(appRoot, 'app', 'license-server', 'dist', 'tools', 'keygen.js')).href);
-    keygen.main([`--out=${keyFile}`, `--trust=${trustFile}`]);
-    record(`generated a signing key at ${keyFile}`);
-  }
-
-  const env = process.env;
-  env.QSERVE_LS_DATA_DIR = dataDir;
-  env.QSERVE_LS_SIGNING_KEY_FILE = keyFile;
-  env.QSERVE_LS_PORT = String(port);
-
-  mkdirSync(dataDir, { recursive: true });
-  record(`QServe Vendor starting — data ${dataDir}, runtime ${appRoot}`);
-
-  if (firstRun) {
-    // Said once, loudly. A vendor who does not back this up has one very bad
-    // day somewhere ahead of them, and it will arrive without warning.
-    notice('QServe Vendor is set up.',
-      'Your signing key has been created at:\n'
-      + `${keyFile}\n\n`
-      + 'BACK THIS FILE UP TODAY, somewhere that is not this computer. Every '
-      + 'licence you ever issue is verified against it. It cannot be recovered '
-      + 'or reissued — losing it means no restaurant you have already sold to '
-      + 'can ever be given a new licence.\n\n'
-      + 'The public half, which goes into the restaurant builds you ship, is at:\n'
-      + `${trustFile}\n`
-      + 'That one is not secret.\n\n'
-      + 'Your first sign-in password is written once to:\n'
-      + `${logFile}`);
-  }
-
-  let started;
+  const stable = join(home, 'console.html');
   try {
-    const server = await import(pathToFileURL(entry).href);
-    started = await server.start();
+    mkdirSync(home, { recursive: true });
+    writeFileSync(stable, readFileSync(page));
   } catch (error) {
-    fatal('QServe Vendor could not start.',
-      `${error?.message ?? error}\n\n`
-      + `This is usually port ${port} already in use, or a data folder it is `
-      + 'not allowed to write to.');
-    process.exitCode = 1;
-    return;
+    record(`could not place the console at ${stable}: ${error?.message ?? error}`);
   }
 
-  record(`vendor console listening on ${consoleUrl}`);
-  openBrowser(consoleUrl);
+  const target = existsSync(stable) ? stable : page;
+  record(`opening the vendor console at ${target}`);
+  openBrowser(pathToFileURL(target).href);
 
-  const shutdown = () => {
-    record('shutting down');
-    Promise.resolve(started?.close?.())
-      .catch((error) => record(`shutdown failed: ${error?.stack ?? error}`))
-      .finally(() => {
-        if (logFd !== null) { try { closeSync(logFd); } catch { /* closing */ } }
-        process.exit(0);
-      });
-  };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  if (!existsSync(join(home, 'opened-once'))) {
+    try { writeFileSync(join(home, 'opened-once'), `${new Date().toISOString()}\n`); }
+    catch { /* the notice is nice to have, not load-bearing */ }
+    notice('QServe Vendor',
+      'The licence console has opened in your browser.\n\n'
+      + 'Sign in with the vendor account for your Supabase project. Everything '
+      + 'you do there — issuing a licence, moving one, withdrawing one — happens '
+      + 'in the database directly, so there is nothing on this computer to keep '
+      + 'running and nothing for a restaurant to depend on.\n\n'
+      + `You can also open it again at any time from:\n${target}`);
+  }
+
+  if (logFd !== null) { try { closeSync(logFd); } catch { /* closing */ } }
 }
 
 main().catch((error) => {

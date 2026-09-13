@@ -122,6 +122,53 @@ const broken = 'QSRV-4K7QM-9XTV2-BR5HN-P83WD';
 check(normaliseLicenseKey(broken) === null && denoNormalise(broken) === null,
   'and both reject a key with a bad checksum');
 
+/* ------------------------------------------------- the vendor console's copy */
+
+console.log('the vendor console');
+{
+  /*
+   * A third copy of the key rules lives inside the console page, because that
+   * page runs in a browser with no access to the repository. It is lifted back
+   * out of the built page and made to prove itself, rather than trusted.
+   *
+   * `new Function` on a string is normally a way to be exploited. What is being
+   * compiled here is this repository's own source, read from a file that is in
+   * the same commit as this test: anybody who can change it can already change
+   * what the build produces, so there is nothing here an attacker gains.
+   */
+  const { CONSOLE_PAGE } = await import('../supabase/functions/console/page.ts');
+  const html = CONSOLE_PAGE({ url: 'https://example.supabase.co', anonKey: 'x' });
+
+  const grab = (name) => {
+    const at = html.indexOf(`function ${name}(`);
+    if (at === -1) throw new Error(`the console has no ${name}()`);
+    let depth = 0;
+    for (let i = html.indexOf('{', at); i < html.length; i += 1) {
+      if (html[i] === '{') depth += 1;
+      else if (html[i] === '}') {
+        depth -= 1;
+        if (depth === 0) return html.slice(at, i + 1);
+      }
+    }
+    throw new Error(`${name}() is not closed`);
+  };
+
+  const consoleKeys = new Function([
+    "const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';",
+    'const BODY_LENGTH = 19;',
+    grab('checksumChar'),
+    grab('generateLicenseKey'),
+    'return generateLicenseKey;',
+  ].join('\n'))();
+
+  let bad = 0;
+  for (let i = 0; i < 200; i += 1) {
+    if (normaliseLicenseKey(consoleKeys()) === null) bad += 1;
+  }
+  check(bad === 0, '200 keys issued by the console pass the application checksum',
+    bad + ' were rejected');
+}
+
 console.log(failures === 0
   ? '\nthe Edge Function and the application agree'
   : `\n✗ ${failures} disagreement(s) between the Edge Function and the application`);

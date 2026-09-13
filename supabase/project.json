@@ -1,0 +1,16 @@
+{
+  "comment": [
+    "Where the licence server lives, and the key a browser needs to reach it.",
+    "",
+    "Both values are public by design. The URL is printed inside every packaged",
+    "build, and the publishable key is what any Supabase browser client ships:",
+    "on its own it opens nothing, because every table is behind row level",
+    "security and access needs an account named in vendor_admins.",
+    "",
+    "Kept here rather than in three places so the vendor console, the packaged",
+    "builds and the documentation cannot drift apart."
+  ],
+  "url": "https://zhycxmaqtazjumhzfxeq.supabase.co",
+  "functionsUrl": "https://zhycxmaqtazjumhzfxeq.supabase.co/functions/v1",
+  "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpoeWN4bWFxdGF6anVtaHpmeGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MTMzNTUsImV4cCI6MjEwNDI4OTM1NX0.X-86Wkomx_vZ4D3y1YER5Hvm5ZuGW_tAPdjsIhCt_p0"
+}
