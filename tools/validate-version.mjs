@@ -21,11 +21,16 @@ const appVersion = read('packages/shared/src/index.ts')
   .match(/APP_VERSION = '([^']+)'/)?.[1];
 const androidVersion = read('packaging/phone/app/build.gradle.kts')
   .match(/versionName = "([^"]+)"/)?.[1];
+// The vendor application carries its own, in the form Dart wants:
+// <version>+<build number>.
+const vendorVersion = read('apps/vendor/pubspec.yaml')
+  .match(/^version: ([0-9.]+)\+/m)?.[1];
 
 const found = {
   'package.json': npmVersion,
   'packages/shared/src/index.ts (APP_VERSION)': appVersion,
   'packaging/phone/app/build.gradle.kts (versionName)': androidVersion,
+  'apps/vendor/pubspec.yaml (version)': vendorVersion,
 };
 
 const distinct = [...new Set(Object.values(found))];
