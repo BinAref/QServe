@@ -207,7 +207,21 @@ jobs:
   vendor:
     name: The vendor application
     needs: check
-    runs-on: windows-latest
+    # Pinned, and not to `latest`.
+    #
+    # `windows-latest` now carries Visual Studio Enterprise 2026 —
+    # major version 18. Flutter 3.38.1 maps a detected Visual Studio to
+    # a CMake generator for 16 and 17 and knows nothing about 18, so it
+    # passed no generator at all, CMake fell back to its own default of
+    # "Visual Studio 16 2019", and the build died looking for a 2019
+    # that was never there. `flutter doctor` said the toolchain was
+    # fine, which it was — it was the translation that was missing.
+    #
+    # 2022 is what this Flutter understands. When Flutter is upgraded
+    # past that, this can move with it; until then a runner that
+    # upgrades itself would break the build again on a morning nobody
+    # changed anything.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
