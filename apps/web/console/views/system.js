@@ -1488,8 +1488,7 @@ export async function renderLicense(container) {
             ? h('p', { class: 'qs-small' },
                 `${t('license.license_id')}: `, h('span', { class: 'qs-mono' }, status.licenseId))
             : null,
-          h('p', { class: 'qs-small' },
-            `${t('license.type_perpetual')} · ${t('license.transfers')}: ${status.transferCount}`),
+          h('p', { class: 'qs-small' }, t('license.type_perpetual')),
           status.activatedAt
             ? h('p', { class: 'qs-small qs-muted' },
                 `${t('license.activated_at')}: ${formatDateTime(status.activatedAt)}`)
@@ -1609,9 +1608,11 @@ function vendorPanel(vendor, container) {
           info.tagline ? h('span', { class: 'qs-muted qs-small' }, ` — ${info.tagline}`) : null)
       : null,
 
+    // One price, because there is one thing to buy. A licence is created,
+    // activated and cancelled; it is never moved, so quoting a price for
+    // moving it offers something that cannot be sold.
     h('div', { class: 'qs-rows' },
-      priceRow('license.price_activation', info?.pricing?.activation),
-      priceRow('license.price_transfer', info?.pricing?.transfer)),
+      priceRow('license.price_activation', info?.pricing?.activation)),
 
     info?.instructions
       ? h('p', { class: 'qs-small', style: { whiteSpace: 'pre-wrap' } }, info.instructions)

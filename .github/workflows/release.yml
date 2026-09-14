@@ -95,18 +95,48 @@ jobs:
         env:
           TRUSTED_KEYS: ${{ secrets.QSERVE_TRUSTED_KEYS }}
           VENDOR_URL: ${{ secrets.QSERVE_VENDOR_URL }}
+          VENDOR_INFO: ${{ secrets.QSERVE_VENDOR_INFO }}
         shell: bash
         run: |
           missing=
           [ -n "$TRUSTED_KEYS" ] || missing="$missing QSERVE_TRUSTED_KEYS"
           [ -n "$VENDOR_URL" ] || missing="$missing QSERVE_VENDOR_URL"
+          # 1.0.14 through 1.0.18 all went out with no contact details,
+          # because this one only warned: the licence screen said "ask us"
+          # and listed nobody to ask. A restaurant that cannot find the
+          # vendor cannot buy a licence, which is the same failure as not
+          # being able to verify one.
+          [ -n "$VENDOR_INFO" ] || missing="$missing QSERVE_VENDOR_INFO"
           if [ -n "$missing" ]; then
             echo "::error::cannot publish without:$missing — a restaurant running this"
-            echo "::error::build would have nowhere to ask for a licence, or no key to"
-            echo "::error::verify one with. Set the secret and re-run."
+            echo "::error::build would have nowhere to ask for a licence, no key to"
+            echo "::error::verify one with, or nobody to ask. Set the secret and re-run."
             exit 1
           fi
-          echo "both secrets present"
+          # Present is not the same as usable: a details file with an empty
+          # contact list is the thing that shipped.
+          contacts=$(printf '%s' "$VENDOR_INFO" | node -e '
+            let raw = "";
+            process.stdin.on("data", (d) => { raw += d; });
+            process.stdin.on("end", () => {
+              try {
+                const info = JSON.parse(raw);
+                process.stdout.write(String((info.contacts ?? []).length));
+              } catch {
+                process.stdout.write("bad-json");
+              }
+            });
+          ')
+          if [ "$contacts" = "bad-json" ]; then
+            echo "::error::QSERVE_VENDOR_INFO is not valid JSON"
+            exit 1
+          fi
+          if [ "$contacts" = "0" ]; then
+            echo "::error::QSERVE_VENDOR_INFO lists no contacts, so the licence screen"
+            echo "::error::would say 'ask us' with nobody to ask."
+            exit 1
+          fi
+          echo "all three secrets present; the vendor has $contacts contact(s)"
 
       # Both Windows halves on the one runner: they need the same toolchain,
       # and the setup costs more than either build. One file out apiece — no

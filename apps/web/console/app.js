@@ -424,8 +424,7 @@ async function renderDashboard(container) {
           h('span', { class: 'qs-badge qs-badge-text' }, t(status.license.explanation)),
           status.license.licenseId ? h('span', { class: 'qs-mono' }, ` ${status.license.licenseId}`) : null),
         h('p', { class: 'qs-small qs-muted' },
-          `${t('license.restaurant_id')}: ${status.restaurantId ?? '—'}`, h('br'),
-          `${t('license.transfers')}: ${status.license.transferCount}`),
+          `${t('license.restaurant_id')}: ${status.restaurantId ?? '—'}`),
         // "Licence" under a heading that says Licence, beside a nav item that
         // says Licence: the button says what pressing it does.
         h('button', { class: 'qs-btn qs-btn-sm', onClick: () => navigate('license') },
