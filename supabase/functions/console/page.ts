@@ -137,12 +137,27 @@ export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doc
 
 <div id="signin" class="card" style="max-width:380px;margin:14vh auto;">
   <h2>QServe licences</h2>
-  <p class="muted small">Sign in with the vendor account.</p>
-  <form id="signin-form">
-    <label><span>Email</span><input name="email" type="email" required autocomplete="username" /></label>
-    <label><span>Password</span><input name="password" type="password" required autocomplete="current-password" /></label>
-    <button class="primary" style="width:100%" type="submit">Sign in</button>
-  </form>
+
+  <!-- Shown only on a computer where Windows Hello has been set up here. It is
+       first because it is the way in: the password is underneath it for the
+       day the face does not work. -->
+  <div id="hello-box" hidden>
+    <p class="muted small">Locked. Unlock with your face, fingerprint or PIN.</p>
+    <button class="primary" style="width:100%" id="hello-unlock" type="button">Unlock</button>
+    <p class="small" style="margin-top:10px;">
+      <a href="#" id="hello-use-password">Use the password instead</a>
+    </p>
+  </div>
+
+  <div id="password-box">
+    <p class="muted small">Sign in with the vendor account.</p>
+    <form id="signin-form">
+      <label><span>Email</span><input name="email" type="email" required autocomplete="username" /></label>
+      <label><span>Password</span><input name="password" type="password" required autocomplete="current-password" /></label>
+      <button class="primary" style="width:100%" type="submit">Sign in</button>
+    </form>
+  </div>
+
   <p id="signin-error" class="small" style="color:var(--danger);display:none;margin-top:10px;"></p>
 </div>
 
@@ -153,6 +168,10 @@ export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doc
     <span class="grow"></span>
     <button id="export" class="ghost">Download everything</button>
     <span id="who" class="muted small"></span>
+    <button id="account" class="ghost">Account</button>
+    <!-- Lock leaves the account signed in and asks for the face again; sign
+         out forgets it. Two different intentions that used to be one button. -->
+    <button id="lock" class="ghost" hidden>Lock</button>
     <button id="signout" class="ghost">Sign out</button>
   </header>
   <main>
@@ -183,6 +202,36 @@ export const CONSOLE_PAGE = (config: { url: string; anonKey: string }) => `<!doc
     </details>
   </main>
 </div>
+
+<dialog id="accountdialog">
+  <div class="inner">
+    <h2>Account</h2>
+    <p class="small muted" id="account-who"></p>
+
+    <h3 style="margin-top:18px;">Change the password</h3>
+    <form id="password-form">
+      <label><span>Current password</span>
+        <input name="current" type="password" required autocomplete="current-password" /></label>
+      <label><span>New password</span>
+        <input name="next" type="password" required minlength="8" autocomplete="new-password" /></label>
+      <label><span>New password again</span>
+        <input name="again" type="password" required minlength="8" autocomplete="new-password" /></label>
+      <button class="primary" type="submit">Change it</button>
+    </form>
+
+    <h3 style="margin-top:20px;">This computer</h3>
+    <p class="small muted" id="hello-state"></p>
+    <div class="row">
+      <button id="hello-enrol" type="button">Set up Windows Hello</button>
+      <button id="hello-forget" class="danger" type="button" hidden>Forget this computer</button>
+    </div>
+
+    <p id="account-message" class="small" style="display:none;margin-top:12px;"></p>
+  </div>
+  <footer>
+    <button id="account-close">Close</button>
+  </footer>
+</dialog>
 
 <dialog id="askdialog">
   <div class="inner">
@@ -321,40 +370,407 @@ function archive(entry) {
   }
 }
 
+/* -------------------------------------------------- the face on this computer
+
+ * Windows Hello, and what it is actually protecting.
+ *
+ * What has to survive between one opening of this console and the next is the
+ * refresh token: hold it and you are the vendor, with no password needed. It
+ * used to sit in localStorage in the clear and be restored on load without
+ * asking anybody anything, which made the lock on this console the lock on the
+ * computer and nothing more.
+ *
+ * A passkey on its own would not fix that. An assertion is a yes or a no, and
+ * a page that decides for itself what to do with a yes can be told to skip the
+ * question by anyone able to edit the page or read the storage it guards. What
+ * fixes it is the prf extension: the authenticator returns 32 bytes that exist
+ * only after a real face, fingerprint or PIN, and those bytes are the key the
+ * refresh token is encrypted with. No face, no key, no token — not a screen to
+ * get past, a thing that cannot be decrypted.
+ *
+ * Not every Windows Hello can do that. Where it cannot, the passkey is still
+ * required before the saved token is used, which is a lock on the screen
+ * rather than on the file — better than what was here, and the Account panel
+ * says plainly which of the two this computer is doing.
+ *
+ * All of it needs a real origin, which is why the vendor application serves
+ * this page from http://localhost rather than opening it as a file. WebAuthn
+ * refuses a file:// page: there is no domain for a credential to belong to.
+ */
+
+const SESSION = 'qserve.session';
+const HELLO = 'qserve.hello';
+
+const b64 = (buffer) => btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)))
+  .split('+').join('-').split('/').join('_').replace(/=+$/, '');
+const unb64 = (text) => Uint8Array.from(
+  atob(String(text).replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+
+function helloRecord() {
+  try { return JSON.parse(localStorage.getItem(HELLO) || 'null'); } catch { return null; }
+}
+function forgetHello() {
+  try { localStorage.removeItem(HELLO); } catch { /* nothing to forget */ }
+}
+
+async function platformAvailable() {
+  try {
+    return Boolean(window.PublicKeyCredential)
+      && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch { return false; }
+}
+
+/** The 32 bytes a face is worth, as a key. */
+const keyFrom = (bytes) => crypto.subtle.importKey(
+  'raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+
+/**
+ * The key derived this session, held in a variable that dies with the tab.
+ *
+ * Asking for a face after every token refresh would be unusable, and the salt
+ * is fixed per enrolment, so the same key can re-wrap for as long as the page
+ * is open. It is never written anywhere.
+ */
+let liveKey = null;
+
+/** Keep the current refresh token the best way this computer allows. */
+async function keepSession() {
+  const record = helloRecord();
+  if (!record) {
+    try { localStorage.setItem(SESSION, JSON.stringify(session)); } catch { /* private mode */ }
+    return;
+  }
+  // Enrolled: a plain copy must not exist, or the lock guards nothing.
+  try { localStorage.removeItem(SESSION); } catch { /* already gone */ }
+
+  const token = new TextEncoder().encode(session.refresh_token);
+  if (record.prf) {
+    /*
+     * No key in hand: this page was opened and signed in with the password
+     * rather than unlocked with a face, so there is nothing to encrypt with.
+     * The wrapped token already saved stays as it is — it still opens a
+     * valid session — rather than being replaced by a readable one.
+     */
+    if (!liveKey) return;
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, liveKey, token);
+    record.iv = b64(iv);
+    record.token = b64(sealed);
+  } else {
+    record.token = b64(token);
+  }
+  record.email = session.user && session.user.email;
+  try { localStorage.setItem(HELLO, JSON.stringify(record)); } catch { /* private mode */ }
+}
+
+async function prfBytes(credential, salt) {
+  const results = credential.getClientExtensionResults().prf;
+  if (results && results.results && results.results.first) return results.results.first;
+  if (!results || !results.enabled) return null;
+  // Supported, but this browser only hands the bytes back on an assertion —
+  // which is why setting it up can ask for a face twice.
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type: 'public-key', id: credential.rawId }],
+      userVerification: 'required',
+      timeout: 120000,
+      extensions: { prf: { eval: { first: salt } } },
+    },
+  });
+  const second = assertion.getClientExtensionResults().prf;
+  return (second && second.results && second.results.first) || null;
+}
+
+async function enrolHello() {
+  if (!session || !session.user) throw new Error('sign in first');
+  const salt = crypto.getRandomValues(new Uint8Array(32));
+  const handle = Uint8Array.from(
+    String(session.user.id).replace(/-/g, '').match(/../g).map((h) => parseInt(h, 16)));
+
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { id: location.hostname, name: 'QServe licences' },
+      user: { id: handle, name: session.user.email, displayName: session.user.email },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: {
+        // The face or finger belonging to this computer, not a key on a
+        // lanyard: the point is that the vendor's own machine opens it and
+        // nothing else does.
+        authenticatorAttachment: 'platform',
+        userVerification: 'required',
+        residentKey: 'preferred',
+      },
+      attestation: 'none',
+      timeout: 120000,
+      extensions: { prf: { eval: { first: salt } } },
+    },
+  });
+  if (!credential) throw new Error('this computer did not create a passkey');
+
+  const bytes = await prfBytes(credential, salt);
+  const record = {
+    credentialId: b64(credential.rawId),
+    salt: b64(salt),
+    prf: Boolean(bytes),
+    email: session.user.email,
+  };
+  if (bytes) liveKey = await keyFrom(bytes);
+  try { localStorage.setItem(HELLO, JSON.stringify(record)); } catch (failure) {
+    throw new Error('this browser is blocking storage, so nothing could be saved');
+  }
+  await keepSession();
+  return record;
+}
+
+async function sessionFromRefresh(refreshToken) {
+  const res = await fetch(URL_BASE + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    headers: { apikey: ANON, 'content-type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  const body = await res.json();
+  if (!body.access_token) {
+    throw new Error(body.error_description || body.msg || 'the saved sign-in has expired');
+  }
+  return body;
+}
+
+async function unlockWithHello() {
+  const record = helloRecord();
+  if (!record) throw new Error('this computer has no passkey for the console');
+
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type: 'public-key', id: unb64(record.credentialId) }],
+      userVerification: 'required',
+      timeout: 120000,
+      extensions: record.prf ? { prf: { eval: { first: unb64(record.salt) } } } : {},
+    },
+  });
+  if (!assertion) throw new Error('the check was cancelled');
+
+  let refreshToken;
+  if (record.prf) {
+    const results = assertion.getClientExtensionResults().prf;
+    const bytes = results && results.results && results.results.first;
+    if (!bytes) throw new Error('this computer would not give the key back');
+    liveKey = await keyFrom(bytes);
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: unb64(record.iv) }, liveKey, unb64(record.token));
+    refreshToken = new TextDecoder().decode(plain);
+  } else {
+    refreshToken = new TextDecoder().decode(unb64(record.token));
+  }
+
+  session = await sessionFromRefresh(refreshToken);
+  // Supabase hands out a new refresh token each time and spends the old one,
+  // so the saved copy has to become the new one or the next unlock fails.
+  await keepSession();
+  await start();
+}
+
 /* --------------------------------------------------------------- sign in */
+
+async function signInWithPassword(email, password) {
+  const res = await fetch(URL_BASE + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { apikey: ANON, 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const body = await res.json();
+  if (!body.access_token) {
+    throw new Error(body.error_description || body.msg || 'Could not sign in.');
+  }
+  return body;
+}
 
 el('signin-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
   const error = el('signin-error');
   error.style.display = 'none';
-  const res = await fetch(URL_BASE + '/auth/v1/token?grant_type=password', {
-    method: 'POST',
-    headers: { apikey: ANON, 'content-type': 'application/json' },
-    body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
-  });
-  const body = await res.json();
-  if (!body.access_token) {
-    error.textContent = body.error_description || body.msg || 'Could not sign in.';
+  try {
+    session = await signInWithPassword(form.get('email'), form.get('password'));
+  } catch (failure) {
+    error.textContent = failure.message;
     error.style.display = 'block';
     return;
   }
-  session = body;
-  try { localStorage.setItem('qserve.session', JSON.stringify(body)); } catch { /* private mode */ }
+  await keepSession();
   await start();
 });
 
-el('signout').addEventListener('click', () => {
-  try { localStorage.removeItem('qserve.session'); } catch { /* nothing to clear */ }
+el('hello-unlock').addEventListener('click', async () => {
+  const error = el('signin-error');
+  error.style.display = 'none';
+  el('hello-unlock').disabled = true;
+  try {
+    await unlockWithHello();
+  } catch (failure) {
+    error.textContent = failure.message;
+    error.style.display = 'block';
+    // A face that will not open it is not a dead end: the password is there.
+    el('password-box').hidden = false;
+  } finally {
+    el('hello-unlock').disabled = false;
+  }
+});
+
+el('hello-use-password').addEventListener('click', (event) => {
+  event.preventDefault();
+  el('password-box').hidden = false;
+});
+
+/* Lock puts the face back in the way; sign out forgets the computer. */
+el('lock').addEventListener('click', () => {
   session = null;
+  liveKey = null;
   el('app').hidden = true;
   el('signin').style.display = '';
+  el('hello-box').hidden = false;
+  el('password-box').hidden = true;
+});
+
+el('signout').addEventListener('click', () => {
+  try { localStorage.removeItem(SESSION); } catch { /* nothing to clear */ }
+  forgetHello();
+  session = null;
+  liveKey = null;
+  el('app').hidden = true;
+  el('signin').style.display = '';
+  el('hello-box').hidden = true;
+  el('password-box').hidden = false;
+});
+
+/* --------------------------------------------------------------- account */
+
+function accountSays(message, bad) {
+  const line = el('account-message');
+  line.textContent = message;
+  line.style.color = bad ? 'var(--danger)' : 'var(--ok)';
+  line.style.display = 'block';
+}
+
+async function drawAccount() {
+  el('account-who').textContent = (session && session.user && session.user.email) || '';
+  el('account-message').style.display = 'none';
+
+  const record = helloRecord();
+  const available = await platformAvailable();
+  el('hello-enrol').hidden = Boolean(record);
+  el('hello-forget').hidden = !record;
+  el('hello-enrol').disabled = !available;
+
+  if (record) {
+    el('hello-state').textContent = record.prf
+      ? 'Windows Hello is set up, and the saved sign-in on this computer is '
+        + 'encrypted with a key your face or fingerprint produces. Without it '
+        + 'there is nothing to read.'
+      : 'Windows Hello is set up. This computer cannot encrypt with it, so it '
+        + 'locks the screen rather than the saved sign-in — anybody who can '
+        + 'read this browser profile could still take that sign-in.';
+  } else if (available) {
+    el('hello-state').textContent = 'You can open this console with your face, '
+      + 'fingerprint or PIN instead of typing the password. It is set up per '
+      + 'computer, and you may be asked to confirm twice while it is made.';
+  } else {
+    el('hello-state').textContent = 'This computer offers no Windows Hello (or '
+      + 'this page is not being served from localhost), so there is nothing to '
+      + 'set up here.';
+  }
+}
+
+el('account').addEventListener('click', async () => {
+  await drawAccount();
+  el('accountdialog').showModal();
+});
+el('account-close').addEventListener('click', () => el('accountdialog').close());
+
+el('hello-enrol').addEventListener('click', async () => {
+  el('hello-enrol').disabled = true;
+  try {
+    const record = await enrolHello();
+    el('lock').hidden = false;
+    await drawAccount();
+    accountSays(record.prf
+      ? 'Done. The saved sign-in on this computer is now encrypted with it.'
+      : 'Done. This computer cannot encrypt with Windows Hello, so it locks the '
+        + 'screen rather than the saved sign-in.', false);
+  } catch (failure) {
+    await drawAccount();
+    accountSays(failure.message || 'Windows Hello could not be set up.', true);
+  }
+});
+
+el('hello-forget').addEventListener('click', async () => {
+  forgetHello();
+  liveKey = null;
+  // The session still has to live somewhere, and it is no longer wrapped.
+  await keepSession();
+  el('lock').hidden = true;
+  await drawAccount();
+  accountSays('Forgotten. The passkey itself is still in Windows — remove it '
+    + 'under Settings, Passkeys, if you want it gone from there as well.', false);
+});
+
+el('password-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const current = form.get('current');
+  const next = form.get('next');
+  if (next !== form.get('again')) {
+    accountSays('The two new passwords are not the same.', true);
+    return;
+  }
+  if (next === current) {
+    accountSays('That is the password you already have.', true);
+    return;
+  }
+
+  /*
+   * The current password is proved first, and the token that proves it is the
+   * one used to set the new one. Somebody who walked up to an unlocked console
+   * does not get to change the password without knowing the old one.
+   */
+  let fresh;
+  try {
+    fresh = await signInWithPassword(session.user.email, current);
+  } catch (failure) {
+    accountSays('That is not the current password.', true);
+    return;
+  }
+
+  const res = await fetch(URL_BASE + '/auth/v1/user', {
+    method: 'PUT',
+    headers: {
+      apikey: ANON,
+      authorization: 'Bearer ' + fresh.access_token,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ password: next }),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    accountSays(body.msg || body.error_description || 'The password was not changed.', true);
+    return;
+  }
+
+  // Changing it can retire the tokens that were in the air, so the console
+  // takes a clean one now rather than finding out on the next click.
+  session = await signInWithPassword(session.user.email, next);
+  await keepSession();
+  event.target.reset();
+  accountSays('Changed. The saved sign-in on this computer was updated too.', false);
 });
 
 async function start() {
   el('signin').style.display = 'none';
   el('app').hidden = false;
   el('who').textContent = (session.user && session.user.email) || '';
+  el('lock').hidden = !helloRecord();
   await refresh();
 }
 
@@ -622,18 +1038,45 @@ el('new-form').addEventListener('submit', async (event) => {
   await refresh();
 });
 
+/* ------------------------------------------------------- telling it we are here
+
+ * The desktop application serves this page and closes itself a minute after
+ * the page stops answering, so that a licence console nobody has open is not a
+ * process somebody finds in Task Manager and wonders about.
+ *
+ * Only on localhost, which is the only place there is anything listening.
+ */
+if (location.protocol === 'http:' && location.hostname === 'localhost') {
+  const beat = () => { fetch('/alive', { method: 'POST' }).catch(() => {}); };
+  beat();
+  setInterval(beat, 10000);
+}
+
 /* ------------------------------------------------------------------- boot */
 
 try {
-  const stored = localStorage.getItem('qserve.session');
-  if (stored) {
-    session = JSON.parse(stored);
-    // A stored token may have expired while the page was closed; one call
-    // proves it either way, and failing lands on the sign-in form.
-    await rpc('vendor_overview');
-    await start();
-  } else {
+  const record = helloRecord();
+  if (record) {
+    /*
+     * Enrolled: there is no session lying about to restore, only something
+     * encrypted that a face opens. The password form is underneath rather than
+     * gone — a fingerprint reader that has stopped working is a bad day, not a
+     * lockout.
+     */
+    el('hello-box').hidden = false;
+    el('password-box').hidden = true;
     drawArchive();
+  } else {
+    const stored = localStorage.getItem(SESSION);
+    if (stored) {
+      session = JSON.parse(stored);
+      // A stored token may have expired while the page was closed; one call
+      // proves it either way, and failing lands on the sign-in form.
+      await rpc('vendor_overview');
+      await start();
+    } else {
+      drawArchive();
+    }
   }
 } catch (error) {
   session = null;

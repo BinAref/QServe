@@ -74,8 +74,9 @@ Signing in to the project grants nothing. Access is an explicit list, empty
 until somebody is put on it, because a Supabase project accepts public
 sign-ups by default and "anybody with an email address" is not the vendor.
 
-Create the account once, in the dashboard under Authentication → Users, then
-name it:
+The account for this project exists: **a.binaref@gmail.com**, created in
+Authentication → Users and named in `vendor_admins`. For a second one, or for
+a fresh project, it is two steps:
 
     insert into vendor_admins (user_id, note)
     select id, 'the vendor' from auth.users where email = 'you@example.com';
@@ -84,6 +85,36 @@ From then on that account reads and writes every licence through PostgREST
 directly, with no server in between — which is the whole reason the licence
 server moved here. Everyone else who signs in sees an empty database: not an
 error, just no rows, which is what row level security looks like from outside.
+
+The password is changed in the console itself, under **Account**. It asks for
+the current one first and uses the token that proves it, so somebody who walks
+up to an unlocked console cannot change it without knowing the old one.
+
+## Windows Hello, and why the console is served rather than opened
+
+The vendor application used to write `console.html` to disk and hand the file
+to a browser. It now serves that same page on `http://localhost:8787` and
+closes itself a minute after the page stops answering.
+
+The reason is WebAuthn. A `file://` page has no domain, and a passkey belongs
+to a domain, so Windows Hello could never have worked from a file. The port is
+remembered in `port.txt` and reused, because the saved sign-in, the archive of
+deleted licences and the Hello enrolment all live in `localStorage`, which is
+per origin — and an origin includes the port. A second copy of the application
+notices the first and just opens a browser at it.
+
+What Hello actually protects is the refresh token. Holding that token *is*
+being the vendor, and it used to sit in `localStorage` in the clear, restored
+on load without asking anybody anything. A passkey alone would not fix that —
+an assertion is a yes or a no, and a page can be told to skip the question. The
+`prf` extension is what fixes it: the authenticator returns 32 bytes that exist
+only after a real face, fingerprint or PIN, and the refresh token is encrypted
+with them. Where a computer's Hello cannot do `prf`, the passkey is still
+required before the saved token is used — a lock on the screen rather than on
+the file — and the Account panel says which of the two that computer is doing.
+
+The password is always underneath. A fingerprint reader that has stopped
+working is a bad day, not a lockout.
 
 The Edge Function is unaffected either way. It uses the service role, is what
 restaurants talk to, and never asks who anybody is.
