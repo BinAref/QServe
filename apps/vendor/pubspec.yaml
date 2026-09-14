@@ -1,0 +1,44 @@
+name: qserve_vendor
+description: The QServe licence console, for the person who sells QServe.
+publish_to: none
+version: 1.0.19+20
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # The database is reached over plain REST, the same calls the web console
+  # made. A whole Supabase SDK would bring realtime, storage and auth state
+  # machinery this app has no use for.
+  http: ^1.2.2
+
+  # Where the refresh token lives: the platform keystore, not a file.
+  flutter_secure_storage: ^9.2.2
+
+  # The fingerprint and the face.
+  local_auth: ^2.3.0
+
+  shared_preferences: ^2.3.3
+  intl: ^0.20.2
+
+  # The licence key's checksum, computed the same way the restaurant
+  # computes it, and the hash the database stores instead of the key.
+  crypto: ^3.0.6
+
+  # "Download everything": a file, and the platform's own way of
+  # putting a file somewhere the person will find it again.
+  path_provider: ^2.1.5
+  share_plus: ^10.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
