@@ -26,6 +26,7 @@ import { CertificateVerdict } from '../packages/shared/dist/index.js';
 import { issueCertificate, canonicalJson as denoCanonical, computeKeyId } from '../supabase/functions/api/crypto.ts';
 import { normaliseLicenseKey as denoNormalise, generateLicenseKey } from '../supabase/functions/api/license-key.ts';
 import { normaliseLicenseKey } from '../packages/shared/dist/license-key.js';
+import { readFile } from 'node:fs/promises';
 
 let failures = 0;
 const check = (ok, what, extra = '') => {
@@ -106,6 +107,10 @@ check(verifyCertificate(certificate, trust, {
 
 /* ---------------------------------------------------------- licence keys */
 
+/* The two facts every copy of the key rules has to agree on. */
+const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const BODY_LENGTH = 19;
+
 console.log('licence keys');
 for (let i = 0; i < 200; i += 1) {
   const key = generateLicenseKey();
@@ -122,51 +127,44 @@ const broken = 'QSRV-4K7QM-9XTV2-BR5HN-P83WD';
 check(normaliseLicenseKey(broken) === null && denoNormalise(broken) === null,
   'and both reject a key with a bad checksum');
 
-/* ------------------------------------------------- the vendor console's copy */
+/* --------------------------------------------- the vendor application's copy */
 
-console.log('the vendor console');
+console.log('the vendor application');
 {
   /*
-   * A third copy of the key rules lives inside the console page, because that
-   * page runs in a browser with no access to the repository. It is lifted back
-   * out of the built page and made to prove itself, rather than trusted.
+   * A third copy of the key rules lives in the vendor's own application, in
+   * Dart, because that application runs on a phone with no access to this
+   * repository. It used to live in a web page, which could be compiled and
+   * run here; Dart cannot, so the constants and the formula are read out of
+   * the source and compared to this one instead.
    *
-   * `new Function` on a string is normally a way to be exploited. What is being
-   * compiled here is this repository's own source, read from a file that is in
-   * the same commit as this test: anybody who can change it can already change
-   * what the build produces, so there is nothing here an attacker gains.
+   * That is weaker than running it — a formula can match and still be reached
+   * by different code — so it is not the whole story. `apps/vendor/test`
+   * pins the checksum against vectors produced by the implementation in
+   * `packages/shared`, which is the part that catches a real divergence. This
+   * catches the cheaper mistake: somebody editing one alphabet and not the
+   * other.
    */
-  const { CONSOLE_PAGE } = await import('../supabase/functions/console/page.ts');
-  const html = CONSOLE_PAGE({ url: 'https://example.supabase.co', anonKey: 'x' });
+  const dart = await readFile(
+    new URL('../apps/vendor/lib/data/licence_key.dart', import.meta.url), 'utf8');
 
-  const grab = (name) => {
-    const at = html.indexOf(`function ${name}(`);
-    if (at === -1) throw new Error(`the console has no ${name}()`);
-    let depth = 0;
-    for (let i = html.indexOf('{', at); i < html.length; i += 1) {
-      if (html[i] === '{') depth += 1;
-      else if (html[i] === '}') {
-        depth -= 1;
-        if (depth === 0) return html.slice(at, i + 1);
-      }
-    }
-    throw new Error(`${name}() is not closed`);
-  };
+  const alphabet = dart.match(/const alphabet = '([^']+)'/)?.[1];
+  check(alphabet === ALPHABET,
+    'the vendor application uses the same alphabet',
+    alphabet ? `it has ${alphabet}` : 'it has no alphabet at all');
 
-  const consoleKeys = new Function([
-    "const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';",
-    'const BODY_LENGTH = 19;',
-    grab('checksumChar'),
-    grab('generateLicenseKey'),
-    'return generateLicenseKey;',
-  ].join('\n'))();
+  const bodyLength = Number(dart.match(/const bodyLength = (\d+)/)?.[1]);
+  check(bodyLength === BODY_LENGTH,
+    'and the same body length',
+    Number.isNaN(bodyLength) ? 'it has none' : `it has ${bodyLength}`);
 
-  let bad = 0;
-  for (let i = 0; i < 200; i += 1) {
-    if (normaliseLicenseKey(consoleKeys()) === null) bad += 1;
-  }
-  check(bad === 0, '200 keys issued by the console pass the application checksum',
-    bad + ' were rejected');
+  /*
+   * The weighting is the part that makes a transposition detectable, and the
+   * part most likely to be "simplified" by somebody who does not know that.
+   */
+  check(/alphabet\.indexOf\(body\[i\]\) \* \(i \+ 2\)/.test(dart),
+    'and weights each character by its position, so a transposition is caught');
+  check(/sum % 32/.test(dart), 'and takes the sum modulo 32');
 }
 
 console.log(failures === 0

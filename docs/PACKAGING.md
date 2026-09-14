@@ -1,20 +1,26 @@
 # Packaging and releases
 
-Three things ship, and none of them is the repository. Each has its own folder
-under `packaging/`, its own build script, and its own README:
+Three things ship, and none of them is the repository.
 
-| Folder | Artifact | Who runs it |
+| Source | Artifact | Who runs it |
 |---|---|---|
-| [`developer/`](../packaging/developer/) | `QServe-Vendor-<version>-windows-x64.exe` | **you**, the vendor. The licence server that issues keys. A restaurant never runs this. |
-| [`restaurant/`](../packaging/restaurant/) | `QServe-<version>-windows-x64.exe` | the restaurant's computer. Server, console, six front-ends, packs — one file. |
-| [`phone/`](../packaging/phone/) | `QServe-Terminal-<version>.apk` | the restaurant's own phones and tablets. A window onto that computer. |
+| [`packaging/restaurant/`](../packaging/restaurant/) | `QServe-<version>-windows-x64.exe` | the restaurant's computer. Server, console, six front-ends, packs — one file. |
+| [`packaging/phone/`](../packaging/phone/) | `QServe-Terminal-<version>.apk` | the restaurant's own phones and tablets. A window onto that computer. |
+| [`apps/vendor/`](../apps/vendor/) | `QServe-Vendor-<version>-<abi>.apk`, `QServe-Vendor-<version>-windows-x64.zip` | **you**, the vendor. Where licences are issued. A restaurant never runs this. |
 
 ```
-npm run build:developer      # -> dist/developer/
 npm run build:restaurant     # -> dist/restaurant/
 npm run build:phone          # -> packaging/phone/app/build/outputs/apk/release/
+npm run build:vendor         # -> apps/vendor/build/
 npm run build:all
 ```
+
+The vendor's application is the odd one out and deliberately so. The other two
+are a Node runtime with a payload baked into it, because they are a server and
+a window onto a server. The vendor's is a Flutter application, because it is
+neither: it is one person's client of a cloud database, with no local network,
+nothing to serve, and no requirement to open without being installed — which is
+the requirement that makes the restaurant's front-ends web pages.
 
 The two Windows executables share everything from "stage a folder" onwards —
 fetch a Node runtime, zip the payload, bake both into it, stop Windows opening a
@@ -137,107 +143,35 @@ See [SECURITY.md](SECURITY.md).
 
 ---
 
-## The vendor's executable
+## The vendor's application
 
 ```
-node packaging/developer/build.mjs
+node tools/build-vendor-config.mjs      # needs QSERVE_VENDOR_EMAIL
+cd apps/vendor && flutter build apk --release --split-per-abi
+cd apps/vendor && flutter build windows --release
 ```
 
-Produces `dist/developer/QServe-Vendor-<version>-windows-x64.exe`. Same
-technique as the restaurant's and for the same reason — one file, no window —
-but this one is yours rather than a customer's, and it had no packaged form at
-all until recently. Running the licence server meant cloning the repository and
-knowing which npm script to type, which is a strange thing to ask of the person
-whose whole job is selling the software.
+Three APKs and a Windows folder, from one source. Split by architecture because
+one universal APK carries three machines' worth of code and weighs 50 MB, where
+each of the three is about seventeen.
 
-Two things it does that the restaurant build does not:
+`build-vendor-config.mjs` writes `apps/vendor/lib/config.dart` from
+`supabase/project.json` and the `QSERVE_VENDOR_EMAIL` secret: where the
+application talks, the publishable key it opens with, and whose account it is.
+That file is generated and not committed — the address and the key are public by
+design, and an email address in a public repository is one more than there needs
+to be. The release workflow refuses to publish without the secret, because an
+application with no account to sign in as refuses every password, and finding
+that out by installing it is the expensive way.
 
-**It makes its own signing key on first run**, into
-`%LOCALAPPDATA%\QServe Vendor\secrets\`, and then says so in a dialog nobody can
-miss. From a checkout that is `npm run keygen`, which is the right shape for
-somebody who already has a terminal open; a vendor who downloaded one .exe has
-not, and a licence server with no key looks like it works right up until the
-first sale. The public half lands beside it, ready for the `QSERVE_TRUSTED_KEYS`
-repository secret.
+There is nothing to keep running and nothing for a restaurant to depend on. The
+signing key lives in Supabase secrets; this application never sees it.
 
-**It listens on the network.** The restaurant server binds its console to
-loopback and only opens to the LAN once a licence is active; this one has to
-answer restaurants activating, so it binds where it is told. It is the only part
-of QServe that needs to be reachable from the internet, and only for activation
-and transfer — never during a service.
-
-The keygen tool is deliberately staged into this payload and deliberately kept
-out of the restaurant's: a restaurant should never be shipped code that mints
-its own activation certificates.
-
----
-
-## The vendor's executable
-
-\
-▸ preparing
-
-▸ installing runtime dependencies
-  $ npm install --omit=dev --no-audit --no-fund
-
-added 38 packages in 1m
-
-▸ staging the workspace packages
-
-▸ staging the licence server
-
-▸ checking the payload
-  8 required paths present
-
-▸ packing the payload
-  420 files, 1.5 MB compressed (66 compiler leftovers dropped)
-
-▸ fetching node 24.18.0 for windows-x64
-  $ powershell -NoProfile -Command Expand-Archive -Path 'D:QServeQServepackagingdeveloperuild
-ode-v24.18.0-win-x64.zip' -DestinationPath 'D:QServeQServepackagingdeveloperuild' -Force
-
-▸ building QServe-Vendor-1.0.7-windows-x64.exe
-  $ C:Program Files
-odejs
-ode.exe --experimental-sea-config D:QServeQServepackagingdeveloperuildsea-config.json
-  $ npx --yes postject D:QServeQServedistdeveloperQServe-Vendor-1.0.7-windows-x64.exe NODE_SEA_BLOB D:QServeQServepackagingdeveloperuildsea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
-[36mStart injection of NODE_SEA_BLOB in D:QServeQServedistdeveloperQServe-Vendor-1.0.7-windows-x64.exe...[0m
-[32m💉 Injection done![0m
-
-▸ removing the console window
-  console subsystem 3 → GUI subsystem 2
-
-▸ done: QServe-Vendor-1.0.7-windows-x64.exe (90 MB)
-
-  This one is yours, not a restaurant's. It makes its own signing key on
-  first run and tells you where — back that file up the same day.
-Produces . Same technique
-as the restaurant's and for the same reason — one file, no window — but this one
-is yours rather than a customer's, and it had no packaged form at all until
-recently. Running the licence server meant cloning the repository and knowing
-which npm script to type, which is a strange thing to ask of the person whose
-whole job is selling the software.
-
-Two things it does that the restaurant build does not:
-
-**It makes its own signing key on first run**, into
-, and then says so in a dialog nobody can
-miss. From a checkout that is , which is the right shape for
-somebody who already has a terminal open; a vendor who downloaded one .exe has
-not, and a licence server with no key looks like it works right up until the
-first sale. The public half lands beside it, ready for the
- repository secret.
-
-**It listens on the network.** The restaurant server binds its console to
-loopback and only opens to the LAN once a licence is active; this one has to
-answer restaurants activating, so it binds where it is told. It is the only part
-of QServe that needs to be reachable from the internet.
-
-The keygen tool is deliberately staged into this payload and deliberately kept
-out of the restaurant's: a restaurant should never be shipped code that mints
-its own activation certificates.
-
----
+**What was here before.** A Node executable that unpacked an HTML console and
+served it on `http://localhost`, and an Android flavour that pointed a WebView
+at the licence server's own console. The licence server moved into Supabase and
+took that console with it; the Android flavour went on shipping and went on
+answering `{"code":"NOT_FOUND"}` to anybody who installed it. Both are gone.
 
 ## The Android terminal
 

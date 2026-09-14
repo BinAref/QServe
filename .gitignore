@@ -1,7 +1,11 @@
 node_modules/
 dist/
 *.tsbuildinfo
-data/
+# The server's own data directory, at the root only. Unanchored, this was
+# `data/` anywhere at any depth — which silently swallowed
+# apps/vendor/lib/data/, the whole data layer of the vendor application, and
+# would have handed CI a checkout that could not build.
+/data/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

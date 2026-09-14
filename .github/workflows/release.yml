@@ -150,9 +150,6 @@ jobs:
           QSERVE_VENDOR_URL: ${{ secrets.QSERVE_VENDOR_URL }}
         run: node packaging/restaurant/build.mjs
 
-      - name: Build the vendor licence server
-        run: node packaging/developer/build.mjs
-
       - uses: actions/upload-artifact@v4
         with:
           name: windows
