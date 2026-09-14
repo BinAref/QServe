@@ -492,6 +492,7 @@
     "menu.empty_products": "This category has no products yet",
     "menu.from": "from",
     "menu.image": "Image",
+    "menu.image_remove": "Remove the image",
     "menu.item_notes": "Notes for the kitchen",
     "menu.max_select": "Choose up to {count}",
     "menu.min_select": "Choose at least {count}",

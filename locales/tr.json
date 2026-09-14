@@ -492,6 +492,7 @@
     "menu.empty_products": "Bu kategoride henüz ürün yok",
     "menu.from": "başlangıç",
     "menu.image": "Görsel",
+    "menu.image_remove": "Görseli kaldır",
     "menu.item_notes": "Mutfak için notlar",
     "menu.max_select": "En fazla {count} seçin",
     "menu.min_select": "En az {count} seçin",

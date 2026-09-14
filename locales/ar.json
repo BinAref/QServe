@@ -492,6 +492,7 @@
     "menu.empty_products": "لا توجد منتجات في هذا القسم بعد",
     "menu.from": "من",
     "menu.image": "الصورة",
+    "menu.image_remove": "إزالة الصورة",
     "menu.item_notes": "ملاحظات للمطبخ",
     "menu.max_select": "اختر حتى {count}",
     "menu.min_select": "اختر {count} على الأقل",

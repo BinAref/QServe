@@ -265,6 +265,8 @@ function productPanel() {
 }
 
 function openProductForm(product) {
+  const image = imageField(product);
+
   // Digits and one decimal point, refused at the keystroke, previewed as the
   // diner will see it — and the currency picked right beside the number.
   const price = moneyField({
@@ -311,7 +313,7 @@ function openProductForm(product) {
         h('span', {}, t('common.unavailable') + ' ✕'))),
 
     h('div', { class: 'qs-section-title' }, t('menu.image')),
-    imageField(product),
+    image.node,
 
     addons.length > 0
       ? h('div', {},
@@ -388,14 +390,13 @@ function openProductForm(product) {
             toast(t('error.validation'), 'error');
             return;
           }
-          if (uploadedAssetId !== undefined) payload.imageAssetId = uploadedAssetId;
+          if (image.value() !== undefined) payload.imageAssetId = image.value();
 
           const saved = await guard(() => product
             ? api.patch(`/api/menu/products/${product.id}`, payload)
             : api.post('/api/menu/products', payload));
           if (!saved) return;
 
-          uploadedAssetId = undefined;
           dialog.close();
           await render(currentContainer);
         },
@@ -410,43 +411,76 @@ function openProductForm(product) {
 
 /* ------------------------------------------------------------- images */
 
-let uploadedAssetId;
-
+/**
+ * The photograph of a dish: choose one, change it, or take it away.
+ *
+ * The choice is kept here, in the field, rather than in a variable the whole
+ * page shares. It used to be shared, and that is a quiet way to move a
+ * photograph onto the wrong dish: open one, pick a new picture, press Cancel,
+ * then edit any other dish and save — the abandoned picture went to that one.
+ * A field that answers for itself cannot do that, because it dies with the
+ * form it was drawn in.
+ *
+ * Untouched is `undefined` and is not sent at all, so saving a price change
+ * leaves the photograph exactly where it was. Taken away is `null`.
+ */
 function imageField(product) {
+  const original = product?.imageAssetId ?? null;
+  let choice;
+
   const preview = h('img', {
     class: 'product-thumb',
     style: { width: '96px', height: '96px' },
-    src: product?.imageAssetId ? `/assets/${product.imageAssetId}` : '',
     alt: '',
   });
 
-  return h('div', { class: 'qs-row' },
-    preview,
-    h('input', {
-      type: 'file',
-      accept: 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml',
-      onChange: async (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const bytes = await file.arrayBuffer();
-        const asset = await guard(() =>
-          api.upload(`/api/assets?kind=product`, bytes, file.type));
-        if (!asset) return;
-        uploadedAssetId = asset.id;
-        preview.src = `/assets/${asset.id}`;
-        toast(t('common.saved'), 'success');
-      },
-    }),
-    product?.imageAssetId
-      ? h('button', {
-          class: 'qs-btn qs-btn-ghost',
-          type: 'button',
-          onClick: () => {
-            uploadedAssetId = null;
-            preview.src = '';
-          },
-        }, t('common.delete'))
-      : null);
+  const picker = h('input', {
+    type: 'file',
+    accept: 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml',
+    onChange: async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const bytes = await file.arrayBuffer();
+      const asset = await guard(() =>
+        api.upload('/api/assets?kind=product', bytes, file.type));
+      // Emptied either way: after a failed upload, choosing the same file again
+      // has to count as a change or the picker looks broken.
+      picker.value = '';
+      if (!asset) return;
+      choice = asset.id;
+      draw();
+    },
+  });
+
+  // "Remove" rather than "Delete": the dialog already has a Delete, and that
+  // one deletes the dish.
+  const remove = h('button', {
+    class: 'qs-btn qs-btn-ghost',
+    type: 'button',
+    onClick: () => {
+      choice = null;
+      draw();
+    },
+  }, t('menu.image_remove'));
+
+  /*
+   * No picture is not an <img> with an empty src — that asks the browser for
+   * the page itself and draws a broken icon in the middle of the form.
+   */
+  function draw() {
+    const id = choice === undefined ? original : choice;
+    if (id) preview.src = `/assets/${id}`;
+    else preview.removeAttribute('src');
+    preview.hidden = !id;
+    remove.hidden = !id;
+  }
+  draw();
+
+  return {
+    node: h('div', { class: 'qs-row' }, preview, picker, remove),
+    /** `undefined` until somebody touches it, which is how it stays untouched. */
+    value: () => choice,
+  };
 }
 
 /* ------------------------------------------------------------- options */
