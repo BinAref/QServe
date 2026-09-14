@@ -150,6 +150,10 @@ export async function renderLanguages(container) {
   mount(container,
     pageHeader(t('languages.title'),
       h('button', {
+        class: 'qs-btn',
+        onClick: () => openMenuLanguage(container, languages),
+      }, t('languages.add_menu')),
+      h('button', {
         class: 'qs-btn qs-btn-primary',
         onClick: () => openLanguageEditor(container, null, languages),
       }, t('languages.add'))),
@@ -159,6 +163,113 @@ export async function renderLanguages(container) {
         h('p', {}, t('languages.subtitle'))),
       h('div', { class: 'qs-card qs-narrow' },
         h('div', { class: 'qs-rows' }, languages.map(row)))));
+}
+
+/**
+ * A language for the menu, and only for the menu.
+ *
+ * Translating the whole application is a real job: eight hundred strings, a
+ * translator, a file. Putting the menu in Russian for the tourists who come in
+ * every summer is not that job, and making somebody do the first in order to
+ * get the second is why menus end up in one language.
+ *
+ * So this writes a language pack with no interface strings at all and a
+ * fallback to the one the restaurant already uses. The till stays in Arabic;
+ * the menu gains a Russian column that dishes can be typed into. If somebody
+ * later wants the whole interface too, they translate the pack — this is the
+ * same kind of object, started empty.
+ */
+function openMenuLanguage(container, languages) {
+  /*
+   * The language the restaurant already runs in, which is the one every
+   * interface string will come from. It is read from the language list rather
+   * than from the system status: only the list knows which one is the default,
+   * and guessing `en` would tell an Arabic restaurant that its till is about to
+   * be in English.
+   */
+  const home = languages.find((entry) => entry.isDefault) ?? languages[0];
+  const fallback = home?.locale ?? 'en';
+
+  const codeInput = h('input', {
+    name: 'locale', required: true, maxlength: '35',
+    pattern: '[A-Za-z]{2,8}(-[A-Za-z0-9]{2,8})*', placeholder: 'ru',
+  });
+  const nameInput = h('input', {
+    name: 'name', required: true, maxlength: '60', placeholder: 'Русский',
+  });
+  const englishInput = h('input', {
+    name: 'englishName', required: true, maxlength: '60', placeholder: 'Russian',
+  });
+
+  /*
+   * Direction is a property of the language, not a preference, and getting it
+   * wrong is not subtle: an Arabic menu laid out left to right is unreadable.
+   * It is asked plainly rather than guessed from the code, because a guess
+   * would be right for the languages we thought of and silently wrong for the
+   * rest.
+   */
+  const directionSelect = h('select', { name: 'direction' },
+    h('option', { value: 'ltr' }, t('languages.direction_ltr')),
+    h('option', { value: 'rtl' }, t('languages.direction_rtl')));
+
+  const dialog = modal({
+    title: t('languages.add_menu'),
+    body: h('div', {},
+      h('p', { class: 'qs-muted qs-small' }, t('languages.add_menu_hint', {
+        language: home?.name ?? fallback,
+      })),
+      h('div', { class: 'qs-row' },
+        h('label', { class: 'qs-field' },
+          h('span', {}, t('languages.code')),
+          codeInput),
+        h('label', { class: 'qs-field' },
+          h('span', {}, t('languages.direction')),
+          directionSelect)),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('languages.name')),
+        nameInput),
+      h('label', { class: 'qs-field' },
+        h('span', {}, t('languages.english_name')),
+        englishInput)),
+    actions: [
+      h('button', { class: 'qs-btn', value: 'cancel' }, t('common.cancel')),
+      h('button', {
+        class: 'qs-btn qs-btn-primary',
+        onClick: async () => {
+          const locale = codeInput.value.trim();
+          if (!locale || !nameInput.value.trim() || !englishInput.value.trim()) {
+            toast(t('error.validation'), 'error');
+            return;
+          }
+          const bundle = {
+            $schema: 'qserve.translation.bundle.v1',
+            locale,
+            name: nameInput.value.trim(),
+            englishName: englishInput.value.trim(),
+            direction: directionSelect.value,
+            // Every interface string comes from the language the restaurant
+            // already runs in. Only the menu is new, and it is typed in the
+            // menu builder rather than pasted here.
+            fallback,
+            ui: {},
+            content: {},
+          };
+          const saved = await guard(() => api.post('/api/languages', {
+            bundle: JSON.stringify(bundle),
+            locale,
+            name: bundle.name,
+            englishName: bundle.englishName,
+            direction: bundle.direction,
+            enable: true,
+          }));
+          if (!saved) return;
+          dialog.close();
+          toast(t('languages.added', { name: bundle.name }), 'success');
+          await renderLanguages(container);
+        },
+      }, t('common.save')),
+    ],
+  });
 }
 
 /**
