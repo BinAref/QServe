@@ -391,8 +391,49 @@ export async function renderThemes(container) {
         h('div', { class: 'qs-rows' }, themes.map(row)))));
 }
 
+/**
+ * The theme editor.
+ *
+ * It used to be a JSON textarea. That is a fine tool for whoever wrote the
+ * token contract and a wall for the person who actually wants their menu to
+ * be green: an owner should not have to learn what "surfaceAlt" is, or that a
+ * missing comma means their restaurant has no theme.
+ *
+ * So the colours that matter are pickers, in the words a restaurant would use,
+ * and the menu is drawn next to them as they change. Everything else in the
+ * contract — spacing, motion, the component overrides — is inherited from the
+ * theme this one started as and never shown, because nobody has ever wanted to
+ * change the easing curve of a modal in order to open a restaurant.
+ *
+ * The full JSON is still there, behind a fold, for the case this is wrong.
+ */
+
+/** The handful worth putting in front of somebody, in the order they matter. */
+const THEME_COLOURS = [
+  ['primary', 'themes.colour_primary'],
+  ['background', 'themes.colour_background'],
+  ['surface', 'themes.colour_surface'],
+  ['text', 'themes.colour_text'],
+  ['textMuted', 'themes.colour_text_muted'],
+  ['border', 'themes.colour_border'],
+];
+
+const ROUNDNESS = [
+  ['sharp', 'themes.roundness_sharp', { sm: '0px', md: '0px', lg: '0px', pill: '999px' }],
+  ['soft', 'themes.roundness_soft', { sm: '6px', md: '10px', lg: '16px', pill: '999px' }],
+  ['round', 'themes.roundness_round', { sm: '10px', md: '18px', lg: '26px', pill: '999px' }],
+];
+
+/** A colour a picker can show: it only speaks #rrggbb. */
+function asHex(value, fallback) {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim())
+    ? value.trim()
+    : fallback;
+}
+
 function openThemeEditor(container, theme) {
   const isNew = theme === null;
+  let pack = null;
 
   const idInput = h('input', {
     name: 'id', required: true, maxlength: '32', pattern: '[a-z0-9\\-]{2,32}',
@@ -401,58 +442,171 @@ function openThemeEditor(container, theme) {
   const nameInput = h('input', {
     name: 'name', required: true, maxlength: '60', value: theme?.name ?? '',
   });
-  const paste = h('textarea', {
-    name: 'theme', rows: '16', spellcheck: 'false', class: 'qs-mono qs-small',
-    placeholder: '{ "$schema": "qserve.theme.v1", … }',
+
+  const scheme = h('select', { name: 'colorScheme' },
+    h('option', { value: 'light' }, t('themes.scheme_light')),
+    h('option', { value: 'dark' }, t('themes.scheme_dark')));
+
+  const preview = h('div', { class: 'theme-preview' });
+  const swatches = h('div', { class: 'theme-swatches' });
+  const advanced = h('textarea', {
+    name: 'theme', rows: '14', spellcheck: 'false', class: 'qs-mono qs-small',
   });
 
-  const loadPack = async (sourceId) => {
-    const pack = await guard(() => api.get(`/api/themes-authoring/${sourceId}/pack`));
+  /* --------------------------------------------------------- the preview */
+
+  /*
+   * The menu, drawn in the colours being chosen.
+   *
+   * Not a swatch grid: a swatch grid tells you what the colours are, and this
+   * has to tell you what the menu will look like. Every choice lands here
+   * immediately, because the question an owner is answering is "does this look
+   * right", and that question has no answer until they can see it.
+   */
+  const drawPreview = () => {
     if (!pack) return;
-    paste.value = pretty(pack);
-    await copyText(paste.value);
+    const c = pack.tokens.color;
+    const r = pack.tokens.radius ?? {};
+    preview.style.cssText = 'background:' + c.background + ';color:' + c.text
+      + ';border-color:' + c.border + ';border-radius:' + (r.lg ?? '16px');
+
+    mount(preview,
+      h('div', {
+        class: 'theme-preview-card',
+        style: 'background:' + c.surface + ';border:1px solid ' + c.border
+          + ';border-radius:' + (r.md ?? '10px'),
+      },
+        h('div', { class: 'theme-preview-title', style: 'color:' + c.text },
+          t('themes.preview_dish')),
+        h('div', { class: 'theme-preview-note', style: 'color:' + c.textMuted },
+          t('themes.preview_note')),
+        h('div', { class: 'theme-preview-row' },
+          h('span', { style: 'color:' + c.primary + ';font-weight:650' }, '45.00'),
+          h('button', {
+            type: 'button',
+            style: 'background:' + c.primary + ';color:' + (c.primaryContrast ?? '#fff')
+              + ';border:0;border-radius:' + (r.sm ?? '6px') + ';padding:8px 14px;font:inherit',
+          }, t('menu.add_to_order')))));
   };
 
-  // Editing an existing theme starts from its own tokens; a new one starts from
-  // whichever theme is in use, because that is the one the owner is looking at.
+  const drawSwatches = () => {
+    if (!pack) return;
+    mount(swatches, THEME_COLOURS.map(([key, labelKey]) => {
+      const current = asHex(pack.tokens.color[key], '#000000');
+      const picker = h('input', {
+        type: 'color', value: current,
+        onInput: (event) => {
+          pack.tokens.color[key] = event.target.value;
+          // Two tokens are the same decision wearing different names: an owner
+          // choosing an accent has not also agreed to an unreadable focus ring.
+          if (key === 'primary') {
+            pack.tokens.color.focusRing = event.target.value;
+            pack.tokens.color.lit = event.target.value;
+          }
+          advanced.value = pretty(pack);
+          drawPreview();
+        },
+      });
+      return h('label', { class: 'theme-swatch' },
+        picker,
+        h('span', {}, t(labelKey)));
+    }));
+  };
+
+  const roundness = h('div', { class: 'theme-roundness' },
+    ROUNDNESS.map(([value, labelKey, radii]) => h('button', {
+      type: 'button', class: 'qs-btn qs-btn-sm',
+      onClick: () => {
+        if (!pack) return;
+        pack.tokens.radius = { ...pack.tokens.radius, ...radii };
+        advanced.value = pretty(pack);
+        drawPreview();
+      },
+    }, t(labelKey))));
+
+  /* ------------------------------------------------------------ loading */
+
+  const loadPack = async (sourceId) => {
+    const loaded = await guard(() => api.get('/api/themes-authoring/' + sourceId + '/pack'));
+    if (!loaded) return;
+    pack = loaded;
+    pack.tokens = pack.tokens ?? {};
+    pack.tokens.color = pack.tokens.color ?? {};
+    scheme.value = pack.colorScheme === 'dark' ? 'dark' : 'light';
+    advanced.value = pretty(pack);
+    drawSwatches();
+    drawPreview();
+  };
+
+  // Editing starts from this theme's own tokens; a new one starts from whichever
+  // theme is in use, because that is the one the owner is looking at.
   void loadPack(theme?.id ?? 'light');
 
+  scheme.addEventListener('change', () => {
+    if (!pack) return;
+    pack.colorScheme = scheme.value;
+    advanced.value = pretty(pack);
+  });
+
+  // The fold: whoever wants the whole contract can have it, and typing in it
+  // wins over the pickers, because somebody who opened this knows what they
+  // are doing.
+  advanced.addEventListener('input', () => {
+    try {
+      const parsed = JSON.parse(advanced.value);
+      if (parsed && typeof parsed === 'object' && parsed.tokens?.color) {
+        pack = parsed;
+        drawSwatches();
+        drawPreview();
+      }
+    } catch {
+      // Half-typed JSON is not an error, it is somebody in the middle of a word.
+    }
+  });
+
   const dialog = modal({
-    title: isNew ? t('themes.add') : `${t('common.edit')} — ${theme.name}`,
-    body: h('div', { class: 'pack-editor' },
-      h('div', { class: 'qs-grid qs-grid-2' },
-        h('label', { class: 'qs-field' },
-          h('span', {}, t('themes.id')), idInput,
-          h('small', { class: 'qs-muted' }, t('themes.id_help'))),
-        h('label', { class: 'qs-field' },
-          h('span', {}, t('themes.name')), nameInput)),
+    title: isNew ? t('themes.add') : t('themes.edit'),
+    body: h('div', { class: 'theme-editor' },
+      h('div', { class: 'qs-row' },
+        h('label', { class: 'qs-field' }, h('span', {}, t('common.name')), nameInput),
+        h('label', { class: 'qs-field' }, h('span', {}, t('themes.id')), idInput)),
+      h('label', { class: 'qs-field' }, h('span', {}, t('themes.scheme')), scheme),
 
-      h('p', { class: 'qs-muted qs-small' }, t('themes.tokens_explain')),
-      h('label', { class: 'qs-field' },
-        h('span', {}, t('themes.paste')), paste)),
+      h('div', {},
+        h('div', { class: 'qs-section-title' }, t('themes.colours')),
+        swatches,
+        h('div', { class: 'qs-section-title' }, t('themes.roundness')),
+        roundness),
 
+      h('div', {},
+        h('div', { class: 'qs-section-title' }, t('themes.preview')),
+        preview),
+
+      h('details', { class: 'qs-details' },
+        h('summary', {}, t('themes.advanced')),
+        advanced)),
     actions: [
       h('button', { class: 'qs-btn', value: 'cancel' }, t('common.cancel')),
       h('button', {
         class: 'qs-btn qs-btn-primary',
-        value: 'save',
-        onClick: async (event) => {
-          event.preventDefault();
+        onClick: async () => {
+          let parsed;
           try {
-            JSON.parse(paste.value);
+            parsed = JSON.parse(advanced.value);
           } catch {
-            toast(t('languages.invalid_json'), 'error');
+            toast(t('themes.invalid_json'), 'error');
             return;
           }
-          const result = await guard(() => api.post('/api/themes-authoring', {
-            theme: paste.value,
-            id: idInput.value.trim(),
-            name: nameInput.value.trim(),
+          parsed.id = idInput.value.trim();
+          parsed.name = nameInput.value.trim();
+          parsed.colorScheme = scheme.value;
+
+          const saved = await guard(() => api.post('/api/themes-authoring', {
+            id: parsed.id, name: parsed.name, theme: parsed,
           }));
-          if (!result) return;
-          toast(t('themes.saved'), 'success');
-          dialog.close('save');
-          await refreshAll();
+          if (!saved) return;
+          dialog.close();
+          await renderThemes(container);
         },
       }, t('common.save')),
     ],

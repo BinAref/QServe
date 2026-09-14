@@ -565,3 +565,54 @@
 .import-row:hover { background: var(--qs-color-surface-alt); }
 .import-row input { margin-block-start: 3px; flex: none; }
 .import-row p { margin: 0; }
+
+/* ------------------------------------------------------------ the theme */
+
+.theme-editor { display: grid; gap: var(--qs-spacing-md); }
+
+/*
+ * Colours as colours. A hex field tells somebody what a colour is called; a
+ * swatch tells them what it looks like, which is the question being asked.
+ */
+.theme-swatches { display: flex; flex-wrap: wrap; gap: var(--qs-spacing-sm); }
+.theme-swatch {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--qs-color-border); border-radius: var(--qs-radius-md);
+  background: var(--qs-color-surface-alt); font-size: var(--qs-typography-size-sm);
+}
+.theme-swatch input[type="color"] {
+  inline-size: 34px; block-size: 34px; padding: 0; flex: none; cursor: pointer;
+  border: 1px solid var(--qs-color-border); border-radius: var(--qs-radius-sm);
+  background: none;
+}
+.theme-roundness { display: flex; gap: var(--qs-spacing-sm); flex-wrap: wrap; }
+
+/*
+ * The menu itself, in the colours being chosen — not a swatch grid. "Does this
+ * look right" has no answer until somebody can see the thing they are asking
+ * about.
+ */
+.theme-preview {
+  padding: var(--qs-spacing-md);
+  border: 1px solid var(--qs-color-border);
+  transition: background var(--qs-motion-fast) var(--qs-motion-ease-standard);
+}
+.theme-preview-card { padding: var(--qs-spacing-md); }
+.theme-preview-title { font-weight: var(--qs-typography-weight-medium); }
+.theme-preview-note { font-size: var(--qs-typography-size-sm); margin-block: 2px 10px; }
+.theme-preview-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/*
+ * On anything wider than a phone the preview sits beside the colours.
+ *
+ * Picking a colour and then scrolling to see what it did is two actions for
+ * one question, and the answer stops being obvious by the time you arrive.
+ */
+@media (min-width: 720px) {
+  .theme-editor { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .theme-editor > .qs-row,
+  .theme-editor > .qs-field,
+  .theme-editor > details { grid-column: 1 / -1; }
+  .theme-preview { position: sticky; top: 0; }
+}

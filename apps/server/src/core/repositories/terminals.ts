@@ -103,16 +103,31 @@ export class TerminalRepository {
   /**
    * The terminal a scanned code belongs to.
    *
-   * The token is the whole of the link, so this is the lookup a scan performs.
-   * An exact match on a 32-character random string is not a comparison anybody
-   * can walk: there is nothing to guess and nothing in the URL that says which
-   * table it opens.
+   * The token is the whole of the link, so this is the lookup a scan performs,
+   * and it is reachable by anybody on the restaurant's Wi-Fi.
+   *
+   * `WHERE enrol_token = ?` would have been the obvious way to write it and it
+   * gives away a little: SQL string comparison stops at the first byte that
+   * differs, which is the shape every timing attack is built on. The signal
+   * would be buried under network jitter and a B-tree walk, and a 192-bit
+   * token is not being guessed byte by byte in any case — but "probably too
+   * small to measure" is a bad reason to hand somebody a measurement.
+   *
+   * A restaurant has tens of stations, not millions, so the candidates are
+   * read and compared in constant time. The cost is a scan of a tiny table on
+   * a path taken when somebody points a camera at a card.
    */
   getByEnrolToken(token: string): TerminalRow | undefined {
     if (token.length < 16) return undefined;
-    return this.db.prepare('SELECT * FROM terminals WHERE enrol_token = ?').get(token) as
-      | TerminalRow
-      | undefined;
+    const rows = this.db.prepare('SELECT * FROM terminals').all() as TerminalRow[];
+
+    let found: TerminalRow | undefined;
+    for (const row of rows) {
+      // Every row is compared, and the loop does not stop early: returning as
+      // soon as it matches would leak the position of the match.
+      if (constantTimeEquals(row.enrol_token, token)) found = row;
+    }
+    return found;
   }
 
   list(type?: TerminalType): TerminalRow[] {
