@@ -181,44 +181,119 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      # One build, two flavours: the restaurant's terminal and the vendor's
-      # console. Same source — what differs is the name, which server it points
-      # at, and that the vendor's asks for a code before it opens.
-      # The vendor build is told where its licence server is and what code it
-      # opens with. Both come from repository secrets rather than from the
-      # source: an .apk can be taken apart by whoever holds it, and a value
-      # written into this repository would additionally be readable by everyone
-      # who can see the repository, which is a much larger set of people.
-      # Absent, the vendor app asks for an address and ships unlocked.
-      - name: Build both apps
+      # The restaurant's terminal, and only that one.
+      #
+      # This used to build a second flavour for the vendor as well: the same
+      # WebView, pointed at the licence server's own console. There is no such
+      # console any more — it moved into Supabase, and the flavour went on
+      # opening `<vendor-url>/admin`, which answers "Requested function was not
+      # found" and had done since the move. The vendor's application is now
+      # apps/vendor, built below, and is not a browser in a box.
+      - name: Build the restaurant terminal
         working-directory: packaging/phone
-        env:
-          QSERVE_VENDOR_URL: ${{ secrets.QSERVE_VENDOR_URL }}
-          QSERVE_VENDOR_CODE: ${{ secrets.QSERVE_VENDOR_CODE }}
-        run: gradle --no-daemon assembleRelease
+        run: gradle --no-daemon assembleRestaurantRelease
 
-      - name: Name them after the version
+      - name: Name it after the version
         shell: bash
         run: |
           version=$(node -p "require('./package.json').version")
-          mkdir -p dist/phone dist/developer
+          mkdir -p dist/phone
           cp packaging/phone/app/build/outputs/apk/restaurant/release/app-restaurant-release.apk \
              "dist/phone/QServe-Terminal-${version}.apk"
-          # With the vendor's other things, because that is who it is for.
-          cp packaging/phone/app/build/outputs/apk/developer/release/app-developer-release.apk \
-             "dist/developer/QServe-Vendor-Terminal-${version}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: |
-            dist/phone/*.apk
-            dist/developer/*.apk
+          path: dist/phone/*.apk
+          if-no-files-found: error
+
+  vendor:
+    name: The vendor application
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Pinned, for the same reason everything else here is: a toolchain that
+      # moves on its own turns a reproducible build into a weather report.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.1'
+          channel: stable
+          cache: true
+
+      # Where it talks, the key it opens with, and whose account it is. The
+      # first two are public and come from supabase/project.json; the email is
+      # a secret only because an address in a public repository is an address
+      # in a public repository.
+      - name: Write its configuration
+        env:
+          QSERVE_VENDOR_EMAIL: ${{ secrets.QSERVE_VENDOR_EMAIL }}
+        run: node tools/build-vendor-config.mjs
+
+      - name: Refuse to publish an application with nobody to sign in as
+        if: github.event_name == 'push' || inputs.tag != ''
+        env:
+          QSERVE_VENDOR_EMAIL: ${{ secrets.QSERVE_VENDOR_EMAIL }}
+        shell: bash
+        run: |
+          if [ -z "$QSERVE_VENDOR_EMAIL" ]; then
+            echo "::error::no QSERVE_VENDOR_EMAIL — every password would be refused"
+            exit 1
+          fi
+          echo "it signs in as a real account"
+
+      - name: Check and test it
+        working-directory: apps/vendor
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      # Split by architecture: one 50 MB file that carries three machines'
+      # worth of code, or three files of about seventeen. A vendor installing
+      # this on their own phone downloads one of them.
+      - name: Build the Android application
+        working-directory: apps/vendor
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build the Windows application
+        working-directory: apps/vendor
+        run: flutter build windows --release
+
+      - name: Collect them
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          mkdir -p dist/vendor
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "apps/vendor/build/app/outputs/flutter-apk/app-$abi-release.apk" \
+               "dist/vendor/QServe-Vendor-${version}-${abi}.apk"
+          done
+          # Windows is a folder, not a file: the exe needs the engine and the
+          # assets beside it. One zip, so there is one thing to download.
+          cd apps/vendor/build/windows/x64/runner/Release
+          7z a -tzip "$GITHUB_WORKSPACE/dist/vendor/QServe-Vendor-${version}-windows-x64.zip" ./*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vendor
+          path: dist/vendor/*
           if-no-files-found: error
 
   publish:
     name: Publish the release
-    needs: [windows, android]
+    needs: [windows, android, vendor]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -246,7 +321,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          find artifacts -type f \( -name '*.exe' -o -name '*.apk' \) -exec cp {} dist/ \;
+          find artifacts -type f \( -name '*.exe' -o -name '*.apk' -o -name '*.zip' \)             -exec cp {} dist/ \;
           ls -l dist
 
       - name: Publish

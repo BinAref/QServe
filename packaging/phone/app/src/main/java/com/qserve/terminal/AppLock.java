@@ -56,12 +56,6 @@ final class AppLock {
      * phone, which is what it is for. It is not a secret, and the licence
      * server behind it has its own sign-in that is.
      */
-    static void seedFromBuild(Context context, String code) {
-        if (code == null || code.length() < MIN_LENGTH) return;
-        if (isSet(context)) return;
-        set(context, code);
-    }
-
     static boolean isSet(Context context) {
         return prefs(context).getString(KEY_HASH, null) != null;
     }

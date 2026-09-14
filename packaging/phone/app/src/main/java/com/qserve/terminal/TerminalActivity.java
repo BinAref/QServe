@@ -99,8 +99,6 @@ public class TerminalActivity extends ComponentActivity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        // Before the guard below can ask for a code, in case this build ships one.
-        AppLock.seedFromBuild(this, BuildConfig.VENDOR_CODE);
         setContentView(R.layout.activity_terminal);
 
         web = findViewById(R.id.web);
@@ -113,17 +111,6 @@ public class TerminalActivity extends ComponentActivity {
         wireFieldActions();
         wireAppearance();
         arrive();
-
-        /*
-         * The vendor's build has no station codes to read: its server issues
-         * licences, it does not print QR cards. Offering a camera button that
-         * can only ever fail is worse than offering nothing.
-         */
-        if (BuildConfig.BUILD_FOR_VENDOR) {
-            scan.setVisibility(View.GONE);
-            // "or type it" with nothing above it to be an alternative to.
-            findViewById(R.id.or_divider).setVisibility(View.GONE);
-        }
 
         // A kitchen screen that sleeps is a kitchen screen that misses a
         // ticket, and a table's menu that sleeps mid-order loses the order.
@@ -243,18 +230,6 @@ public class TerminalActivity extends ComponentActivity {
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_SHOW_SETUP, false)) {
             address.setText(prefs().getString(KEY_ADDRESS, ""));
             return;
-        }
-
-        /*
-         * A build that was told where it belongs goes there.
-         *
-         * The vendor has one licence server, so the address screen would be a
-         * question with one answer. Remembered like a typed one, so "point at a
-         * different server" still works and still sticks.
-         */
-        if (prefs().getString(KEY_ADDRESS, null) == null
-            && !BuildConfig.VENDOR_URL.isEmpty()) {
-            remember(BuildConfig.VENDOR_URL);
         }
 
         String saved = prefs().getString(KEY_ADDRESS, null);
@@ -555,25 +530,11 @@ public class TerminalActivity extends ComponentActivity {
         return here != null && here.equals(there);
     }
 
-    /**
-     * Where a typed address actually leads.
-     *
-     * The licence server answers its console at /admin and redirects / to it,
-     * so a bare address works — but only by a redirect, and only for the root.
-     * Asking for the console outright means a vendor who typed an address with
-     * a path on the end still lands on the console rather than on whatever
-     * they typed.
-     */
-    private String consoleUrl(String base) {
-        if (!BuildConfig.BUILD_FOR_VENDOR) return base;
-        return base.endsWith("/admin") ? base : base + "/admin";
-    }
-
     private void open(String url) {
         setup.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
         loadedHost = hostOf(url);
-        web.loadUrl(consoleUrl(url));
+        web.loadUrl(url);
 
         /*
          * From here the device is a station, and a station has to keep

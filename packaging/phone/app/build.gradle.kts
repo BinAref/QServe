@@ -17,66 +17,32 @@ android {
     }
 
     buildFeatures {
-        // For BUILD_FOR_VENDOR below. Off by default since AGP 8.
+        // BuildConfig.VERSION_NAME, which the station notification reads.
+        // Off by default since AGP 8.
         buildConfig = true
     }
 
     /*
-     * Two apps, one source.
+     * One audience: the restaurant.
      *
-     * A restaurant's phone and the vendor's phone do the same job — a window
-     * onto a QServe server, remembered, with a QR scanner and a clipboard the
-     * page cannot have for itself. What differs is which server, what it is
-     * called, and that the vendor's holds the power to issue licences and so
-     * asks for a code before it opens.
+     * This app is a window onto a QServe server — remembered, with a QR
+     * scanner and a clipboard the page cannot have for itself.
      *
-     * Flavours rather than a second project: everything that is the same stays
-     * the same file, and the differences are a handful of strings and one
-     * boolean. Two separate codebases would have drifted by the second change.
+     * There was a second flavour here, for the vendor: the same WebView,
+     * pointed at the licence server's own console at `<vendor-url>/admin`.
+     * That console moved into Supabase and the address stopped existing, but
+     * the flavour went on shipping and went on answering "Requested function
+     * was not found" to anybody who installed it. The vendor's application is
+     * `apps/vendor` now, written in Flutter, and is not a browser in a box.
+     *
+     * The dimension stays because the restaurant's APK is named after it, and
+     * a release is easier to read than to rename.
      */
     flavorDimensions += "audience"
     productFlavors {
         create("restaurant") {
             dimension = "audience"
             applicationId = "com.qserve.terminal"
-            buildConfigField("boolean", "BUILD_FOR_VENDOR", "false")
-            // A restaurant's terminal is told where it belongs by the station
-            // code it scans, so there is nothing to bake in here.
-            buildConfigField("String", "VENDOR_URL", "\"\"")
-            buildConfigField("String", "VENDOR_CODE", "\"\"")
-        }
-        create("developer") {
-            dimension = "audience"
-            // A different id on purpose: a vendor testing against a restaurant
-            // installs both, and one must not replace the other.
-            applicationId = "com.qserve.vendor"
-            buildConfigField("boolean", "BUILD_FOR_VENDOR", "true")
-
-            /*
-             * Where this build goes, and the code it opens with.
-             *
-             * A restaurant's terminal has to be told which restaurant it belongs
-             * to, because there are many of them and the app cannot know. The
-             * vendor has exactly one licence server — their own — so asking them
-             * for its address every time they install the app is asking a
-             * question with one possible answer. Baked in at build time, the app
-             * opens straight onto the console.
-             *
-             * Both come from outside this file and neither has a default. They
-             * are read from gradle properties or the environment, which is how
-             * the release workflow passes them in from repository secrets —
-             * because an .apk can be taken apart by anyone who has it, and a
-             * value written here would additionally be readable by anyone who
-             * can see this repository, which is a different and larger set of
-             * people. Absent, the app simply asks, as it did before.
-             */
-            val vendorUrl = (project.findProperty("qserve.vendor.url") as String?)
-                ?: System.getenv("QSERVE_VENDOR_URL") ?: ""
-            val vendorCode = (project.findProperty("qserve.vendor.code") as String?)
-                ?: System.getenv("QSERVE_VENDOR_CODE") ?: ""
-
-            buildConfigField("String", "VENDOR_URL", "\"${vendorUrl.trim()}\"")
-            buildConfigField("String", "VENDOR_CODE", "\"${vendorCode.trim()}\"")
         }
     }
 
