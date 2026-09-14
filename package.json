@@ -21,7 +21,7 @@
     "validate:themes": "node tools/validate-themes.mjs",
     "validate:audit": "node tools/validate-audit-labels.mjs",
     "validate:version": "node tools/validate-version.mjs",
-    "validate": "npm run validate:tracked && npm run validate:syntax && npm run validate:i18n && npm run validate:themes && npm run validate:audit && npm run validate:version && npm run validate:supabase",
+    "validate": "npm run validate:tracked && npm run validate:chars && npm run validate:syntax && npm run validate:i18n && npm run validate:themes && npm run validate:audit && npm run validate:version && npm run validate:supabase",
     "start": "node apps/server/dist/main.js",
     "start:license-server": "node apps/license-server/dist/main.js",
     "dev": "npm run build && npm run start",
@@ -34,7 +34,8 @@
     "build:all": "npm run build:restaurant && npm run build:phone && npm run build:vendor",
     "validate:supabase": "node tools/validate-supabase-parity.mjs",
     "validate:syntax": "node tools/validate-syntax.mjs",
-    "validate:tracked": "node tools/validate-tracked.mjs"
+    "validate:tracked": "node tools/validate-tracked.mjs",
+    "validate:chars": "node tools/validate-control-characters.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
