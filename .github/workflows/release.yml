@@ -264,6 +264,16 @@ jobs:
         working-directory: apps/vendor
         run: flutter build apk --release --split-per-abi
 
+      # What the runner actually has. The first attempt at this job failed
+      # with CMake choosing "Visual Studio 16 2019" and then not finding it,
+      # which is what Flutter's toolchain detection returning nothing looks
+      # like from the outside.
+      - name: What this machine has
+        run: |
+          flutter doctor -v
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installerswhere.exe" -products * -format value -property displayName
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installerswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+
       - name: Build the Windows application
         working-directory: apps/vendor
         run: flutter build windows --release
